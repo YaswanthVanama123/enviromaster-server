@@ -1,0 +1,45 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "start:pm2": "pm2 start ecosystem.config.cjs --env production",
+    "stop:pm2": "pm2 stop ecosystem.config.cjs",
+    "restart:pm2": "pm2 restart ecosystem.config.cjs",
+    "logs:pm2": "pm2 logs enviro-backend",
+    "monitor:pm2": "pm2 monit",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "build:docker": "docker build -t enviro-backend .",
+    "run:docker": "docker run -p 5000:5000 --env-file .env enviro-backend"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "csv-parse": "^6.2.1",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
+    "helmet": "^7.1.0",
+    "joi": "^17.12.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.6.1",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "mustache": "^4.2.0",
+    "nodemailer": "^7.0.12",
+    "puppeteer": "^22.15.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.11"
+  }
+}

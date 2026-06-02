@@ -1,0 +1,360 @@
+\documentclass[10pt]{article}
+
+% Slightly smaller bottom margin so everything fits on 1 page
+\usepackage[top=1.3cm,bottom=1.3cm,left=1.4cm,right=1.4cm]{geometry}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{helvet}
+\usepackage{tabularx}
+\usepackage{array}
+\renewcommand{\familydefault}{\sfdefault}
+
+% ---- Colors ----
+\definecolor{emred}{RGB}{228,0,43}
+
+\pagestyle{empty}
+
+% Flex-style column shortcuts
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+% Small inline blank (for patterns like "@ ___  $ ___")
+\newcommand{\sblank}{\underline{\hspace{0.6cm}}}
+
+\begin{document}
+
+%==================== TOP HEADER BLOCK ====================
+
+\noindent
+\begin{minipage}[c]{0.20\textwidth}
+  \centering
+  \includegraphics[width=0.75\linewidth]{images/Envimaster.png}
+\end{minipage}%
+\hspace{0.6cm}
+\begin{minipage}[c]{0.75\textwidth}
+  \centering
+  {\bfseries\normalsize\textcolor{emred}{Customer Update Addendum}\par}
+
+  \vspace{0.3em}
+
+  \footnotesize
+  \renewcommand{\arraystretch}{1.15}%
+  \begin{tabularx}{\linewidth}{@{}lX lX@{}}
+    \textbf{\textcolor{emred}{CUSTOMER NAME:}} &
+      \hrulefill &
+    \textbf{\textcolor{emred}{CUSTOMER CONTACT:}} &
+      \hrulefill \\[0.12em]
+
+    \textbf{\textcolor{emred}{CUSTOMER NUMBER:}} &
+      \hrulefill &
+    \textbf{\textcolor{emred}{POC EMAIL:}} &
+      \hrulefill \\[0.12em]
+
+    & &
+    \textbf{\textcolor{emred}{POC PHONE:}} &
+      \hrulefill \\
+  \end{tabularx}
+\end{minipage}
+
+%==================== PRODUCTS TITLE BAR ====================
+
+\vspace{1.0em}
+
+\noindent
+\fcolorbox{emred}{emred}{%
+  \parbox{0.98\textwidth}{%
+    \centering
+    \bfseries\footnotesize\textcolor{white}{PRODUCTS}%
+  }%
+}
+
+\vspace{0.15em}
+
+%==================== PRODUCTS TABLE ====================
+
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.25}
+
+\noindent
+\begin{tabularx}{0.98\textwidth}{|
+    Y | C{1.4cm} | Y | C{0.9cm} | C{1.6cm} | C{2.0cm} |
+    Y | C{0.9cm} | C{1.4cm} | Y |}
+  \hline
+  \textbf{\textcolor{emred}{Products}} &
+  \textbf{\textcolor{emred}{Amount Per Unit}} &
+  \textbf{\textcolor{emred}{Dispensers}} &
+  \textbf{\textcolor{emred}{Qty}} &
+  \textbf{\textcolor{emred}{Warranty Rate}} &
+  \textbf{\textcolor{emred}{Replacement Rate/Install}} &
+  \textbf{\textcolor{emred}{Products}} &
+  \textbf{\textcolor{emred}{Qty}} &
+  \textbf{\textcolor{emred}{Amount}} &
+  \textbf{\textcolor{emred}{Frequency of Service}} \\
+  \hline
+
+  EM Proprietary JRT Tissue &
+  \$ &
+  EM Proprietary Twin JRT &
+  &
+  \$ &
+  \$ &
+  EM Urinal Mat &
+  &
+  \$ &
+  \\ \hline
+
+  EM Proprietary Hardwood Natural &
+  \$ &
+  EM Proprietary Towel Mechanical &
+  &
+  \$ &
+  \$ &
+  EM Commode Mat &
+  &
+  \$ &
+  \\ \hline
+
+  EM Proprietary Hardwood White &
+  \$ &
+  EM Proprietary Towel Hybrid &
+  &
+  \$ &
+  \$ &
+  Bowl Clip &
+  &
+  \$ &
+  \\ \hline
+
+  Center Pull Towels &
+  \$ &
+  Center Pull Towel Dispenser &
+  &
+  \$ &
+  \$ &
+  Wave 3D Urinal Screen &
+  &
+  \$ &
+  \\ \hline
+
+  Multi-Fold Natural &
+  \$ &
+  Multi-Fold Dispenser &
+  &
+  \$ &
+  \$ &
+  Splash Hog Urinal Screen &
+  &
+  \$ &
+  \\ \hline
+
+  Seat Cover Sleeve &
+  \$ &
+  Seat Cover Dispenser &
+  &
+  \$ &
+  \$ &
+  Surefoot EZ &
+  &
+  \$ &
+  \\ \hline
+
+  Grit Soap &
+  \$ &
+  Grit Soap Dispenser / SaniPod Receptacle &
+  &
+  \$ &
+  \$ &
+  Daily / Dish Detergent &
+  &
+  \$ &
+  \\ \hline
+
+\end{tabularx}
+
+%==================== SERVICES TITLE BAR ====================
+
+\vspace{1.0em}
+
+\noindent
+\fcolorbox{emred}{emred}{%
+  \parbox{0.98\textwidth}{%
+    \centering
+    \bfseries\footnotesize\textcolor{white}{SERVICES}%
+  }%
+}
+
+\vspace{0.45em}
+
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+
+% ----------------------------------------------------------
+%   SERVICES: 4 columns, two rows
+% ----------------------------------------------------------
+
+\noindent
+\begin{tabularx}{0.98\textwidth}{@{}X X X X@{}}
+
+% ================= ROW 1 BLOCK 1 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{RESTROOM \& HYGIENE}}\\[0.25em]
+  Restrooms\hrulefill\\
+  Bowls\hrulefill\\
+  Urinals\hrulefill\\
+  Sinks\hrulefill\\[0.25em]
+  \textbf{Total Sani Charge \$}\hrulefill\\
+  Frequency\hrulefill
+\end{minipage}
+&
+% ================= ROW 1 BLOCK 2 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{FOAMING DRAIN}}\\[0.25em]
+  Kitchen\hrulefill\\
+  Restrooms\hrulefill\\
+  Bar Area\hrulefill\\
+  Total Drains\hrulefill\\[0.25em]
+  \textbf{Foaming Drain Charge \$}\hrulefill\\
+  Frequency\hrulefill
+\end{minipage}
+&
+% ================= ROW 1 BLOCK 3 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{SCRUB SERVICE}}\\[0.25em]
+  No. of Rooms\hrulefill\\
+  Square Footage\hrulefill\\
+  Tiles (Small/Large)\hrulefill\\[0.25em]
+  \textbf{Sani-Scrub Charge \$}\hrulefill\\
+  Frequency\hrulefill
+\end{minipage}
+&
+% ================= ROW 1 BLOCK 4 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{HAND SANITIZER}}\\[0.25em]
+  No. of Sanitizers\hrulefill\\
+  \textbf{Sanitizer Charge \$}\hrulefill\\
+  Frequency\hrulefill
+\end{minipage}
+\\[2.3em] % bigger gap before MICROMAX FLOOR row
+
+% ================= ROW 2 BLOCK 1 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{MICROMAX FLOOR}}\\[0.35em]
+  No. of Rooms @ \sblank{} \$\sblank{}\\
+  MicroMax Frequency\hrulefill
+\end{minipage}
+&
+% ================= ROW 2 BLOCK 2 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{RPM WINDOW}}\\[0.35em]
+  No. of Windows @ \sblank{} \$\sblank{}\\
+  RPM Frequency\hrulefill
+\end{minipage}
+&
+% ================= ROW 2 BLOCK 3 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{SANIPOD}}\\[0.35em]
+  No. of Fem Bins @ \sblank{} \$\sblank{}\\
+  SaniPod Frequency\hrulefill
+\end{minipage}
+&
+% ================= ROW 2 BLOCK 4 =================
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{\textcolor{emred}{TRIP CHARGE}}\\[0.35em]
+  Trip Charge \$\hrulefill
+\end{minipage}
+\\
+\end{tabularx}
+
+%==================== REFRESH POWER SCRUB (BORDERED TABLE) ====================
+
+\vspace{1.0em}
+
+\noindent
+\begin{tabularx}{0.98\textwidth}{|lX|lX|lX|}
+  \hline
+  \multicolumn{6}{|l|}{\textbf{\textcolor{emred}{REFRESH POWER SCRUB}}}\\ \hline
+  Dumpster \$ & \hrulefill &
+  Patio \$ & \hrulefill &
+  Walkway \$ & \hrulefill \\[0.15em]
+  FOH \$ & \hrulefill &
+  BOH \$ & \hrulefill &
+  Other \$ & \hrulefill \\[0.15em]
+  Freq & \hrulefill &
+  Freq & \hrulefill &
+  Freq & \hrulefill \\[0.15em]
+  Freq & \hrulefill &
+  Freq & \hrulefill &
+  Freq & \hrulefill \\
+  \hline
+\end{tabularx}
+
+%==================== SERVICE NOTES ====================
+
+\vspace{1.0em}
+
+\noindent\textbf{\textcolor{emred}{SERVICE NOTES}}
+
+\vspace{0.25em}
+
+\noindent\hrulefill\\[0.3em]
+\noindent\hrulefill\\[0.3em]
+\noindent\hrulefill
+
+%==================== LEGAL PARAGRAPH + TOP RED LINE ====================
+
+\vspace{0.5em}
+\noindent\textcolor{emred}{\rule{0.98\textwidth}{0.6pt}}
+
+\vspace{0.4em}
+
+{\scriptsize
+\noindent Enviro-Master of \underline{\hspace{2.5cm}}, and Customer hereby agree to extend the current term of
+the current Service Agreement, executed by Customer on \underline{\hspace{2cm}}, for an additional
+\underline{\hspace{1.2cm}} months. The parties agree that except as amended by this Renewal Addendum, all other
+terms and conditions set forth in the Service Agreement shall remain in full force and effect.
+}
+
+%==================== SIGNATURE BLOCKS ====================
+
+\vspace{0.6em}
+
+\scriptsize
+\noindent
+\begin{tabularx}{0.98\textwidth}{@{}X X@{}}
+
+% ----- LEFT SIGNATURE COLUMN -----
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{PRINT}\\[0.25em]
+  \hrulefill\\[-0.2em]
+  Name of Customer\\[0.7em]
+
+  \textbf{PRINT}\\[0.25em]
+  \hrulefill\\[-0.2em]
+  Name \& Title of Customer Contact\\[0.7em]
+
+  \textbf{By}\hspace{2.0cm}\textbf{Date}\\[0.25em]
+  \makebox[2.6cm]{\hrulefill}\hspace{0.5cm}\makebox[2.6cm]{\hrulefill}\\[-0.2em]
+  Signature of Authorized Customer Representative
+\end{minipage}
+&
+% ----- RIGHT SIGNATURE COLUMN -----
+\begin{minipage}[t]{0.96\linewidth}
+  \textbf{Sign}\hspace{1.8cm}\textbf{Date}\\[0.25em]
+  \makebox[2.6cm]{\hrulefill}\hspace{0.5cm}\makebox[2.6cm]{\hrulefill}\\[-0.2em]
+  Signature -- Enviro-Master Representative\\[0.9em]
+
+  \textbf{Sign}\hspace{1.8cm}\textbf{Date}\\[0.25em]
+  \makebox[2.6cm]{\hrulefill}\hspace{0.5cm}\makebox[2.6cm]{\hrulefill}\\[-0.2em]
+  Signature -- Enviro-Master Franchisee
+\end{minipage}
+\\
+\end{tabularx}
+
+% Bottom red rule
+\vspace{0.6em}
+\noindent\textcolor{emred}{\rule{0.98\textwidth}{0.6pt}}
+
+%==========================================================
+\end{document}

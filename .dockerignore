@@ -1,0 +1,86 @@
+# ============================================
+# Docker Ignore File
+# ============================================
+
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Node.js
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing
+coverage
+.nyc_output
+*.test.js
+test-*.js
+
+# Documentation
+*.md
+!README.md
+DEPLOYMENT*.md
+QUICK_REFERENCE.md
+ENV_PRODUCTION_REVIEW.md
+
+# Temporary files
+tmp
+*.tmp
+.cache
+.temp
+
+# Build files (if any)
+dist
+build
+
+# PM2
+.pm2
+
+# Deployment scripts (not needed in container)
+deploy-*.sh
+scripts/deploy*.sh
+
+# Database dumps
+*.dump
+*.sql
+
+# IDX files
+.idx
+
+# Python files
+*.py
+__pycache__
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor backup files
+*~
+*.bak
+*.backup

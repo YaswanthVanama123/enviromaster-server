@@ -1,0 +1,576 @@
+[
+  {
+    "serviceId": "saniclean",
+    "version": "v1.0",
+    "label": "SaniClean - Restroom & Hygiene",
+    "description": "Comprehensive restroom sanitization service",
+    "config": {
+      "geographicPricing": {
+        "insideBeltway": {
+          "ratePerFixture": 7,
+          "weeklyMinimum": 40,
+          "tripCharge": 0,
+          "parkingFee": 0
+        },
+        "outsideBeltway": {
+          "ratePerFixture": 6,
+          "weeklyMinimum": 40,
+          "tripCharge": 0
+        }
+      },
+      "smallFacilityMinimum": {
+        "fixtureThreshold": 5,
+        "minimumWeeklyCharge": 40,
+        "includesTripCharge": true
+      },
+      "allInclusivePackage": {
+        "weeklyRatePerFixture": 20,
+        "includeAllAddOns": true,
+        "waiveTripCharge": true,
+        "waiveWarrantyFees": true,
+        "autoAllInclusiveMinFixtures": 10
+      },
+      "soapUpgrades": {
+        "standardToLuxury": 5,
+        "excessUsageCharges": {
+          "standardSoap": 13,
+          "luxurySoap": 30
+        }
+      },
+      "warrantyFeePerDispenser": 1,
+      "paperCredit": {
+        "creditPerFixturePerWeek": 5
+      },
+      "facilityComponents": {
+        "urinals": {
+          "urinalScreen": 4,
+          "urinalMat": 4
+        },
+        "maleToilets": {
+          "toiletClips": 1.5,
+          "seatCoverDispenser": 0.5
+        },
+        "femaleToilets": {
+          "sanipodService": 4
+        },
+        "sinks": {
+          "ratioSinkToSoap": 1,
+          "ratioSinkToAirFreshener": 2
+        }
+      },
+      "addOnServices": {
+        "microfiberMopping": {
+          "pricePerBathroom": 10
+        }
+      },
+      "billingConversions": {
+        "weekly": {
+          "monthlyMultiplier": 4.33,
+          "annualMultiplier": 50
+        }
+      },
+      "rateTiers": {
+        "redRate": {
+          "multiplier": 1.0,
+          "commissionRate": 0.1
+        },
+        "greenRate": {
+          "multiplier": 1.0,
+          "commissionRate": 0.12
+        }
+      },
+      "valueProposition": [
+        "Enviro-Master's core service since the Swisher days.",
+        "Bathroom cleanliness signals whether a location can charge premium pricing.",
+        "With SaniScrub, SaniClean reduces bacteria that can migrate to back-of-house.",
+        "Reduces time and chemicals for existing staff between weekly sanitization visits."
+      ]
+    },
+    "defaultFormState": {
+      "serviceId": "saniclean",
+      "fixtureCount": 0,
+      "location": "outsideBeltway",
+      "needsParking": false,
+      "pricingMode": "auto",
+      "sinks": 0,
+      "urinals": 0,
+      "maleToilets": 0,
+      "femaleToilets": 0,
+      "soapType": "standard",
+      "excessSoapGallonsPerWeek": 0,
+      "addMicrofiberMopping": false,
+      "microfiberBathrooms": 0,
+      "estimatedPaperSpendPerWeek": 0,
+      "contractMonths": 12,
+      "rateTier": "redRate",
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["restroom", "hygiene", "core-service"]
+  },
+  {
+    "serviceId": "sanipod",
+    "version": "v1.0",
+    "label": "SaniPod - Feminine Hygiene",
+    "description": "Feminine hygiene disposal service",
+    "config": {
+      "weeklyRatePerUnit": 3.0,
+      "altWeeklyRatePerUnit": 8.0,
+      "extraBagPrice": 2.0,
+      "installChargePerUnit": 25.0,
+      "standaloneExtraWeeklyCharge": 40.0,
+      "tripChargePerVisit": 0.0,
+      "defaultFrequency": "weekly",
+      "allowedFrequencies": ["weekly", "biweekly", "monthly"],
+      "annualFrequencies": {
+        "weekly": 52,
+        "biweekly": 26,
+        "monthly": 12
+      },
+      "weeksPerMonth": 4.33,
+      "weeksPerYear": 52,
+      "minContractMonths": 2,
+      "maxContractMonths": 36,
+      "rateCategories": {
+        "redRate": {
+          "multiplier": 1.0,
+          "commissionRate": "20%"
+        },
+        "greenRate": {
+          "multiplier": 1.3,
+          "commissionRate": "25%"
+        }
+      }
+    },
+    "defaultFormState": {
+      "serviceId": "sanipod",
+      "units": 0,
+      "extraBags": 0,
+      "extraBagsRecurring": false,
+      "contractMonths": 12,
+      "frequency": "weekly",
+      "rateTier": "redRate",
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["restroom", "hygiene", "add-on"]
+  },
+  {
+    "serviceId": "saniscrub",
+    "version": "v1.0",
+    "label": "SaniScrub (Refresh Power Scrub)",
+    "description": "Deep cleaning bathroom scrub service",
+    "config": {
+      "fixtureRates": {
+        "monthly": 25,
+        "twicePerMonth": 25,
+        "bimonthly": 35,
+        "quarterly": 40
+      },
+      "minimums": {
+        "monthly": 175,
+        "twicePerMonth": 175,
+        "bimonthly": 250,
+        "quarterly": 250
+      },
+      "nonBathroomUnitSqFt": 500,
+      "nonBathroomFirstUnitRate": 250,
+      "nonBathroomAdditionalUnitRate": 125,
+      "installMultipliers": {
+        "dirty": 3,
+        "clean": 1
+      },
+      "tripChargeBase": 0,
+      "parkingFee": 0,
+      "frequencyMeta": {
+        "monthly": {
+          "visitsPerYear": 12
+        },
+        "twicePerMonth": {
+          "visitsPerYear": 24
+        },
+        "bimonthly": {
+          "visitsPerYear": 6
+        },
+        "quarterly": {
+          "visitsPerYear": 4
+        }
+      },
+      "twoTimesPerMonthDiscountFlat": 15
+    },
+    "defaultFormState": {
+      "serviceId": "saniscrub",
+      "fixtures": 0,
+      "frequency": "monthly",
+      "installCondition": "clean",
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["restroom", "deep-cleaning"]
+  },
+  {
+    "serviceId": "foamingDrain",
+    "version": "v1.0",
+    "label": "Foaming Drain Treatment",
+    "description": "Preventive drain maintenance service",
+    "config": {
+      "standardDrainRate": 10,
+      "altBaseCharge": 20,
+      "altExtraPerDrain": 4,
+      "volumePricing": {
+        "minimumDrains": 10,
+        "weekly": {
+          "ratePerDrain": 20
+        },
+        "bimonthly": {
+          "ratePerDrain": 10
+        }
+      },
+      "grease": {
+        "weeklyRatePerTrap": 125,
+        "installPerTrap": 300
+      },
+      "green": {
+        "weeklyRatePerDrain": 5,
+        "installPerDrain": 100
+      },
+      "plumbing": {
+        "weeklyAddonPerDrain": 10
+      },
+      "installationRules": {
+        "filthyMultiplier": 3
+      },
+      "tripCharges": {
+        "standard": 0,
+        "beltway": 0
+      },
+      "billingConversions": {
+        "weekly": {
+          "monthlyVisits": 4.3,
+          "firstMonthExtraMonths": 3.3,
+          "normalMonthFactor": 4.3
+        },
+        "bimonthly": {
+          "monthlyMultiplier": 0.5
+        }
+      },
+      "contract": {
+        "minMonths": 2,
+        "maxMonths": 36,
+        "defaultMonths": 12
+      },
+      "defaultFrequency": "weekly",
+      "allowedFrequencies": ["weekly", "bimonthly"]
+    },
+    "defaultFormState": {
+      "serviceId": "foamingDrain",
+      "standardDrains": 0,
+      "greaseTraps": 0,
+      "greenDrains": 0,
+      "frequency": "weekly",
+      "addPlumbing": false,
+      "installCondition": "clean",
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["drain", "preventive"]
+  },
+  {
+    "serviceId": "greaseTrap",
+    "version": "v1.0",
+    "label": "Grease Trap Service",
+    "description": "Grease trap pumping and maintenance",
+    "config": {
+      "perTrapRate": 50,
+      "perGallonRate": 2
+    },
+    "defaultFormState": {
+      "serviceId": "greaseTrap",
+      "traps": 0,
+      "gallons": 0,
+      "frequency": "monthly",
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["drain", "grease"]
+  },
+  {
+    "serviceId": "microfiberMopping",
+    "version": "v1.0",
+    "label": "Microfiber Mopping",
+    "description": "Advanced floor mopping service",
+    "config": {
+      "includedBathroomRate": 10,
+      "hugeBathroomPricing": {
+        "enabled": true,
+        "ratePerSqFt": 10,
+        "sqFtUnit": 300,
+        "description": "For huge bathrooms charge $10 per 300 sq ft instead of $10 per bathroom."
+      },
+      "extraAreaPricing": {
+        "singleLargeAreaRate": 100,
+        "extraAreaSqFtUnit": 400,
+        "extraAreaRatePerUnit": 10,
+        "useHigherRate": true
+      },
+      "standalonePricing": {
+        "standaloneSqFtUnit": 200,
+        "standaloneRatePerUnit": 10,
+        "standaloneMinimum": 40,
+        "includeTripCharge": true
+      },
+      "chemicalProducts": {
+        "dailyChemicalPerGallon": 27.34,
+        "customerSelfMopping": true,
+        "waterOnlyBetweenServices": true
+      },
+      "billingConversions": {
+        "weekly": {
+          "annualMultiplier": 52,
+          "monthlyMultiplier": 4.33
+        },
+        "biweekly": {
+          "annualMultiplier": 26,
+          "monthlyMultiplier": 2.17
+        },
+        "monthly": {
+          "annualMultiplier": 12,
+          "monthlyMultiplier": 1
+        }
+      },
+      "defaultFrequency": "weekly",
+      "allowedFrequencies": ["weekly", "biweekly", "monthly"]
+    },
+    "defaultFormState": {
+      "serviceId": "microfiberMopping",
+      "bathrooms": 0,
+      "extraAreaSqFt": 0,
+      "frequency": "weekly",
+      "standalone": false,
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["floor", "mopping"]
+  },
+  {
+    "serviceId": "rpmWindows",
+    "version": "v1.0",
+    "label": "RPM Windows",
+    "description": "Professional window cleaning service",
+    "config": {
+      "smallWindowRate": 1.5,
+      "mediumWindowRate": 3.0,
+      "largeWindowRate": 7.0,
+      "tripCharge": 0,
+      "installMultiplierFirstTime": 3,
+      "installMultiplierClean": 1,
+      "frequencyMultipliers": {
+        "weekly": 1.0,
+        "biweekly": 1.25,
+        "monthly": 1.25,
+        "quarterly": 2.0,
+        "quarterlyFirstTime": 3.0
+      },
+      "annualFrequencies": {
+        "weekly": 52,
+        "biweekly": 26,
+        "monthly": 12,
+        "quarterly": 4
+      },
+      "monthlyConversions": {
+        "weekly": 4.33,
+        "actualWeeksPerMonth": 4.33,
+        "actualWeeksPerYear": 52
+      },
+      "allowedFrequencies": ["Weekly", "Bi-Weekly", "Monthly", "Quarterly"]
+    },
+    "defaultFormState": {
+      "serviceId": "rpmWindows",
+      "smallWindows": 0,
+      "mediumWindows": 0,
+      "largeWindows": 0,
+      "frequency": "Monthly",
+      "installCondition": "firstTime",
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["windows", "cleaning"]
+  },
+  {
+    "serviceId": "carpetCleaning",
+    "version": "v1.0",
+    "label": "Carpet Cleaning",
+    "description": "Professional carpet cleaning service",
+    "config": {
+      "unitSqFt": 500,
+      "firstUnitRate": 250,
+      "additionalUnitRate": 125,
+      "perVisitMinimum": 250,
+      "installMultipliers": {
+        "dirty": 3,
+        "clean": 1
+      },
+      "frequencyMeta": {
+        "monthly": {
+          "visitsPerYear": 12
+        },
+        "twicePerMonth": {
+          "visitsPerYear": 24
+        },
+        "bimonthly": {
+          "visitsPerYear": 6
+        },
+        "quarterly": {
+          "visitsPerYear": 4
+        }
+      }
+    },
+    "defaultFormState": {
+      "serviceId": "carpetCleaning",
+      "squareFeet": 0,
+      "frequency": "monthly",
+      "installCondition": "clean",
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["carpet", "cleaning"]
+  },
+  {
+    "serviceId": "pureJanitorial",
+    "version": "v1.0",
+    "label": "Pure Janitorial Services",
+    "description": "General janitorial services",
+    "config": {
+      "baseHourlyRate": 30,
+      "shortJobHourlyRate": 50,
+      "minHoursPerVisit": 4,
+      "tieredPricing": [
+        {
+          "upToHours": 0.25,
+          "price": 10,
+          "addonOnly": true
+        },
+        {
+          "upToHours": 0.5,
+          "price": 20,
+          "addonOnly": true,
+          "standalonePrice": 35
+        },
+        {
+          "upToHours": 1,
+          "price": 50
+        },
+        {
+          "upToHours": 2,
+          "price": 80
+        },
+        {
+          "upToHours": 3,
+          "price": 100
+        },
+        {
+          "upToHours": 4,
+          "price": 120
+        }
+      ],
+      "weeksPerMonth": 4.33,
+      "minContractMonths": 2,
+      "maxContractMonths": 36,
+      "dirtyInitialMultiplier": 3,
+      "infrequentMultiplier": 3,
+      "defaultFrequency": "weekly",
+      "dustingPlacesPerHour": 30,
+      "dustingPricePerPlace": 1,
+      "vacuumingDefaultHours": 1
+    },
+    "defaultFormState": {
+      "serviceId": "pureJanitorial",
+      "hours": 0,
+      "frequency": "weekly",
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["janitorial", "cleaning"]
+  },
+  {
+    "serviceId": "stripWax",
+    "version": "v1.0",
+    "label": "Strip & Wax",
+    "description": "Floor strip and wax service",
+    "config": {
+      "weeksPerMonth": 4.33,
+      "minContractMonths": 2,
+      "maxContractMonths": 36,
+      "defaultFrequency": "weekly",
+      "defaultVariant": "standardFull",
+      "variants": {
+        "standardFull": {
+          "label": "Standard – full strip + sealant",
+          "ratePerSqFt": 0.75,
+          "minCharge": 550
+        },
+        "noSealant": {
+          "label": "No sealant – 4th coat free / discount",
+          "ratePerSqFt": 0.70,
+          "minCharge": 550
+        },
+        "wellMaintained": {
+          "label": "Well maintained – partial strip",
+          "ratePerSqFt": 0.40,
+          "minCharge": 400
+        }
+      }
+    },
+    "defaultFormState": {
+      "serviceId": "stripWax",
+      "squareFeet": 0,
+      "variant": "standardFull",
+      "frequency": "weekly",
+      "contractMonths": 12,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["floor", "maintenance"]
+  },
+  {
+    "serviceId": "refreshPowerScrub",
+    "version": "v1.0",
+    "label": "Refresh Power Scrub",
+    "description": "Commercial kitchen deep cleaning",
+    "config": {
+      "defaultHourly": 200,
+      "defaultTrip": 75,
+      "defaultMinimum": 475,
+      "kitchenPricing": {
+        "smallMedium": 1500,
+        "large": 2500
+      },
+      "fohRate": 2500,
+      "patioPricing": {
+        "standalone": 875,
+        "upsell": 500
+      },
+      "sqftPricing": {
+        "fixedFee": 200,
+        "insideRate": 0.6,
+        "outsideRate": 0.4
+      }
+    },
+    "defaultFormState": {
+      "serviceId": "refreshPowerScrub",
+      "pricingMethod": "hourly",
+      "hours": 0,
+      "squareFeetInside": 0,
+      "squareFeetOutside": 0,
+      "notes": ""
+    },
+    "isActive": true,
+    "tags": ["kitchen", "deep-cleaning"]
+  }
+]

@@ -1,0 +1,109 @@
+# ============================================
+# Digital Ocean App Platform Specification
+# ============================================
+# This file defines the infrastructure for deploying the EnviroMaster backend
+# on Digital Ocean's managed App Platform
+
+name: enviro-backend
+region: nyc # New York datacenter (change to your preferred region)
+
+# Services configuration
+services:
+  - name: api
+    # Source configuration
+    github:
+      repo: YaswanthVanama123/enviro-bckend
+      branch: main
+      deploy_on_push: true # Auto-deploy on push to main
+
+    # Build configuration
+    dockerfile_path: Dockerfile
+    build_command: echo "Building with Dockerfile"
+
+    # Runtime configuration
+    instance_count: 2 # Run 2 instances for high availability
+    instance_size_slug: basic-xxs # $5/month per instance (upgrade as needed)
+
+    # Environment variables (add secrets via DO dashboard or CLI)
+    envs:
+      - key: NODE_ENV
+        value: production
+        scope: RUN_TIME
+
+      - key: PORT
+        value: "5000"
+        scope: RUN_TIME
+
+      # Database connection (add via dashboard for security)
+      - key: MONGODB_URI
+        scope: RUN_TIME
+        type: SECRET
+
+      # JWT secrets (add via dashboard)
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+
+      # Zoho OAuth credentials (add via dashboard)
+      - key: ZOHO_CLIENT_ID
+        scope: RUN_TIME
+        type: SECRET
+
+      - key: ZOHO_CLIENT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+
+      - key: ZOHO_REFRESH_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+
+      # Email configuration (add via dashboard)
+      - key: EMAIL_USER
+        scope: RUN_TIME
+        type: SECRET
+
+      - key: EMAIL_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+
+      # Allowed origins for CORS
+      - key: ALLOWED_ORIGINS
+        value: "https://your-frontend-domain.com"
+        scope: RUN_TIME
+
+    # Health check configuration
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+
+    # HTTP configuration
+    http_port: 5000
+
+    # Routes configuration
+    routes:
+      - path: /
+        preserve_path_prefix: true
+
+    # Resource limits
+    internal_ports:
+      - 5000
+
+# Database configuration (optional - use managed MongoDB)
+databases:
+  - engine: MONGODB
+    name: enviro-db
+    production: true
+    version: "6" # MongoDB version
+
+# Additional features
+features:
+  - buildpack-stack=ubuntu-22
+
+# Alerts configuration
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED

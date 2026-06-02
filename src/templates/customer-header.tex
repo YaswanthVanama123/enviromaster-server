@@ -1,0 +1,515 @@
+\documentclass[10pt]{article}
+
+\usepackage[top=1cm,bottom=1cm,left=1cm,right=1cm]{geometry}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{colortbl}
+\usepackage{hhline}
+\usepackage{helvet}
+\usepackage{tabularx}
+\usepackage{longtable} % NEW: For tables that break across pages
+\usepackage{array}
+\usepackage{needspace}
+\usepackage[normalem]{ulem}
+\usepackage{amssymb} % NEW: For checkbox symbols (\square, \checkmark)
+
+\renewcommand{\familydefault}{\sfdefault}
+
+% ---- Colors ----
+\definecolor{emred}{RGB}{191, 0, 0}
+\definecolor{linegray}{RGB}{0,0,0} % CUSTOM fill-in blank color
+\definecolor{totalcolor}{RGB}{120,120,120} % dark gray for totals
+\definecolor{serviceHeaderBlue}{RGB}{37,99,235}
+
+\newlength{\filledlineheight}%
+\setlength{\filledlineheight}{0.9pt} % thicker underline for fill-in blanks
+\newlength{\filledlineoffset}%
+\setlength{\filledlineoffset}{3pt} % lift text higher above blank
+
+\renewcommand{\ULthickness}{1.9pt} % slightly thicker underline for headings
+
+\pagestyle{empty}
+
+% ====== GENERIC BLANK HELPERS =====================================
+
+% full-width underline with text centered on the line (used in header + notes)
+\newcommand{\filledline}[1]{
+  \leavevmode
+  \makebox[\linewidth][c]{
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\linewidth}{\filledlineheight}}}
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #1}}
+  }
+}
+
+\newcommand{\filledlineleft}[1]{
+  \leavevmode
+  \makebox[\linewidth][l]{
+    \makebox[0pt][l]{\textcolor{linegray}{\rule{\linewidth}{\filledlineheight}}}
+    \makebox[0pt][l]{\raisebox{\filledlineoffset}{\strut #1}}
+  }
+}
+
+\newcommand{\filledlineleftlim}[2][5cm]{%
+  \leavevmode
+  \makebox[#1][l]{%
+    \makebox[0pt][l]{\textcolor{linegray}{\rule{#1}{\filledlineheight}}}%
+    \makebox[0pt][l]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+}
+
+% medium underline with text centered on the line (generic inline field)
+\newcommand{\smallfilled}[1]{%
+  \leavevmode
+  % IMPROVED: Calculate width dynamically based on content
+  \setbox0=\hbox{\strut #1}%
+  \ifdim\wd0>5cm%
+    \def\fieldwidth{5cm}% Max width
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% Min width
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% Actual width + padding
+    \fi%
+  \fi%
+  \makebox[\fieldwidth][c]{%
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #1}}%
+  }%
+}
+
+% short blank for calc fields – dynamic width based on content
+\newcommand{\smallfilledshort}[1]{%
+  \leavevmode
+  % IMPROVED: Calculate width dynamically based on content
+  \setbox0=\hbox{\strut\small #1}%
+  \ifdim\wd0>5cm%
+    \def\fieldwidth{5cm}% Max width for calc fields
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% Min width for calc fields
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% Actual width + padding
+    \fi%
+  \fi%
+  \makebox[\fieldwidth][c]{%
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut\small #1}}%
+  }%
+}
+
+% small inline blank for things like "Dumpster $ _____"
+\newcommand{\sblank}{\underline{\hspace{1.7cm}}}
+
+% Flex column that wraps text (for tabularx)
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% ====== SERVICES HELPER MACROS ====================================
+
+% fixed label width inside each SERVICES column
+\newlength{\serviceLabelWidth}
+% use one of the longer labels to size this area
+\settowidth{\serviceLabelWidth}{\scriptsize Foaming Drain Charge \$}
+
+% tiny gap between label and value area (prevents overlap)
+\newlength{\serviceGap}
+\setlength{\serviceGap}{1.1em}
+
+% wider gap for long labels
+\newlength{\serviceGapWide}
+\setlength{\serviceGapWide}{8em}
+
+\newcommand{\serviceSection}[1]{%
+  {\bfseries\fontsize{1.2em}{1.5em}\selectfont\textcolor{emred}{\underline{#1}}\par}%
+  \vspace{0.7em}%
+}
+
+% Normal label + aligned blank (appropriate width) – value centered on the line
+\newcommand{\serviceLine}[2]{%
+  \noindent\normalsize
+  % label
+  \makebox[\serviceLabelWidth][l]{#1}%
+  % small gap after label
+  \hspace{\serviceGap}%
+  \leavevmode
+  % IMPROVED: Calculate width based on content with better limits
+  % Removed minimum, increased maximum to prevent overlapping
+  \setbox0=\hbox{\strut #2}%
+  \ifdim\wd0>7cm%
+    \def\fieldwidth{7cm}% Increased max from 4cm to 7cm (prevents overlap)
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% Reduced min from 1.5cm to 0.8cm (less wasted space)
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% Reduced padding from 0.5cm to 0.3cm
+    \fi%
+  \fi%
+  % Create container with calculated width
+  \makebox[\fieldwidth][c]{%
+    % gray line positioned at zero width
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    % FIX: Lift value text slightly above the line
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+  \par
+  \vspace{0.5em}%
+}
+
+\newcommand{\serviceLineWide}[2]{%
+  \noindent\normalsize
+  % label
+  \makebox[\serviceLabelWidth][l]{#1}%
+  % wider gap after label
+  \hspace{\serviceGapWide}%
+  \leavevmode
+  \setbox0=\hbox{\strut #2}%
+  \ifdim\wd0>7cm%
+    \def\fieldwidth{7cm}% ƒo. Increased max from 4cm to 7cm (prevents overlap)
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% ƒo. Reduced min from 1.5cm to 0.8cm (less wasted space)
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% ƒo. Reduced padding from 0.5cm to 0.3cm
+    \fi%
+  \fi%
+  \makebox[\fieldwidth][c]{%
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+  \par
+  \vspace{0.5em}%
+}
+
+% Red bold label + aligned blank (appropriate width) – value centered on the line
+\newcommand{\serviceBoldLine}[2]{%
+  \noindent\normalsize
+  % label (bold + red)
+  \makebox[\serviceLabelWidth][l]{%
+    \textbf{\textcolor{emred}{#1}}%
+  }%
+  % small gap after label
+  \hspace{\serviceGap}%
+  \leavevmode
+  % IMPROVED: Calculate width based on content with better limits
+  \setbox0=\hbox{\strut #2}%
+  \ifdim\wd0>7cm%
+    \def\fieldwidth{7cm}% Increased max from 4cm to 7cm
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% Reduced min from 1.5cm to 0.8cm
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% Reduced padding from 0.5cm to 0.3cm
+    \fi%
+  \fi%
+  % Create container with calculated width
+  \makebox[\fieldwidth][c]{%
+    % gray line positioned at zero width
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    % FIX: Lift value text slightly above the line
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+  \par
+  \vspace{0.5em}%
+}
+
+\newcommand{\serviceBoldLineWide}[2]{%
+  \noindent\normalsize
+  \makebox[\serviceLabelWidth][l]{%
+    \textbf{\textcolor{emred}{#1}}%
+  }%
+  % wider gap after label
+  \hspace{\serviceGapWide}%
+  \leavevmode
+  \setbox0=\hbox{\strut #2}%
+  \ifdim\wd0>7cm%
+    \def\fieldwidth{7cm}% ƒo. Increased max from 4cm to 7cm
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% ƒo. Reduced min from 1.5cm to 0.8cm
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% ƒo. Reduced padding from 0.5cm to 0.3cm
+    \fi%
+  \fi%
+  \makebox[\fieldwidth][c]{%
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+  \par
+  \vspace{0.5em}%
+}
+
+% Dark gray bold label for totals – different color to distinguish from headers
+\newcommand{\serviceTotalLine}[2]{%
+  \noindent\normalsize
+  % label (bold + dark gray)
+  \makebox[\serviceLabelWidth][l]{%
+    \textbf{\textcolor{totalcolor}{#1}}%
+  }%
+  % small gap after label
+  \hspace{\serviceGap}%
+  \leavevmode
+  % IMPROVED: Calculate width based on content with better limits
+  \setbox0=\hbox{\strut #2}%
+  \ifdim\wd0>7cm%
+    \def\fieldwidth{7cm}% Increased max from 4cm to 7cm
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% Reduced min from 1.5cm to 0.8cm
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% Reduced padding from 0.5cm to 0.3cm
+    \fi%
+  \fi%
+  % Create container with calculated width
+  \makebox[\fieldwidth][c]{%
+    % gray line positioned at zero width
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    % FIX: Lift value text slightly above the line
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+  \par
+  \vspace{0.5em}%
+}
+
+\newcommand{\serviceTotalLineWide}[2]{%
+  \noindent\normalsize
+  \makebox[\serviceLabelWidth][l]{%
+    \textbf{\textcolor{totalcolor}{#1}}%
+  }%
+  % wider gap after label
+  \hspace{\serviceGapWide}%
+  \leavevmode
+  \setbox0=\hbox{\strut #2}%
+  \ifdim\wd0>7cm%
+    \def\fieldwidth{7cm}% ƒo. Increased max from 4cm to 7cm
+  \else%
+    \ifdim\wd0<0.8cm%
+      \def\fieldwidth{0.8cm}% ƒo. Reduced min from 1.5cm to 0.8cm
+    \else%
+      \def\fieldwidth{\dimexpr\wd0+0.3cm\relax}% ƒo. Reduced padding from 0.5cm to 0.3cm
+    \fi%
+  \fi%
+  \makebox[\fieldwidth][c]{%
+    \makebox[0pt][c]{\textcolor{linegray}{\rule{\fieldwidth}{\filledlineheight}}}%
+    \makebox[0pt][c]{\raisebox{\filledlineoffset}{\strut #2}}%
+  }%
+  \par
+  \vspace{0.5em}%
+}
+
+% Alternate total style for blank/gap rows (fills in another gap under the label)
+\newcommand{\serviceGapLine}[2]{%
+  \vspace{0.6em}% ? Extra top padding for gap
+  \noindent\normalsize
+  \makebox[\serviceLabelWidth][l]{%
+    \textbf{\textcolor{totalcolor}{#1}}%
+  }%
+  \hspace{\serviceGap}%
+  \filledline{#2}%
+  \par
+  \vspace{1.1em}% ? Larger bottom padding for clearer separation
+}
+
+% MICROMAX / RPM / SANIPOD: label ____@____=$__
+% Bigger font size and better spacing for improved readability
+\newcommand{\serviceAtCharge}[4]{%
+  \noindent\normalsize
+  \mbox{#1}%
+  \hspace{0.2em}%
+  \smallfilledshort{#2}\hspace{0.15em}@\hspace{0.15em}\smallfilledshort{#3}\hspace{0.15em}=\hspace{0.15em}\smallfilledshort{#4}\par
+  \vspace{0.5em}%
+}
+
+% Big red left-aligned heading (REFRESH POWER SCRUB / SERVICE NOTES)
+\newcommand{\serviceBigHeading}[1]{%
+  \noindent{\bfseries\normalsize\textcolor{emred}{#1}\par}%
+  \vspace{0.3em}%
+}
+
+% ====== AGREEMENT + SIGNATURE HELPERS =============================
+
+% short blanks in agreement paragraph (with optional value)
+\newcommand{\agreementBlank}[2][2.5cm]{%
+  \makebox[#1][l]{%
+    \makebox[0pt][l]{\textcolor{linegray}{\rule{#1}{\filledlineheight}}}%
+    \makebox[0pt][l]{\raisebox{\filledlineoffset}{#2}}% Lift text above line
+  }%
+}
+
+% signature-line blanks (no values)
+\newcommand{\sigblank}[1]{\underline{\hspace*{#1}}}
+
+% ==================================================================
+\begin{document}
+
+%==================== TOP HEADER BLOCK (dynamic) ====================
+
+\noindent
+\begin{minipage}[c]{0.20\textwidth}
+  \centering
+  % replace path with your logo path
+  \includegraphics[width=0.80\linewidth]{images/Envimaster.png}%
+\end{minipage}%
+\hspace{0.5cm}%
+\begin{minipage}[c]{0.78\textwidth}
+  \centering
+  {\bfseries\normalsize\textcolor{emred}{CUSTOMER UPDATE ADDENDUM}\par}
+
+  \vspace{1.2em} % Increased from 0.5em to 1.2em for more space
+
+  \small % Changed from \footnotesize to \small for larger values
+  \renewcommand{\arraystretch}{1.5}%
+
+  \begin{tabularx}{\linewidth}{@{}lX@{\hspace{0.3cm}}lX@{}}
+    {{#headerRows}}
+      \textbf{\textcolor{emred}{ {{{labelLeft}}} }} &
+        \filledline{ {{{valueLeft}}} } &
+      \textbf{\textcolor{emred}{ {{{labelRight}}} }} &
+        \filledline{ {{{valueRight}}} } \\
+    {{/headerRows}}
+  \end{tabularx}
+\end{minipage}
+
+\vspace{0.8em}
+
+%==================== PRODUCTS TITLE BAR ============================
+
+{{#includeProductsTable}}
+\noindent
+\fcolorbox{black}{emred}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep\relax}{%
+    \centering
+    \vspace{0.2em}%
+    {\bfseries\fontsize{1.2em}{1.6em}\selectfont\textcolor{white}{PRODUCTS}}% Changed from \footnotesize to \normalsize
+    \vspace{0.2em}%
+  }%
+}%
+\vspace{0.5em}%
+%==================== PRODUCTS TABLE (dynamic, wrapping) ============
+
+\setlength{\LTpre}{0pt}%
+\small % Changed from \scriptsize to \small for better readability
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.5} % Changed from 1.15 to 1.5 for more top/bottom padding
+
+% NEW: Define custom column type for products table
+{{{productsColTypeDefinition}}}
+
+% NEW: Use longtable instead of tabularx for automatic page breaks
+\begin{longtable}{|{{{productsColSpecLatex}}}|}
+  \hline
+  {{{productsHeaderRowLatex}}}
+  \endfirsthead % End of header for first page
+
+  \hline
+  {{{productsHeaderRowLatex}}}
+  \endhead % Repeat header on subsequent pages
+
+  {{{productsBodyRowsLatex}}}
+\end{longtable}
+{{/includeProductsTable}}
+
+%==================== SERVICES SECTION ============================
+
+\needspace{2\baselineskip}
+{{{servicesTopRowLatex}}}
+
+% bigger gap between service rows for better readability and clarity
+\vspace{2.5em}
+\nopagebreak[4]
+{{{servicesBottomRowLatex}}}
+
+%==================== REFRESH POWER SCRUB TABLE =====================
+
+\needspace{4\baselineskip}
+{{{refreshSectionLatex}}}
+
+{{#summaryExists}}
+\vspace{2.5em}
+% ✅ FIXED: Ensure AGREEMENT SUMMARY section fits on one page without breaking
+\needspace{7\baselineskip}
+\serviceSection{AGREEMENT SUMMARY}
+\vspace{0.3em}
+{{#showContractMonths}}
+\nopagebreak[4]
+\serviceLine{Contract Months:}{\strut {{{summaryContractMonthsDisplay}}}}
+{{/showContractMonths}}
+\nopagebreak[4]
+\serviceLine{Trip Charge:}{\strut {{{summaryTripChargeLabel}}}}
+\nopagebreak[4]
+\serviceLine{Parking Charge:}{\strut {{{summaryParkingChargeLabel}}}}
+\nopagebreak[4]
+\serviceLine{Services Total:}{\strut {{{summaryServiceAgreementTotal}}}}
+\nopagebreak[4]
+\serviceLine{Products Total:}{\strut {{{summaryProductTotalsLabel}}}}
+\nopagebreak[4]
+\serviceLine{Payment Method:}{\strut {{{agreementPaymentOption}}}}
+{{/summaryExists}}
+
+{{#agreementPaymentNote}}
+\vspace{0.5em}
+\needspace{3\baselineskip}
+\nopagebreak[4]
+\serviceSection{PAYMENT NOTE}
+\vspace{0.3em}
+\nopagebreak[4]
+\begin{minipage}{\textwidth}
+  \small {{{agreementPaymentNote}}}
+\end{minipage}
+{{/agreementPaymentNote}}
+
+\vspace{0.8em}
+
+%==================== SERVICE NOTES =================================
+
+\begin{center}
+  \begin{minipage}{0.9\textwidth}
+    \setlength{\parindent}{0pt}
+    \raggedright
+    {{{serviceNotesLatex}}}
+  \end{minipage}
+\end{center}
+
+%==================== AGREEMENT PARAGRAPH + SIGNATURES ==============
+% \small
+% Enviro-Master of \agreementBlank{ {{{agreementEnviroOf}}} }, and Customer hereby
+% agree to extend the current term of the current Service Agreement, executed
+% by Customer on \agreementBlank[1.8cm]{ {{{agreementExecutedOn}}} }, for an
+% additional \agreementBlank[1.8cm]{ {{{agreementAdditionalMonths}}} } months.
+% The parties agree that except as amended by this Renewal Addendum, all other
+% terms and conditions set forth in the Service Agreement shall remain in full
+% force and effect.
+
+% \vspace{1.2em}
+
+% \noindent
+% \begin{minipage}[t]{0.55\textwidth}
+%   \raggedright
+%   \textsc{Print}\ \sigblank{7.0cm}\\[-0.2em]
+%   {\scriptsize Name of Customer}\par
+
+%   \vspace{0.8em}
+
+%   \textsc{Print}\ \sigblank{7.0cm}\\[-0.2em]
+%   {\scriptsize Name \& Title of Customer Contact}\par
+
+%   \vspace{0.8em}
+
+%   By\ \sigblank{4.0cm}\hfill\\[-0.2em]
+%   {\scriptsize Signature of Authorized Customer Representative}\par
+% \end{minipage}%
+% \hfill
+% \begin{minipage}[t]{0.40\textwidth}
+%   \raggedright
+%   Sign\ \sigblank{4.0cm}\hfill Date\ \sigblank{2.0cm}\\[-0.2em]
+%   {\scriptsize Signature -- Enviro-Master Representative}\par
+
+%   \vspace{0.8em}
+
+%   Sign\ \sigblank{4.0cm}\hfill Date\ \sigblank{2.0cm}\\[-0.2em]
+%   {\scriptsize Signature -- Enviro-Master Franchisee}\par
+% \end{minipage}
+
+% \vspace{1.2em}
+% \noindent\textcolor{emred}{\rule{\textwidth}{0.4pt}}
+
+\end{document}
+
