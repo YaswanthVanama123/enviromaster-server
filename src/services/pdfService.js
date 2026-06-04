@@ -185,8 +185,7 @@ function buildServiceAgreementLatex(agreementData = {}) {
       })
       // Remove any Unicode replacement characters or other problematic Unicode
       .replace(/[\uFFF0-\uFFFF]/g, '')
-      // Final pass: remove anything that's not printable ASCII or safe Unicode
-      .replace(/[^\x20-\x7E\xC0-\xFF\n\r\t\u00A0-\u024F\u2000-\u206F\u2010-\u2027]/g, '');
+      .replace(/[^\x20-\x7E\xA0-\u024F\u2000-\u206F\u2010-\u2027]/g, '');
 
     if (cleaned.length !== originalLength) {
       console.warn(`⚠️ [SERVICE AGREEMENT] Sanitized field "${fieldName}": removed ${originalLength - cleaned.length} chars`);
@@ -1236,9 +1235,6 @@ function transformServicesToPdfFormat(usedServices) {
 }
 
 function transformServiceToColumn(serviceKey, serviceData, label) {
-  if (serviceKey === 'refreshPowerScrub') {
-  }
-
   const rows = [];
   const pushRow = (field, row) => rows.push(attachOrderNo(field, row));
 
@@ -1251,9 +1247,6 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
     console.log('🧹 [PURE JANITORIAL PDF] serviceData.formData exists:', !!serviceData.formData);
     console.log('🧹 [PURE JANITORIAL PDF] using data from:', serviceData.formData ? 'serviceData.formData' : 'serviceData');
     console.log('🧹 [PURE JANITORIAL PDF] data.isActive:', data.isActive);
-  }
-
-  if (serviceKey === 'refreshPowerScrub') {
   }
 
   const getCorrectRate = (item) => {
@@ -1380,8 +1373,6 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
 
   if (data.isActive && (data.fixtureBreakdown || data.drainBreakdown || data.serviceBreakdown || data.windows || data.service || data.restroomFixtures || data.nonBathroomArea ||
       data.dumpster || data.patio || data.walkway || data.foh || data.boh || data.other)) {
-    if (serviceKey === 'refreshPowerScrub') {
-    }
 
     if (data.fixtureBreakdown && Array.isArray(data.fixtureBreakdown)) {
       for (const fixture of data.fixtureBreakdown) {
@@ -1556,9 +1547,6 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
             continue;
           }
 
-        if (serviceKey === 'refreshPowerScrub') {
-        }
-
         if (area.type === 'calc' && area.qty != null && area.rate != null && area.total != null) {
           rows.push({
             type: 'atCharge',
@@ -1703,11 +1691,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
     if (data.pdfExtras && Array.isArray(data.pdfExtras)) {
       for (const field of data.pdfExtras) {
         if (!shouldDisplayField(field)) continue;
-        const rowType = field.type === 'atCharge'
-          ? 'atCharge'
-          : field.type === 'bold'
-            ? 'bold'
-            : 'line';
+        const rowType = field.type === 'atCharge' ? 'atCharge' : field.type === 'bold' ? 'bold' : 'line';
         let row = {
           type: rowType,
           label: field.label || '',
@@ -2103,9 +2087,6 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
 
     if (data.notes && data.notes.trim()) {
       rows.push({ type: 'line', label: 'Notes', value: data.notes });
-    }
-
-    if (serviceKey === 'refreshPowerScrub') {
     }
 
     return {
@@ -2641,9 +2622,7 @@ function buildServicesLatex(services = {}) {
             legacyArea.type === 'calc' &&
             legacyArea.qty > 0
           ) {
-            const displayName = areaKey === 'foh' ? 'FRONT HOUSE' :
-                              areaKey === 'boh' ? 'BACK HOUSE' :
-                              areaKey.toUpperCase();
+            const displayName = areaKey === 'foh' ? 'FRONT HOUSE' : areaKey === 'boh' ? 'BACK HOUSE' : areaKey.toUpperCase();
 
             enabledAreas.push({
               key: areaKey,
@@ -2803,11 +2782,10 @@ function buildServicesLatex(services = {}) {
         const frequencyRow = "  Frequency & " +
           enabledAreas.slice(0, maxAreas)
             .map(area => {
-              if (refreshData.services) {
-                return `\\scriptsize ${latexEscape(area.data.frequency ? area.data.frequency.value : 'TBD')}`;
-              } else {
-                return `\\scriptsize TBD`;
-              }
+              const frequencyValue = refreshData.services
+                ? latexEscape(area.data.frequency ? area.data.frequency.value : 'TBD')
+                : 'TBD';
+              return `\\scriptsize ${frequencyValue}`;
             })
             .join(" & ") +
           " \\\\";

@@ -20,7 +20,7 @@ const CustomerHeaderDoc = mongoose.model('CustomerHeaderDoc', new mongoose.Schem
 
 // Regex to detect problematic characters
 const PROBLEMATIC_CHARS = /[\x00-\x1F\x7F-\xFF]/;
-const SMART_QUOTES = /[""'']/;
+const SMART_QUOTES = /["'']/;
 const EM_DASH = /[—–]/;
 const EMOJI = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
 

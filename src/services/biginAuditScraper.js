@@ -249,50 +249,42 @@ async function closePromotionalModals(page) {
 
   // First, try clicking the X button directly using coordinates or specific Lyte selectors
   const closedViaEval = await page.evaluate(() => {
-    // Zoho uses lyte-wormhole for modals - look for close button inside
     const wormholes = document.querySelectorAll('lyte-wormhole, lyte-modal, lyte-dialog');
     for (const wormhole of wormholes) {
-      // Look for the X/close icon - usually an SVG or span with specific class
       const closeElements = wormhole.querySelectorAll('svg, lyte-icon, span, button, div');
       for (const el of closeElements) {
         const rect = el.getBoundingClientRect();
-        // The X button is usually in the top-right corner of the modal (x > 1000, y < 100)
         if (rect.width > 0 && rect.height > 0 && rect.x > 1000 && rect.y < 100 && rect.y > 40) {
-          // Check if it looks like a close button (small, square-ish)
           if (rect.width < 50 && rect.height < 50) {
             el.click();
-            return 'clicked-corner-element';
+            return true;
           }
         }
       }
     }
 
-    // Try finding any element that looks like an X close button
     const allElements = document.querySelectorAll('*');
     for (const el of allElements) {
       const rect = el.getBoundingClientRect();
-      // Look for elements in top-right area of a modal (around x:1070-1090, y:50-70 based on screenshot)
       if (rect.x > 1060 && rect.x < 1100 && rect.y > 40 && rect.y < 80) {
         if (rect.width > 0 && rect.width < 40 && rect.height > 0 && rect.height < 40) {
           el.click();
-          return 'clicked-position-based';
+          return true;
         }
       }
     }
 
-    // Look for SVG close icons
     const svgs = document.querySelectorAll('svg');
     for (const svg of svgs) {
       const rect = svg.getBoundingClientRect();
-      // Modal close buttons are typically in top-right of modal
       if (rect.x > 1000 && rect.y < 100 && rect.width > 0) {
         const parent = svg.closest('button, div, span, lyte-button');
         if (parent) {
           parent.click();
-          return 'clicked-svg-parent';
+          return true;
         }
         svg.click();
-        return 'clicked-svg';
+        return true;
       }
     }
 
@@ -300,7 +292,7 @@ async function closePromotionalModals(page) {
   });
 
   if (closedViaEval) {
-    console.log(`   Closed modal via: ${closedViaEval}`);
+    console.log('   Closed modal via evaluate method');
     await new Promise(resolve => setTimeout(resolve, 1000));
     return true;
   }

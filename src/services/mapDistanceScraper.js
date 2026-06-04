@@ -286,7 +286,7 @@ class MapDistanceSession {
       if (typeof bootbox !== 'undefined') {
         bootbox.alert = function() { return null; };
         bootbox.dialog = function() { return null; };
-        bootbox.confirm = function(msg, cb) { if(cb) cb(true); return null; };
+        bootbox.confirm = function(msg, cb) { if(cb) { cb(true); } return null; };
         bootbox.prompt = function() { return null; };
       }
     });

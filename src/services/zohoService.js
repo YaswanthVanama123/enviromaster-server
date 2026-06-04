@@ -1228,7 +1228,8 @@ export async function testLayoutPipelineDetection() {
         console.log(`  - Required: ${pipelineField.required}`);
         console.log(`  - Read only: ${pipelineField.read_only}`);
         if (pipelineField.pick_list_values) {
-          console.log(`  - Available values: ${pipelineField.pick_list_values.map(p => `"${p.display_value}"`).join(', ')}`);
+          const availableValues = pipelineField.pick_list_values.map(p => `"${p.display_value}"`).join(', ');
+          console.log(`  - Available values: ${availableValues}`);
         }
       }
     }

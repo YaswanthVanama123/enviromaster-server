@@ -71,11 +71,8 @@ export async function sendEmailWithPdf(req, res) {
           if (manualUpload?.pdfBuffer) {
             const hasBufferProperty = manualUpload.pdfBuffer.buffer;
             const isBufferInstance = Buffer.isBuffer(manualUpload.pdfBuffer);
-            pdfBuffer = hasBufferProperty
-              ? Buffer.from(manualUpload.pdfBuffer.buffer)
-              : isBufferInstance
-                ? manualUpload.pdfBuffer
-                : Buffer.from(manualUpload.pdfBuffer);
+            const bufferChoice = hasBufferProperty ? Buffer.from(manualUpload.pdfBuffer.buffer) : manualUpload.pdfBuffer;
+            pdfBuffer = isBufferInstance ? bufferChoice : Buffer.from(manualUpload.pdfBuffer);
 
             fileName = manualUpload.fileName;
             attachmentContentType = manualUpload.mimeType || "application/pdf";
@@ -123,11 +120,8 @@ export async function sendEmailWithPdf(req, res) {
 
         const hasBufferProperty = manualUpload.pdfBuffer.buffer;
         const isBufferInstance = Buffer.isBuffer(manualUpload.pdfBuffer);
-        pdfBuffer = hasBufferProperty
-          ? Buffer.from(manualUpload.pdfBuffer.buffer)
-          : isBufferInstance
-            ? manualUpload.pdfBuffer
-            : Buffer.from(manualUpload.pdfBuffer);
+        const bufferChoice = hasBufferProperty ? Buffer.from(manualUpload.pdfBuffer.buffer) : manualUpload.pdfBuffer;
+        pdfBuffer = isBufferInstance ? bufferChoice : Buffer.from(manualUpload.pdfBuffer);
 
         fileName = manualUpload.fileName;
         attachmentContentType = manualUpload.mimeType || "application/pdf";
@@ -180,11 +174,8 @@ export async function sendEmailWithPdf(req, res) {
           const rawBuffer = agreement.pdf_meta.pdfBuffer;
           const hasBufferProperty = rawBuffer.buffer;
           const isBufferInstance = Buffer.isBuffer(rawBuffer);
-          pdfBuffer = hasBufferProperty
-            ? Buffer.from(rawBuffer.buffer)
-            : isBufferInstance
-              ? rawBuffer
-              : Buffer.from(rawBuffer);
+          const bufferChoice = hasBufferProperty ? Buffer.from(rawBuffer.buffer) : rawBuffer;
+          pdfBuffer = isBufferInstance ? bufferChoice : Buffer.from(rawBuffer);
 
           fileName = `${agreement.payload?.headerTitle || 'Agreement'}.pdf`;
           console.log(`📄 [EMAIL-CONTROLLER] Loaded agreement PDF: ${fileName} (${pdfBuffer.length} bytes)`);
