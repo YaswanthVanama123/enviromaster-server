@@ -82,6 +82,7 @@ export async function getUserCommissions(req, res) {
       let weeklyCommission = 0;
       let annualCommission = 0;
       let contractCommission = 0;
+      let finalRate;
       let breakdown = {};
 
       if (hasSavedCommission) {
@@ -352,6 +353,7 @@ export async function getEmployeeCommissions(req, res) {
       let weeklyCommission = 0;
       let annualCommission = 0;
       let contractCommission = 0;
+      let finalRate;
       let breakdown = {};
 
       if (hasSavedCommission) {

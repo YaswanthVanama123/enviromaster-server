@@ -2,7 +2,6 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { signAdminToken } from "../../middleware/adminAuth.js";
 import { AdminUser } from "../../models/user/index.js";
-import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
 
 export async function adminLogin(req, res) {
   try {

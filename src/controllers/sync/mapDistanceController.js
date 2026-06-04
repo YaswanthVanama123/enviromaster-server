@@ -939,6 +939,7 @@ export const getStats = async (req, res) => {
     ]);
 
     let storageSizeBytes = 0;
+    let storageSizeFormatted;
     let avgBytesPerRecord = 0;
 
     try {
@@ -1453,7 +1454,7 @@ export const detectAccountTypeWithMapbox = async (req, res) => {
         accountType = 'Bread15';
         reason = `${shortestDrivingTime.toFixed(1)} min drive to ${shortestDestination.destination} - within 15 min`;
       } else {
-        accountType = 'Pit';
+        // accountType already set
         reason = `${shortestDrivingTime.toFixed(1)} min drive to ${shortestDestination.destination} - beyond 15 min`;
       }
     } else {
@@ -1743,7 +1744,7 @@ async function processDistanceRecords(distanceRecords, fromAddress) {
       accountType = 'Bread15';
       reason = `${shortestDrivingTime.toFixed(1)} min to ${shortestDestination}`;
     } else {
-      accountType = 'Pit';
+      // accountType already set
       reason = `${shortestDrivingTime.toFixed(1)} min to ${shortestDestination} (>15 min)`;
     }
   } else {

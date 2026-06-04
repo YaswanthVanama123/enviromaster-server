@@ -16,9 +16,6 @@ import {
   getBiginPipelineStages,
   validatePipelineStage,
 } from "../../services/zohoService.js";
-import {
-  getPdfForAgreement,
-} from "../../services/zohoUploadService.js";
 
 /**
  * Get upload status for an agreement

@@ -131,7 +131,7 @@ export async function searchProductsFromActive(filters) {
       typeof displayByAdmin === "boolean" &&
       p.displayByAdmin !== displayByAdmin
     )
-      return false;
+      return !(typeof displayByAdmin === "boolean" && p.displayByAdmin !== displayByAdmin);
     return true;
   });
 }
