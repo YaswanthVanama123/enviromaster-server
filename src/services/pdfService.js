@@ -2552,15 +2552,11 @@ function buildServicesLatex(services = {}) {
   }
 
   const transformedServices = transformServicesToPdfFormat(usedServices);
+  const topRowCols = transformedServices.topRow || [];
+  const bottomRowCols = transformedServices.bottomRow || [];
 
-  const filteredTopRowCols = filterServiceColumns(topRowCols);
-  const filteredBottomRowCols = filterServiceColumns(bottomRowCols);
-
-  if (refreshPowerScrubUsed || services.refreshPowerScrub) {
-  }
-
-  servicesTopRowLatex = buildServiceRowSequence(filteredTopRowCols, true);
-  servicesBottomRowLatex = buildServiceRowSequence(filteredBottomRowCols, false);
+  servicesTopRowLatex = buildServiceRowSequence(filterServiceColumns(topRowCols), true);
+  servicesBottomRowLatex = buildServiceRowSequence(filterServiceColumns(bottomRowCols), false);
 
   if (usedServices.refreshPowerScrub) {
     const refreshData = usedServices.refreshPowerScrub.formData || usedServices.refreshPowerScrub;
