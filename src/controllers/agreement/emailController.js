@@ -69,9 +69,11 @@ export async function sendEmailWithPdf(req, res) {
             .lean();
 
           if (manualUpload?.pdfBuffer) {
-            pdfBuffer = manualUpload.pdfBuffer.buffer
+            const hasBufferProperty = manualUpload.pdfBuffer.buffer;
+            const isBufferInstance = Buffer.isBuffer(manualUpload.pdfBuffer);
+            pdfBuffer = hasBufferProperty
               ? Buffer.from(manualUpload.pdfBuffer.buffer)
-              : Buffer.isBuffer(manualUpload.pdfBuffer)
+              : isBufferInstance
                 ? manualUpload.pdfBuffer
                 : Buffer.from(manualUpload.pdfBuffer);
 
@@ -119,9 +121,11 @@ export async function sendEmailWithPdf(req, res) {
           throw new Error('File buffer not found');
         }
 
-        pdfBuffer = manualUpload.pdfBuffer.buffer
+        const hasBufferProperty = manualUpload.pdfBuffer.buffer;
+        const isBufferInstance = Buffer.isBuffer(manualUpload.pdfBuffer);
+        pdfBuffer = hasBufferProperty
           ? Buffer.from(manualUpload.pdfBuffer.buffer)
-          : Buffer.isBuffer(manualUpload.pdfBuffer)
+          : isBufferInstance
             ? manualUpload.pdfBuffer
             : Buffer.from(manualUpload.pdfBuffer);
 
@@ -174,9 +178,11 @@ export async function sendEmailWithPdf(req, res) {
           }
 
           const rawBuffer = agreement.pdf_meta.pdfBuffer;
-          pdfBuffer = rawBuffer.buffer
+          const hasBufferProperty = rawBuffer.buffer;
+          const isBufferInstance = Buffer.isBuffer(rawBuffer);
+          pdfBuffer = hasBufferProperty
             ? Buffer.from(rawBuffer.buffer)
-            : Buffer.isBuffer(rawBuffer)
+            : isBufferInstance
               ? rawBuffer
               : Buffer.from(rawBuffer);
 

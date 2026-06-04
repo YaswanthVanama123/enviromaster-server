@@ -183,7 +183,7 @@ LogSchema.index({ agreementId: 1, versionNumber: -1, createdAt: -1 });
 // Static: Get logs for agreement
 LogSchema.statics.getLogsForAgreement = function (agreementId, options = {}) {
   const filter = {
-    agreementId: new mongoose.Types.ObjectId(agreementId),
+    agreementId,
     isDeleted: { $ne: true },
   };
 

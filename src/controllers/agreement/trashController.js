@@ -177,9 +177,14 @@ export async function deleteFile(req, res) {
       return res.status(404).json({ success: false, error: "not_found", detail: "File not found or already deleted" });
     }
 
-    let fileName = fileType === 'attached_file' ? (result.fileName || result.originalFileName) :
-                   fileType === 'version_pdf' ? (result.fileName || `Version ${result.versionNumber}`) :
-                   (result.fileName || `Log v${result.versionNumber}`);
+    let fileName;
+    if (fileType === 'attached_file') {
+      fileName = result.fileName || result.originalFileName;
+    } else if (fileType === 'version_pdf') {
+      fileName = result.fileName || `Version ${result.versionNumber}`;
+    } else {
+      fileName = result.fileName || `Log v${result.versionNumber}`;
+    }
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json({ success: true, message: "File moved to trash successfully", fileType, fileName });

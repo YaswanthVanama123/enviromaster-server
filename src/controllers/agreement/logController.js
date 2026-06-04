@@ -116,9 +116,9 @@ export const createVersionLog = async (req, res) => {
     }
 
     const logDoc = new Log({
-      agreementId: new mongoose.Types.ObjectId(agreementId),
+      agreementId,
       agreementTitle,
-      versionId: new mongoose.Types.ObjectId(versionId),
+      versionId,
       versionNumber: resolvedVersionNumber,
       salespersonId,
       salespersonName,
@@ -191,7 +191,7 @@ export const getVersionLogs = async (req, res) => {
     }
 
     const logs = await Log.find({
-      agreementId: new mongoose.Types.ObjectId(agreementId),
+      agreementId,
       isDeleted: { $ne: true }
     })
       .sort({ versionNumber: -1, createdAt: -1 })
@@ -250,7 +250,7 @@ export const getAllVersionLogs = async (req, res) => {
     const filter = { isDeleted: { $ne: true } };
 
     if (agreementId && mongoose.Types.ObjectId.isValid(agreementId)) {
-      filter.agreementId = new mongoose.Types.ObjectId(agreementId);
+      filter.agreementId = agreementId;
     }
 
     const totalLogs = await Log.countDocuments(filter);
@@ -317,7 +317,7 @@ export const downloadVersionLog = async (req, res) => {
     const includeDeleted = req.query.includeDeleted === "true";
 
     const filter = {
-      _id: new mongoose.Types.ObjectId(logId)
+      _id: logId
     };
     if (!includeDeleted) {
       filter.isDeleted = { $ne: true };

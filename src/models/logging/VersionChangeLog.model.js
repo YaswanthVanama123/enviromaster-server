@@ -220,7 +220,7 @@ VersionChangeLogSchema.index({
 
 VersionChangeLogSchema.statics.getLogsForAgreement = function(agreementId, options = {}) {
   const filter = {
-    agreementId: new mongoose.Types.ObjectId(agreementId),
+    agreementId,
     isDeleted: { $ne: true }
   };
 
@@ -246,7 +246,7 @@ VersionChangeLogSchema.statics.getChangeStats = function(agreementId) {
   return this.aggregate([
     {
       $match: {
-        agreementId: new mongoose.Types.ObjectId(agreementId),
+        agreementId,
         isDeleted: { $ne: true }
       }
     },

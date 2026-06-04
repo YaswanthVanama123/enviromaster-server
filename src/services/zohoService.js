@@ -52,10 +52,12 @@ export async function handleZohoOAuthCallback(authorizationCode, location = "in"
       throw new Error("ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET environment variables are required");
     }
 
-    const accountsUrl = location === "in" ? "https://accounts.zoho.in" :
-                       location === "eu" ? "https://accounts.zoho.eu" :
-                       location === "com.au" ? "https://accounts.zoho.com.au" :
-                       "https://accounts.zoho.com";
+    const accountsUrlMap = {
+      "in": "https://accounts.zoho.in",
+      "eu": "https://accounts.zoho.eu",
+      "com.au": "https://accounts.zoho.com.au"
+    };
+    const accountsUrl = accountsUrlMap[location] || "https://accounts.zoho.com";
 
     console.log("🔄 Step 2 - exchanging authorization code for tokens...");
     console.log("  ├ Accounts URL:", accountsUrl);

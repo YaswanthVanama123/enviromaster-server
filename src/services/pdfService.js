@@ -861,17 +861,7 @@ const productsHeaderRowLatex =
     const leftCustomValues = (customColumns.products || []).map(col => {
       const value = mp.customFields?.[col.id];
 
-      const sanitizeValue = (val) => {
-        if (val === undefined || val === null || val === "") return "";
-        const str = String(val);
-        return str
-          .replace(/[\x00-\x1F\x7F-\xFF]/g, '')
-          .replace(/\uFFFD/g, '')
-          .replace(/[^\x20-\x7E\n\r\t]/g, '')
-          .trim();
-      };
-
-      const sanitized = sanitizeValue(value);
+      const sanitized = sanitizeString(value);
 
       if (sanitized === "") {
         return latexEscape("");
@@ -895,17 +885,7 @@ const productsHeaderRowLatex =
     const rightCustomValues = (customColumns.dispensers || []).map(col => {
       const value = dp.customFields?.[col.id];
 
-      const sanitizeValue = (val) => {
-        if (val === undefined || val === null || val === "") return "";
-        const str = String(val);
-        return str
-          .replace(/[\x00-\x1F\x7F-\xFF]/g, '')
-          .replace(/\uFFFD/g, '')
-          .replace(/[^\x20-\x7E\n\r\t]/g, '')
-          .trim();
-      };
-
-      const sanitized = sanitizeValue(value);
+      const sanitized = sanitizeString(value);
 
       if (sanitized === "") {
         return latexEscape("");
@@ -2766,10 +2746,12 @@ function buildServicesLatex(services = {}) {
               const largeTotal = readFieldValue(serviceData.largeTotal);
 
               if (smallQty && smallRate) {
-                details.push(`Small/Med: ${smallQty} @ \\$${smallRate}${smallTotal ? ` = \\$${smallTotal}` : ""}`);
+                const totalDisplay = smallTotal ? ` = \\$${smallTotal}` : "";
+                details.push(`Small/Med: ${smallQty} @ \\$${smallRate}${totalDisplay}`);
               }
               if (largeQty && largeRate) {
-                details.push(`Large: ${largeQty} @ \\$${largeRate}${largeTotal ? ` = \\$${largeTotal}` : ""}`);
+                const totalDisplay = largeTotal ? ` = \\$${largeTotal}` : "";
+                details.push(`Large: ${largeQty} @ \\$${largeRate}${totalDisplay}`);
               }
             }
 
@@ -3568,7 +3550,11 @@ export async function compileCustomerHeader(body = {}, options = {}) {
   const manifest = { "Envimaster.png": "images/Envimaster.png" };
 
   console.log(`📷 [PDF] Sending ${files.length} files to remote PDF service`);
-  console.log(`📷 [PDF] Files: ${files.map(f => `${f.name} (${f.data.length} bytes)`).join(', ')}`);
+  const filesDesc = files.map(f => {
+    const sizeBytes = f.data.length;
+    return `${f.name} (${sizeBytes} bytes)`;
+  }).join(', ');
+  console.log(`📷 [PDF] Files: ${filesDesc}`);
   console.log(`📷 [PDF] Manifest:`, JSON.stringify(manifest));
 
   try {

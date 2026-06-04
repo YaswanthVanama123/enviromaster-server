@@ -204,7 +204,7 @@ PriceOverrideLogSchema.statics.getOverrideStats = async function(agreementId) {
   const stats = await this.aggregate([
     {
       $match: {
-        agreementId: new mongoose.Types.ObjectId(agreementId),
+        agreementId,
         isDeleted: { $ne: true }
       }
     },

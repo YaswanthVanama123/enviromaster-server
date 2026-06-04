@@ -76,7 +76,8 @@ export async function getPdfForAgreement(agreementId, options = {}) {
   const requestedVersionId = options?.versionId ? String(options.versionId).trim() : null;
   const cachedAgreement = options?.agreementDoc || null;
 
-  console.log(`📎 [PDF-LOOKUP] Searching for PDF data in VersionPdf collection for agreement: ${agreementId}${requestedVersionId ? ` (versionId: ${requestedVersionId})` : ""}`);
+  const versionIdDisplay = requestedVersionId ? ` (versionId: ${requestedVersionId})` : "";
+  console.log(`📎 [PDF-LOOKUP] Searching for PDF data in VersionPdf collection for agreement: ${agreementId}${versionIdDisplay}`);
 
   let versionDoc = null;
 
