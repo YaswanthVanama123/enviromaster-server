@@ -152,7 +152,6 @@ function calculateCommissionV2(input) {
     frequency,
     accountType,
     agreementTerm,
-    contractMonths,
     businessType,
     yearsAsCustomer = 0,
     totalRenewalValue = 0,

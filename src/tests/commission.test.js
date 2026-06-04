@@ -6,7 +6,6 @@
  * Or: npx jest src/tests/commission.test.js
  */
 
-import { jest } from '@jest/globals';
 
 // Mock the Commission calculation logic (same as in controller)
 const DEFAULT_RULES = {

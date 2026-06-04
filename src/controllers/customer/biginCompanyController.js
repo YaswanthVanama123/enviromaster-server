@@ -4,7 +4,6 @@
  */
 
 import { BiginCompany } from "../../models/customer/index.js";
-import { getAllBiginCompanies, getBiginCompanies } from "../../services/zohoService.js";
 import { v4 as uuidv4 } from "uuid";
 
 // Track fetch status in memory

@@ -747,7 +747,6 @@ export const getQuotaStatus = async (req, res) => {
     let renewalCount = 0;
 
     const recentAgreements = savedPdfs.slice(0, 5).map(pdf => {
-      const contractMonths = pdf.payload?.summary?.contractMonths || 12;
       // serviceAgreementTotal is already the MONTHLY value (same as My Commissions)
       const serviceMonthlyValue = pdf.payload?.summary?.serviceAgreementTotal || 0;
       const productMonthlyTotal = pdf.payload?.summary?.productMonthlyTotal || 0;

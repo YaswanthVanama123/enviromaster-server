@@ -4,7 +4,7 @@
  */
 
 import mongoose from "mongoose";
-import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
+import { CustomerHeaderDoc, ManualUploadDocument } from "../../models/agreement/index.js";
 
 export async function getSavedFilesList(req, res) {
   try {

@@ -4,7 +4,7 @@
  */
 
 import mongoose from "mongoose";
-import { CustomerHeaderDoc, VersionPdf } from "../../models/agreement/index.js";
+import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 
 export async function getDocumentStatusCounts(req, res) {
   try {

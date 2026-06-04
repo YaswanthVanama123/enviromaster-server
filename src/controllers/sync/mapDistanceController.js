@@ -939,7 +939,6 @@ export const getStats = async (req, res) => {
     ]);
 
     let storageSizeBytes = 0;
-    let storageSizeFormatted = 'N/A';
     let avgBytesPerRecord = 0;
 
     try {

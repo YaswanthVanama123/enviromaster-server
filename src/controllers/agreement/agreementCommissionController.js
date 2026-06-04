@@ -3,7 +3,6 @@
  * Handles agreement-based commission calculations
  */
 
-import mongoose from "mongoose";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 
 // Quota level to commission rate mapping
@@ -83,7 +82,6 @@ export async function getUserCommissions(req, res) {
       let weeklyCommission = 0;
       let annualCommission = 0;
       let contractCommission = 0;
-      let finalRate = 6;
       let breakdown = {};
 
       if (hasSavedCommission) {
@@ -354,7 +352,6 @@ export async function getEmployeeCommissions(req, res) {
       let weeklyCommission = 0;
       let annualCommission = 0;
       let contractCommission = 0;
-      let finalRate = 6;
       let breakdown = {};
 
       if (hasSavedCommission) {

@@ -63,7 +63,7 @@ class MapDistanceSession {
   async initialize(onProgress) {
     if (this.isInitialized) {
       console.log('[Session] Already initialized, reusing session');
-      return true;
+      return;
     }
 
     console.log('[Session] Initializing new session...');
@@ -97,7 +97,6 @@ class MapDistanceSession {
     this.isInitialized = true;
     this.isOnMapDistancePage = true;
     console.log('[Session] Session initialized successfully');
-    return true;
   }
 
   /**

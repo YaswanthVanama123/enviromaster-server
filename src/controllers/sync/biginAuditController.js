@@ -774,7 +774,6 @@ export const deleteUnnecessaryData = async (req, res) => {
 
     const totalCount = await BiginAuditLog.countDocuments();
     const lisaCount = await BiginAuditLog.countDocuments({ user: "Lisa Rothwell" });
-    const toDeleteCount = totalCount - lisaCount;
 
     const result = await BiginAuditLog.deleteMany({ user: { $ne: "Lisa Rothwell" } });
 

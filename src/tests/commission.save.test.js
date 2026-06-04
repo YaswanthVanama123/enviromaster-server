@@ -469,24 +469,6 @@ describe('Commission Save - Data Integrity', () => {
   });
 
   test('Breakdown values should match rules applied', () => {
-    const commission = createMockCommissionData({
-      input: {
-        quotaLevel: 'double',
-        accountType: 'Bread15',
-        pricingLine: 'Greenline',
-        isInsideSales: true,
-        agreementTerm: '3-year',
-      },
-      breakdown: {
-        baseRate: 9,           // double quota
-        accountTypeAdjustment: -0.5,  // Bread15
-        greenlineBonus: 1,     // Greenline
-        insideSalesDeduction: -3,     // inside sales
-        agreementMultiplier: 135,     // 3-year
-        renewalBonus: 0,       // new business
-      },
-    });
-
     // Effective: 9 - 0.5 + 1 - 3 = 6.5%
     // Final: 6.5 * 135% = 8.775%
     const effectiveRate = 9 - 0.5 + 1 + 0 - 3;

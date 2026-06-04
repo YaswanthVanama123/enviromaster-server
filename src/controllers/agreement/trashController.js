@@ -68,7 +68,6 @@ export async function restoreFile(req, res) {
     }
 
     let file = null, fileType = null, fileName = "Unknown File";
-    const fileTypeHint = String(req.query.fileType || "").trim().toLowerCase();
 
     // Try to find deleted file
     const [manual, version, log] = await Promise.all([

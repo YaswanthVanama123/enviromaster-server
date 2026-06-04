@@ -3,33 +3,21 @@
  * Handles all Zoho Bigin upload operations
  */
 
-import mongoose from "mongoose";
 import { ZohoMapping } from "../../models/sync/index.js";
-import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
-import { Log } from "../../models/logging/index.js";
-import { AdminSettings } from "../../models/admin/index.js";
-import { compileCustomerHeader } from "../../services/pdfService.js";
+import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import {
-  getBiginCompanies,
   getAllBiginCompanies,
   searchBiginCompanies,
   createBiginCompany,
   getBiginDealsByCompany,
-  createBiginDeal,
-  createBiginNote,
   createBiginTask,
   getBiginUsers,
-  uploadBiginFile,
   getBiginModules,
   getBiginPipelineStages,
   validatePipelineStage,
-  getOrCreateContactForDeal,
 } from "../../services/zohoService.js";
 import {
-  convertTextLogToPdf,
   getPdfForAgreement,
-  buildNormalizedFileName,
-  calculateDealAmount,
 } from "../../services/zohoUploadService.js";
 
 /**

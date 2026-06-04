@@ -5,7 +5,6 @@ import {
 } from "../../validations/serviceConfigValidation.js";
 
 import mongoose from "mongoose";
-import path from "path";
 import { ServiceAgreementTemplate } from "../../models/service/index.js";
 
 import {

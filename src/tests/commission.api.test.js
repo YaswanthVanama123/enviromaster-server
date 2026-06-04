@@ -1,6 +1,5 @@
 
 
-import { jest } from '@jest/globals';
 
 // Base URL for API calls (adjust port if needed)
 const API_BASE_URL = process.env.TEST_API_URL || 'http://localhost:3001';

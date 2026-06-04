@@ -1,7 +1,5 @@
-import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import Mustache from "mustache";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = path.join(__dirname, "..", "templates", "proposal.tex");
