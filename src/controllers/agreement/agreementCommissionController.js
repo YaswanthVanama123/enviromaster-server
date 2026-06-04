@@ -205,7 +205,7 @@ export async function getAllEmployeesCommissions(req, res) {
   try {
     const { startDate, endDate, status } = req.query;
 
-    const matchFilter = { isDeleted: { $ne: true }, createdBy: { $ne: null, $exists: true, $ne: '' } };
+    const matchFilter = { isDeleted: { $ne: true }, createdBy: { $nin: [null, ""], $exists: true } };
     if (status) matchFilter.status = status;
     if (startDate || endDate) {
       matchFilter.createdAt = {};

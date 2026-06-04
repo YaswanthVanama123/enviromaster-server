@@ -366,11 +366,13 @@ export async function getSavedFilesGrouped(req, res) {
       };
     });
 
-    const finalAgreements = isTrashMode
-      ? transformedAgreements.filter(agreement => agreement.fileCount > 0 || agreement.isDeleted === true)
-      : !includeDrafts
-        ? transformedAgreements.filter(agreement => agreement.fileCount > 0)
-        : transformedAgreements.map(agreement => ({...agreement, isDraftOnly: agreement.fileCount === 0}));
+    const getFilteredAgreements = () => {
+      if (isTrashMode) return transformedAgreements.filter(a => a.fileCount > 0 || a.isDeleted === true);
+      if (!includeDrafts) return transformedAgreements.filter(a => a.fileCount > 0);
+      return transformedAgreements.map(a => ({...a, isDraftOnly: a.fileCount === 0}));
+    };
+
+    const finalAgreements = getFilteredAgreements();
 
     const totalFiles = finalAgreements.reduce((sum, agreement) => sum + agreement.fileCount, 0);
     const totalTime = Date.now() - startTime;

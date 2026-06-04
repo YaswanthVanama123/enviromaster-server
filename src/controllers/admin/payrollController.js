@@ -176,7 +176,7 @@ export async function getEmployeesPayroll(req, res) {
 
     const agreements = await CustomerHeaderDoc.find({
       isDeleted: { $ne: true },
-      createdBy: { $ne: null, $exists: true, $ne: '' },
+      createdBy: { $nin: [null, ""], $exists: true },
       createdAt: { $gte: periodStart, $lte: periodEnd }
     })
       .select({

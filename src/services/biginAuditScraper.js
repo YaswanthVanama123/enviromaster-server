@@ -140,7 +140,7 @@ function parseActionText(actionText) {
   };
 
   // Extract user name (first bold span)
-  const userMatch = actionText.match(/^([A-Za-z ]+?)\s+(added|updated|deleted|sent|created|removed)/i);
+  const userMatch = actionText.match(/^([\w ]+?)\s+(added|updated|deleted|sent|created|removed)/i);
   if (userMatch) {
     result.user = userMatch[1].trim();
   }

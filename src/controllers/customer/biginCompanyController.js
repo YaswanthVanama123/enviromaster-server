@@ -293,7 +293,7 @@ export const getCompanyStats = async (req, res) => {
 
     // Get city breakdown
     const cityBreakdown = await BiginCompany.aggregate([
-      { $match: { city: { $ne: null, $ne: "" } } },
+      { $match: { city: { $nin: [null, ""] } } },
       { $group: { _id: "$city", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
@@ -301,7 +301,7 @@ export const getCompanyStats = async (req, res) => {
 
     // Get owner breakdown
     const ownerBreakdown = await BiginCompany.aggregate([
-      { $match: { owner: { $ne: null, $ne: "" } } },
+      { $match: { owner: { $nin: [null, ""] } } },
       { $group: { _id: "$owner", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },

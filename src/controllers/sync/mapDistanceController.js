@@ -1347,7 +1347,7 @@ export const detectAccountTypeWithMapbox = async (req, res) => {
     // 3. Build query for distance records (filter by frequency if provided)
     const distanceQuery = {
       customerId: mapping.routeStarCustomerId,
-      destinationCustomerName: { $ne: customer.name, $exists: true, $ne: '' },
+      destinationCustomerName: { $nin: [customer.name, ""], $exists: true },
       distanceMiles: { $gt: 0 }  // Exclude 0-mile records
     };
 
@@ -1592,7 +1592,7 @@ export const detectAccountTypeBatch = async (req, res) => {
         // Build query for this frequency
         const distanceQuery = {
           customerId: mapping.routeStarCustomerId,
-          destinationCustomerName: { $ne: customer.name, $exists: true, $ne: '' },
+          destinationCustomerName: { $nin: [customer.name, ""], $exists: true },
           distanceMiles: { $gt: 0 },
           frequency: freqNum
         };
@@ -1607,7 +1607,7 @@ export const detectAccountTypeBatch = async (req, res) => {
           // Fallback: try without frequency filter
           const fallbackQuery = {
             customerId: mapping.routeStarCustomerId,
-            destinationCustomerName: { $ne: customer.name, $exists: true, $ne: '' },
+            destinationCustomerName: { $nin: [customer.name, ""], $exists: true },
             distanceMiles: { $gt: 0 }
           };
 

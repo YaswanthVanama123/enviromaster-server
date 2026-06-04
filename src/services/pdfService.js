@@ -185,7 +185,7 @@ function buildServiceAgreementLatex(agreementData = {}) {
       })
       // Remove any Unicode replacement characters or other problematic Unicode
       .replace(/[\uFFF0-\uFFFF]/g, '')
-      .replace(/[^\x20-\x7E\xA0-\u024F\u2000-\u206F\u2010-\u2027]/g, '');
+      .replace(/[^\x20-\x7E\xA0-\u024F-\u206F\u2010-\u2027]/g, '');
 
     if (cleaned.length !== originalLength) {
       console.warn(`⚠️ [SERVICE AGREEMENT] Sanitized field "${fieldName}": removed ${originalLength - cleaned.length} chars`);
@@ -1561,9 +1561,6 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
           const hasTotal = area.total != null && area.total !== '';
           const hasQty = area.qty != null && area.qty !== '' && area.qty > 0;
 
-          if (serviceKey === 'refreshPowerScrub') {
-          }
-
           if (hasQty && (hasRate || hasTotal)) {
             rows.push({
               type: 'atCharge',
@@ -2527,10 +2524,7 @@ function buildServicesLatex(services = {}) {
       console.log('🔍 [SERVICES DEBUG] pureJanitorial isUsed:', isUsed);
     }
 
-    if (svc && serviceKey === 'refreshPowerScrub') {
-    }
-
-    if (isUsed) {
+    if (svc && isUsed) {
       usedServices[serviceKey] = svc;
     }
   }
@@ -2547,8 +2541,6 @@ function buildServicesLatex(services = {}) {
   }
 
   const refreshPowerScrubUsed = Object.keys(usedServices).includes('refreshPowerScrub');
-  if (refreshPowerScrubUsed || services.refreshPowerScrub) {
-  }
 
   if (Object.keys(usedServices).length === 0) {
     return {
@@ -2560,11 +2552,6 @@ function buildServicesLatex(services = {}) {
   }
 
   const transformedServices = transformServicesToPdfFormat(usedServices);
-  const topRowCols = transformedServices.topRow || [];
-  const bottomRowCols = transformedServices.bottomRow || [];
-
-  if (refreshPowerScrubUsed || services.refreshPowerScrub) {
-  }
 
   const filteredTopRowCols = filterServiceColumns(topRowCols);
   const filteredBottomRowCols = filterServiceColumns(bottomRowCols);
@@ -2574,9 +2561,6 @@ function buildServicesLatex(services = {}) {
 
   servicesTopRowLatex = buildServiceRowSequence(filteredTopRowCols, true);
   servicesBottomRowLatex = buildServiceRowSequence(filteredBottomRowCols, false);
-
-  if (refreshPowerScrubUsed || services.refreshPowerScrub) {
-  }
 
   if (usedServices.refreshPowerScrub) {
     const refreshData = usedServices.refreshPowerScrub.formData || usedServices.refreshPowerScrub;
