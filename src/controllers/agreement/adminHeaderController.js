@@ -56,12 +56,13 @@ export async function getAdminHeaders(req, res) {
     );
 
     const filter = {};
-    const total = await AdminHeaderDoc.countDocuments(filter);
+    const total = await AdminHeaderDoc.countDocuments(filter).exec();
     const items = await AdminHeaderDoc.find(filter)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .lean();
+      .lean()
+      .exec();
 
     res.json({ total, page, limit, items });
   } catch (err) {
@@ -73,7 +74,7 @@ export async function getAdminHeaders(req, res) {
 export async function getAdminHeaderById(req, res) {
   try {
     const { id } = req.params;
-    const doc = await AdminHeaderDoc.findById(id).lean();
+    const doc = await AdminHeaderDoc.findById(id).lean().exec();
     if (!doc) {
       return res.status(404).json({ error: "Not found", detail: "AdminHeaderDoc not found" });
     }
@@ -83,7 +84,8 @@ export async function getAdminHeaderById(req, res) {
       adminByDisplay: { $ne: false }
     })
     .select('serviceId label description tags')
-    .lean();
+    .lean()
+    .exec();
 
     const serviceMetadata = activeServices.map(service => ({
       serviceId: service.serviceId,
@@ -102,72 +104,80 @@ export async function getAdminHeaderById(req, res) {
   }
 }
 
+function applyFieldUpdates(doc, body) {
+  if (body.headerTitle !== undefined) doc.headerTitle = body.headerTitle;
+  if (body.headerRows !== undefined) doc.headerRows = body.headerRows;
+  if (body.products !== undefined) doc.products = body.products;
+  if (body.services !== undefined) doc.services = body.services;
+  if (body.status !== undefined) doc.status = body.status;
+  if (body.label !== undefined) doc.label = body.label;
+
+  if (body.agreement !== undefined) {
+    doc.agreement = {
+      enviroOf: body.agreement.enviroOf ?? doc.agreement?.enviroOf ?? "",
+      customerExecutedOn: body.agreement.customerExecutedOn ?? doc.agreement?.customerExecutedOn ?? "",
+      additionalMonths: body.agreement.additionalMonths ?? doc.agreement?.additionalMonths ?? "",
+    };
+  }
+}
+
+async function compilePdfIfNeeded(doc, recompile) {
+  if (!recompile) return { buffer: null, filename: "admin-header.pdf" };
+
+  const { buffer, filename } = await compileCustomerHeader({
+    headerTitle: doc.headerTitle,
+    headerRows: doc.headerRows,
+    products: doc.products,
+    services: doc.services,
+    agreement: doc.agreement,
+  });
+
+  doc.pdfMeta = {
+    sizeBytes: buffer.length,
+    contentType: "application/pdf",
+    storedAt: new Date(),
+    externalUrl: doc.pdfMeta?.externalUrl || null,
+  };
+
+  return { buffer, filename };
+}
+
+function sendResponse(res, doc, buffer, filename) {
+  if (buffer) {
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.setHeader("X-AdminHeaderDoc-Id", doc._id.toString());
+    return res.send(buffer);
+  }
+
+  return res.json({
+    success: true,
+    doc: {
+      _id: doc._id,
+      status: doc.status,
+      updatedAt: doc.updatedAt
+    }
+  });
+}
+
 export async function updateAdminHeader(req, res) {
   try {
     const { id } = req.params;
     const body = req.body || {};
     const recompile = req.query.recompile === "true";
 
-    const doc = await AdminHeaderDoc.findById(id);
+    const doc = await AdminHeaderDoc.findById(id).exec();
     if (!doc) {
       return res.status(404).json({ error: "Not found", detail: "AdminHeaderDoc not found" });
     }
 
-    if (body.headerTitle !== undefined) doc.headerTitle = body.headerTitle;
-    if (body.headerRows !== undefined) doc.headerRows = body.headerRows;
-    if (body.products !== undefined) doc.products = body.products;
-    if (body.services !== undefined) doc.services = body.services;
-    if (body.status !== undefined) doc.status = body.status;
-    if (body.label !== undefined) doc.label = body.label;
-
-    if (body.agreement !== undefined) {
-      doc.agreement = {
-        enviroOf: body.agreement.enviroOf ?? doc.agreement?.enviroOf ?? "",
-        customerExecutedOn: body.agreement.customerExecutedOn ?? doc.agreement?.customerExecutedOn ?? "",
-        additionalMonths: body.agreement.additionalMonths ?? doc.agreement?.additionalMonths ?? "",
-      };
-    }
-
+    applyFieldUpdates(doc, body);
     doc.updatedBy = req.user?.username || req.admin?.username || doc.updatedBy;
 
-    let buffer = null;
-    let filename = "admin-header.pdf";
-
-    if (recompile) {
-      const { buffer: pdfBuf, filename: fn } = await compileCustomerHeader({
-        headerTitle: doc.headerTitle,
-        headerRows: doc.headerRows,
-        products: doc.products,
-        services: doc.services,
-        agreement: doc.agreement,
-      });
-      buffer = pdfBuf;
-      filename = fn;
-      doc.pdfMeta = {
-        sizeBytes: buffer.length,
-        contentType: "application/pdf",
-        storedAt: new Date(),
-        externalUrl: doc.pdfMeta?.externalUrl || null,
-      };
-    }
-
+    const { buffer, filename } = await compilePdfIfNeeded(doc, recompile);
     await doc.save();
 
-    if (buffer) {
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-      res.setHeader("X-AdminHeaderDoc-Id", doc._id.toString());
-      return res.send(buffer);
-    } else {
-      return res.json({
-        success: true,
-        doc: {
-          _id: doc._id,
-          status: doc.status,
-          updatedAt: doc.updatedAt
-        }
-      });
-    }
+    return sendResponse(res, doc, buffer, filename);
   } catch (err) {
     console.error("updateAdminHeader error:", err);
     res.status(500).json({

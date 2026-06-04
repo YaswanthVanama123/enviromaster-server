@@ -2657,7 +2657,6 @@ function buildServicesLatex(services = {}) {
 
       if (enabledAreas.length > 0) {
         const maxAreas = Math.min(enabledAreas.length, 4);
-        const colCount = maxAreas + 1;
         const colSpec = "|l|" + Array(maxAreas).fill("Y").join("|") + "|";
 
         const headerRow = "  & " +

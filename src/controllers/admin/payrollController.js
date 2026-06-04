@@ -118,6 +118,49 @@ function formatPeriodLabel(start, end) {
   return `${startStr} - ${endStr}`;
 }
 
+function createEmployeeRecord(username) {
+  return {
+    username,
+    agreements: [],
+    totalAgreements: 0,
+    totalMonthlyRevenue: 0,
+    totalAnnualCommission: 0,
+    totalWeeklyCommission: 0,
+    statusCounts: {
+      draft: 0,
+      saved: 0,
+      pending_approval: 0,
+      approved: 0,
+      active: 0
+    }
+  };
+}
+
+function calculateCommission(summary, savedCommission) {
+  const monthlyValue = summary.serviceAgreementTotal || 0;
+  let annualCommission = 0;
+  let weeklyCommission = 0;
+
+  if (savedCommission.annualCommission !== undefined) {
+    annualCommission = savedCommission.annualCommission || 0;
+    weeklyCommission = savedCommission.weeklyCommission || 0;
+  } else {
+    const monthlyCommission = monthlyValue * 0.06;
+    annualCommission = monthlyCommission * 12;
+    weeklyCommission = monthlyCommission / 4.33;
+  }
+
+  return { annualCommission, weeklyCommission, monthlyValue };
+}
+
+function incrementStatusCount(emp, status) {
+  if (status === 'draft') emp.statusCounts.draft++;
+  else if (status === 'saved') emp.statusCounts.saved++;
+  else if (status === 'pending_approval') emp.statusCounts.pending_approval++;
+  else if (status === 'approved_salesman' || status === 'approved_admin') emp.statusCounts.approved++;
+  else if (status === 'active' || status === 'finalized') emp.statusCounts.active++;
+}
+
 /**
  * Get all employees' payroll data for a specific period
  * GET /api/payroll/employees
@@ -128,11 +171,9 @@ export async function getEmployeesPayroll(req, res) {
     const settings = await AdminSettings.getSingleton();
     const periods = calculatePayrollPeriods(settings.payrollSettings);
 
-    // Use query params or default to current period
     let periodStart = req.query.periodStart ? new Date(req.query.periodStart) : periods.current.start;
     let periodEnd = req.query.periodEnd ? new Date(req.query.periodEnd) : periods.current.end;
 
-    // Fetch all agreements within the period, grouped by createdBy (salesperson)
     const agreements = await CustomerHeaderDoc.find({
       isDeleted: { $ne: true },
       createdBy: { $ne: null, $exists: true, $ne: '' },
@@ -148,9 +189,9 @@ export async function getEmployeesPayroll(req, res) {
         createdAt: 1
       })
       .sort({ createdAt: -1 })
-      .lean();
+      .lean()
+      .exec();
 
-    // Group by employee
     const employeeMap = new Map();
 
     agreements.forEach(a => {
@@ -158,53 +199,20 @@ export async function getEmployeesPayroll(req, res) {
       if (!username) return;
 
       if (!employeeMap.has(username)) {
-        employeeMap.set(username, {
-          username,
-          agreements: [],
-          totalAgreements: 0,
-          totalMonthlyRevenue: 0,
-          totalAnnualCommission: 0,
-          totalWeeklyCommission: 0,
-          statusCounts: {
-            draft: 0,
-            saved: 0,
-            pending_approval: 0,
-            approved: 0,
-            active: 0
-          }
-        });
+        employeeMap.set(username, createEmployeeRecord(username));
       }
 
       const emp = employeeMap.get(username);
       const summary = a.payload?.summary || {};
       const savedCommission = a.payload?.commission || {};
-
-      // Calculate commission
-      const monthlyValue = summary.serviceAgreementTotal || 0;
-      let annualCommission = 0;
-      let weeklyCommission = 0;
-
-      if (savedCommission.annualCommission !== undefined) {
-        annualCommission = savedCommission.annualCommission || 0;
-        weeklyCommission = savedCommission.weeklyCommission || 0;
-      } else {
-        // Fallback calculation
-        const monthlyCommission = monthlyValue * 0.06;
-        annualCommission = monthlyCommission * 12;
-        weeklyCommission = monthlyCommission / 4.33;
-      }
+      const { annualCommission, weeklyCommission, monthlyValue } = calculateCommission(summary, savedCommission);
 
       emp.totalAgreements++;
       emp.totalMonthlyRevenue += monthlyValue;
       emp.totalAnnualCommission += annualCommission;
       emp.totalWeeklyCommission += weeklyCommission;
 
-      // Status counting
-      if (a.status === 'draft') emp.statusCounts.draft++;
-      else if (a.status === 'saved') emp.statusCounts.saved++;
-      else if (a.status === 'pending_approval') emp.statusCounts.pending_approval++;
-      else if (a.status === 'approved_salesman' || a.status === 'approved_admin') emp.statusCounts.approved++;
-      else if (a.status === 'active' || a.status === 'finalized') emp.statusCounts.active++;
+      incrementStatusCount(emp, a.status);
 
       emp.agreements.push({
         id: a._id.toString(),
@@ -217,11 +225,9 @@ export async function getEmployeesPayroll(req, res) {
       });
     });
 
-    // Convert to array and sort by total commission
     const employees = Array.from(employeeMap.values())
       .sort((a, b) => b.totalAnnualCommission - a.totalAnnualCommission);
 
-    // Calculate totals
     const totals = employees.reduce((acc, emp) => {
       acc.totalAgreements += emp.totalAgreements;
       acc.totalMonthlyRevenue += emp.totalMonthlyRevenue;
@@ -311,7 +317,6 @@ export async function getPayrollHistory(req, res) {
         },
         {
           $addFields: {
-            // Calculate commission: use saved annualCommission if exists, otherwise calculate from monthly revenue
             calculatedCommission: {
               $cond: {
                 if: { $gt: ['$payload.commission.annualCommission', 0] },
@@ -319,8 +324,8 @@ export async function getPayrollHistory(req, res) {
                 else: {
                   $multiply: [
                     { $ifNull: ['$payload.summary.serviceAgreementTotal', 0] },
-                    12,  // monthly to annual
-                    0.06 // commission rate
+                    12,
+                    0.06
                   ]
                 }
               }
@@ -340,7 +345,7 @@ export async function getPayrollHistory(req, res) {
             uniqueEmployees: { $addToSet: '$createdBy' }
           }
         }
-      ]);
+      ]).exec();
 
       const data = result[0] || {
         totalAgreements: 0,

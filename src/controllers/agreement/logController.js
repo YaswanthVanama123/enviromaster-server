@@ -79,7 +79,7 @@ export const createVersionLog = async (req, res) => {
     if (overwriteExisting) {
       console.log(`🔄 [LOG-CONTROLLER] Overwrite mode enabled - reason: ${overwriteReason}`);
 
-      const existingLog = await Log.findOne({ versionId: new mongoose.Types.ObjectId(versionId), isDeleted: { $ne: true } });
+      const existingLog = await Log.findOne({ versionId, isDeleted: { $ne: true } });
 
       if (existingLog) {
         console.log(`📝 [LOG-CONTROLLER] Found existing log, updating: ${existingLog._id}`);

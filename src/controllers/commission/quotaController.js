@@ -17,7 +17,7 @@ import {
 
 // Helper: Check if string is valid ObjectId
 function isValidObjectId(id) {
-  return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
+  return mongoose.Types.ObjectId.isValid(id);
 }
 
 // Helper: Build query for finding employee by id or username

@@ -245,7 +245,7 @@ class PricingBackupController {
 
       console.log(`[BACKUP-SNAPSHOT] Fetching snapshot for: ${changeDayId}, preview: ${preview}`);
 
-      const backup = await PricingBackup.findOne({ changeDayId });
+      const backup = await PricingBackup.findOne({ changeDayId }).exec();
 
       if (!backup) {
         return res.status(404).json({
@@ -306,10 +306,11 @@ class PricingBackupController {
       const latestBackup = await PricingBackup.findOne({ isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .select("createdAt version isComplete")
-        .lean();
+        .lean()
+        .exec();
 
-      const totalBackups = await PricingBackup.countDocuments({ isDeleted: { $ne: true } });
-      const completeBackups = await PricingBackup.countDocuments({
+      const totalBackups = PricingBackup.countDocuments({ isDeleted: { $ne: true } });
+      const completeBackups = PricingBackup.countDocuments({
         isDeleted: { $ne: true },
         isComplete: true,
       });
@@ -320,7 +321,8 @@ class PricingBackupController {
       })
         .sort({ createdAt: -1 })
         .select("createdAt")
-        .lean();
+        .lean()
+        .exec();
 
       const health = {
         status: "healthy",

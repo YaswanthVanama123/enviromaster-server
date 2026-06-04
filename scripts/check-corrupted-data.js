@@ -81,7 +81,7 @@ function checkObject(obj, path, documentId, issues, visited = new WeakSet()) {
 
 console.log('\n🔍 Scanning documents for corrupted data...\n');
 
-const documents = await CustomerHeaderDoc.find({}).lean();
+const documents = await CustomerHeaderDoc.find({}).lean().exec();
 console.log(`📊 Found ${documents.length} documents to check\n`);
 
 const allIssues = [];

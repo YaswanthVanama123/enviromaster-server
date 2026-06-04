@@ -5,13 +5,41 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function isCorruptAttachment(attachment) {
+  return !attachment.manualDocumentId || !mongoose.isValidObjectId(attachment.manualDocumentId);
+}
+
+async function processDocument(doc) {
+  const originalCount = doc.attachedFiles?.length || 0;
+  if (!doc.attachedFiles?.length) return null;
+
+  const corruptAttachments = doc.attachedFiles.filter(isCorruptAttachment);
+  if (!corruptAttachments.length) return null;
+
+  const cleanAttachments = doc.attachedFiles.filter(a => !isCorruptAttachment(a));
+
+  console.log(`\n🗂️  Document: ${doc._id}`);
+  console.log(`   Title: ${doc.payload?.headerTitle || 'No title'}`);
+  console.log(`   Corrupt attachments: ${corruptAttachments.length}/${originalCount}`);
+  corruptAttachments.forEach((corrupt, i) => {
+    console.log(`   [${i + 1}] fileName: "${corrupt.fileName || 'N/A'}", manualDocumentId: ${corrupt.manualDocumentId || 'undefined'}`);
+  });
+
+  await CustomerHeaderDoc.updateOne(
+    { _id: doc._id },
+    { $set: { attachedFiles: cleanAttachments, updatedAt: new Date() } }
+  );
+
+  console.log(`   ✅ Document ${doc._id} cleaned successfully`);
+  return { corruptCount: corruptAttachments.length, docId: doc._id };
+}
+
 async function cleanCorruptAttachments() {
   try {
     console.log('🔧 Starting attachment cleanup process...');
     await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/enviromaster");
     console.log('✅ Connected to MongoDB');
 
-    // Find all documents to check attachment integrity
     console.log('\n🔍 Searching for documents with corrupt attachments...');
 
     const allDocs = await CustomerHeaderDoc.find({}, {
@@ -26,51 +54,10 @@ async function cleanCorruptAttachments() {
     let cleanedAttachmentsCount = 0;
 
     for (const doc of allDocs) {
-      const originalAttachmentCount = doc.attachedFiles ? doc.attachedFiles.length : 0;
-
-      if (!doc.attachedFiles || doc.attachedFiles.length === 0) {
-        continue; // Skip documents with no attachments
-      }
-
-      // Find corrupt attachments
-      const corruptAttachments = doc.attachedFiles.filter(attachment =>
-        !attachment.manualDocumentId ||
-        !mongoose.isValidObjectId(attachment.manualDocumentId)
-      );
-
-      if (corruptAttachments.length > 0) {
+      const result = await processDocument(doc);
+      if (result) {
         corruptDocsCount++;
-        cleanedAttachmentsCount += corruptAttachments.length;
-
-        console.log(`\n🗂️  Document: ${doc._id}`);
-        console.log(`   Title: ${doc.payload?.headerTitle || 'No title'}`);
-        console.log(`   Corrupt attachments: ${corruptAttachments.length}/${originalAttachmentCount}`);
-
-        // Show corrupt attachment details
-        corruptAttachments.forEach((corrupt, index) => {
-          console.log(`   [${index + 1}] fileName: "${corrupt.fileName || 'N/A'}", manualDocumentId: ${corrupt.manualDocumentId || 'undefined'}`);
-        });
-
-        // Clean the document - filter out corrupt attachments
-        const cleanAttachments = doc.attachedFiles.filter(attachment =>
-          attachment.manualDocumentId &&
-          mongoose.isValidObjectId(attachment.manualDocumentId)
-        );
-
-        console.log(`   🧹 Keeping ${cleanAttachments.length} valid attachments`);
-
-        // Update the document
-        await CustomerHeaderDoc.updateOne(
-          { _id: doc._id },
-          {
-            $set: {
-              attachedFiles: cleanAttachments,
-              updatedAt: new Date()
-            }
-          }
-        );
-
-        console.log(`   ✅ Document ${doc._id} cleaned successfully`);
+        cleanedAttachmentsCount += result.corruptCount;
       }
     }
 
@@ -85,7 +72,6 @@ async function cleanCorruptAttachments() {
       console.log('   ✅ All corrupt attachments have been successfully removed');
     }
 
-    // Verification check
     console.log('\n🔍 Verification: Checking for remaining corruption...');
     const remainingCorruptDocs = await CustomerHeaderDoc.find({
       'attachedFiles': {

@@ -471,9 +471,7 @@ async function runSyncJob(jobId, customers, isResume = false) {
     });
     console.log('[MapDistance Sync] Browser session ready - starting customer processing');
 
-    for (let i = 0; i < customers.length; i++) {
-      const customer = customers[i];
-
+    for (const customer of customers) {
       const currentJob = await MapDistanceSyncJob.findById(jobId);
       if (currentJob.status === 'cancelled') {
         console.log('[MapDistance Sync] Job was cancelled');
