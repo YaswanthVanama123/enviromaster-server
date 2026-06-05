@@ -28,8 +28,12 @@ export async function getApprovalDocumentsGrouped(req, res) {
       return res.json({ success: true, totalGroups: 0, totalFiles: 0, groups: [] });
     }
 
+    const allAgreementObjectIds = allAgreementIds
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
     const agreements = await CustomerHeaderDoc.aggregate([
-      { $match: { _id: { $in: allAgreementIds }, isDeleted: { $ne: true } } },
+      { $match: { _id: { $in: allAgreementObjectIds }, isDeleted: { $ne: true } } },
       { $lookup: { from: 'versionpdfs', let: { agreementId: '$_id' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$agreementId', '$$agreementId'] }, { $eq: ['$status', 'pending_approval'] }, { $ne: ['$isDeleted', true] }] } } }, { $project: { _id: 1, versionNumber: 1, fileName: 1, status: 1, createdAt: 1, updatedAt: 1, 'pdf_meta.sizeBytes': 1 } }], as: 'pendingVersions' } },
       { $lookup: { from: 'manualuploaddocuments', let: { attachedFileIds: { $ifNull: ['$attachedFiles.manualDocumentId', []] }, agreementIdStr: { $toString: '$_id' } }, pipeline: [{ $match: { $expr: { $and: [{ $or: [{ $in: ['$_id', '$$attachedFileIds'] }, { $eq: ['$metadata.attachedToAgreement', '$$agreementIdStr'] }] }, { $eq: ['$status', 'pending_approval'] }, { $ne: ['$isDeleted', true] }] } } }, { $project: { _id: 1, fileName: 1, originalFileName: 1, fileSize: 1, status: 1, uploadedBy: 1, createdAt: 1, updatedAt: 1 } }], as: 'pendingManualUploads' } },
       { $project: { _id: 1, status: 1, createdAt: 1, updatedAt: 1, 'payload.headerTitle': 1, 'pdf_meta.sizeBytes': 1, pendingVersions: 1, pendingManualUploads: 1 } },
