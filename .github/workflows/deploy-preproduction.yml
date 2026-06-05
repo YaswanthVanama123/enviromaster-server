@@ -1,0 +1,52 @@
+name: Deploy to DigitalOcean Droplet (Preproduction)
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Backend (Preproduction)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to preproduction droplet over SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 138.197.64.229
+          username: ${{ secrets.DROPLET_USERNAME }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          script: |
+            set -e
+
+            cd /var/www/enviro-backend
+
+            echo "Fetching latest code from GitHub..."
+            git fetch origin
+
+            echo "Resetting server code to origin/staging..."
+            git reset --hard origin/staging
+
+            echo "Installing dependencies..."
+            npm ci
+
+            echo "Restarting PM2 app..."
+            pm2 restart enviro-backend || pm2 start npm --name enviro-backend -- start
+
+            echo "Saving PM2 process list..."
+            pm2 save
+
+            echo "Deployment finished. PM2 status:"
+            pm2 status
+
+            echo "Waiting for backend to stabilize..."
+            sleep 15
+
+            echo "Running health check..."
+            curl -f "http://localhost:${PORT:-5000}/health" || exit 1
