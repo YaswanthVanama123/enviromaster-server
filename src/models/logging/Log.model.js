@@ -201,6 +201,72 @@ LogSchema.statics.getLogsForAgreement = function (agreementId, options = {}) {
     .lean();
 };
 
+LogSchema.methods.generateTextContent = function () {
+  const lines = [];
+
+  lines.push("EnviroMaster - Version Change Log");
+  lines.push("=".repeat(60));
+  lines.push(`Document: ${this.documentTitle || ""}`);
+  lines.push(`Agreement: ${this.agreementTitle || ""}`);
+  lines.push(`Version: ${this.versionNumber}`);
+  lines.push(`Salesperson: ${this.salespersonName || ""} (${this.salespersonId || ""})`);
+  lines.push(`Save Action: ${this.saveAction || ""}`);
+  lines.push(`Date: ${this.createdAt ? new Date(this.createdAt).toISOString() : ""}`);
+  lines.push(`Total Changes: ${this.totalChanges || 0}`);
+  lines.push(`Total Price Impact: $${Number(this.totalPriceImpact || 0).toFixed(2)}`);
+  lines.push(`Significant Changes: ${this.hasSignificantChanges ? "Yes" : "No"}`);
+  lines.push("");
+
+  const formatChange = (change, index) => {
+    const out = [];
+    out.push(`${index}. ${change.productName || ""} - ${change.fieldDisplayName || ""}`);
+    if (change.changeType === CHANGE_TYPES.TEXT || change.originalText || change.newText) {
+      out.push(`   Original: ${change.originalText || ""}`);
+      out.push(`   New: ${change.newText || ""}`);
+    } else {
+      out.push(`   Original: $${Number(change.originalValue || 0).toFixed(2)}`);
+      out.push(`   New: $${Number(change.newValue || 0).toFixed(2)}`);
+      out.push(
+        `   Change: $${Number(change.changeAmount || 0).toFixed(2)} (${Number(
+          change.changePercentage || 0
+        ).toFixed(2)}%)`
+      );
+    }
+    if (change.quantity) out.push(`   Quantity: ${change.quantity}`);
+    if (change.frequency) out.push(`   Frequency: ${change.frequency}`);
+    if (change.timestamp) out.push(`   Time: ${change.timestamp}`);
+    return out.join("\n");
+  };
+
+  const current =
+    this.currentChanges && this.currentChanges.length > 0
+      ? this.currentChanges
+      : this.changes;
+
+  lines.push("CURRENT CHANGES");
+  lines.push("-".repeat(60));
+  if (current && current.length > 0) {
+    current.forEach((change, i) => {
+      lines.push(formatChange(change, i + 1));
+      lines.push("");
+    });
+  } else {
+    lines.push("No changes recorded.");
+    lines.push("");
+  }
+
+  if (this.allPreviousChanges && this.allPreviousChanges.length > 0) {
+    lines.push("PREVIOUS CHANGES");
+    lines.push("-".repeat(60));
+    this.allPreviousChanges.forEach((change, i) => {
+      lines.push(formatChange(change, i + 1));
+      lines.push("");
+    });
+  }
+
+  return lines.join("\n");
+};
+
 const Log = mongoose.model("Log", LogSchema);
 
 export default Log;
