@@ -3,6 +3,7 @@
  * Handles all Zoho Bigin upload operations
  */
 
+import mongoose from "mongoose";
 import { ZohoMapping } from "../../models/sync/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import {
