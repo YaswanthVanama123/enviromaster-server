@@ -95,22 +95,15 @@ export async function getUserCommissions(req, res) {
 
         console.log(`[COMMISSION] Agreement ${a._id}: Using saved commission - annual: $${annualCommission.toFixed(2)}, rate: ${finalRate}%`);
       } else {
-        // Fallback: basic calculation (for older agreements without saved commission)
-        const monthlyValue = summary.serviceAgreementTotal || 0;
-        const monthlyCommission = monthlyValue * 0.06;
-        weeklyCommission = monthlyCommission / 4.33;
-        annualCommission = monthlyCommission * 12;
-        contractCommission = monthlyCommission * contractMonths;
-        finalRate = 6;
-        breakdown = {
-          baseRate: 6,
-          agreementMultiplier: 100,
-          accountTypeAdjustment: 0,
-          greenlineBonus: 0,
-          insideSalesDeduction: 0
-        };
+        // No saved commission => the agreement was NOT connected to Bigin, so there
+        // is no commission. We do not fabricate one from revenue.
+        weeklyCommission = 0;
+        annualCommission = 0;
+        contractCommission = 0;
+        finalRate = 0;
+        breakdown = {};
 
-        console.log(`[COMMISSION] Agreement ${a._id}: Using fallback calculation - annual: $${annualCommission.toFixed(2)}`);
+        console.log(`[COMMISSION] Agreement ${a._id}: Not connected to Bigin - no commission`);
       }
 
       // Get contract value from summary
@@ -140,15 +133,16 @@ export async function getUserCommissions(req, res) {
       // Get quota level from saved data
       const savedQuotaLevel = breakdown.quotaLevel || savedCommission.input?.quotaLevel || null;
 
-      // Derive base rate from quota level (ensures consistency)
-      // If we have a quota level, use it to determine the base rate
-      // Otherwise fall back to saved baseRate or default
+      // Derive base rate from quota level (ensures consistency). When not connected to
+      // Bigin there is no commission, so the displayed rate is 0.
       const derivedBaseRate = getBaseRateFromQuotaLevel(savedQuotaLevel);
-      const displayBaseRate = derivedBaseRate !== null ? derivedBaseRate : (breakdown.baseRate || 6);
+      const displayBaseRate = hasSavedCommission
+        ? (derivedBaseRate !== null ? derivedBaseRate : (breakdown.baseRate || 6))
+        : 0;
 
       // Recalculate final rate based on derived base rate and multiplier
       const multiplier = breakdown.agreementMultiplier || 100;
-      const displayFinalRate = displayBaseRate * (multiplier / 100);
+      const displayFinalRate = hasSavedCommission ? displayBaseRate * (multiplier / 100) : 0;
 
       return {
         id: a._id.toString(),
@@ -257,13 +251,11 @@ export async function getAllEmployeesCommissions(req, res) {
       emp.totalAgreements++;
       emp.totalRevenue += monthlyValue;
 
-      // Use annualCommission from saved data (same as My Commissions screen)
+      // Use annualCommission from saved data. No saved commission means the
+      // agreement was not connected to Bigin => no commission (not fabricated).
       let annualCommission = 0;
       if (savedCommission.annualCommission !== undefined) {
         annualCommission = savedCommission.annualCommission || 0;
-      } else {
-        // Fallback: 6% of annual revenue
-        annualCommission = monthlyValue * 12 * 0.06;
       }
       emp.totalCommission += annualCommission;
 
@@ -364,20 +356,12 @@ export async function getEmployeeCommissions(req, res) {
         finalRate = savedCommission.finalCommissionRate || savedCommission.input?.baseRate || 6;
         breakdown = savedCommission.breakdown || {};
       } else {
-        // Fallback: basic calculation (for older agreements without saved commission)
-        const monthlyValue = summary.serviceAgreementTotal || 0;
-        const monthlyCommission = monthlyValue * 0.06;
-        weeklyCommission = monthlyCommission / 4.33;
-        annualCommission = monthlyCommission * 12;
-        contractCommission = monthlyCommission * contractMonths;
-        finalRate = 6;
-        breakdown = {
-          baseRate: 6,
-          agreementMultiplier: 100,
-          accountTypeAdjustment: 0,
-          greenlineBonus: 0,
-          insideSalesDeduction: 0
-        };
+        // No saved commission => not connected to Bigin => no commission.
+        weeklyCommission = 0;
+        annualCommission = 0;
+        contractCommission = 0;
+        finalRate = 0;
+        breakdown = {};
       }
 
       // Get contract value from summary
@@ -407,13 +391,16 @@ export async function getEmployeeCommissions(req, res) {
       // Get quota level from saved data
       const savedQuotaLevel = breakdown.quotaLevel || savedCommission.input?.quotaLevel || null;
 
-      // Derive base rate from quota level (ensures consistency)
+      // Derive base rate from quota level (ensures consistency). Not connected to
+      // Bigin => no commission => displayed rate is 0.
       const derivedBaseRate = getBaseRateFromQuotaLevel(savedQuotaLevel);
-      const displayBaseRate = derivedBaseRate !== null ? derivedBaseRate : (breakdown.baseRate || 6);
+      const displayBaseRate = hasSavedCommission
+        ? (derivedBaseRate !== null ? derivedBaseRate : (breakdown.baseRate || 6))
+        : 0;
 
       // Recalculate final rate based on derived base rate and multiplier
       const multiplier = breakdown.agreementMultiplier || 100;
-      const displayFinalRate = displayBaseRate * (multiplier / 100);
+      const displayFinalRate = hasSavedCommission ? displayBaseRate * (multiplier / 100) : 0;
 
       return {
         id: a._id.toString(),

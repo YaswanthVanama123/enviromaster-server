@@ -3,7 +3,7 @@
  * Handles payroll period calculations and employee payroll data
  */
 
-import { AdminSettings } from "../../models/admin/index.js";
+import { AdminSettings, PayrollSnapshot } from "../../models/admin/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 
 /**
@@ -138,19 +138,20 @@ function createEmployeeRecord(username) {
 
 function calculateCommission(summary, savedCommission) {
   const monthlyValue = summary.serviceAgreementTotal || 0;
-  let annualCommission = 0;
-  let weeklyCommission = 0;
 
-  if (savedCommission.annualCommission !== undefined) {
-    annualCommission = savedCommission.annualCommission || 0;
-    weeklyCommission = savedCommission.weeklyCommission || 0;
-  } else {
-    const monthlyCommission = monthlyValue * 0.06;
-    annualCommission = monthlyCommission * 12;
-    weeklyCommission = monthlyCommission / 4.33;
+  // Commission is only counted when it was actually saved with the agreement, which
+  // only happens when the agreement is connected to Bigin. If there is no saved
+  // commission (not connected to Bigin), there is NO payroll commission — we do not
+  // invent one from revenue.
+  if (savedCommission && savedCommission.annualCommission !== undefined) {
+    return {
+      annualCommission: savedCommission.annualCommission || 0,
+      weeklyCommission: savedCommission.weeklyCommission || 0,
+      monthlyValue,
+    };
   }
 
-  return { annualCommission, weeklyCommission, monthlyValue };
+  return { annualCommission: 0, weeklyCommission: 0, monthlyValue };
 }
 
 function incrementStatusCount(emp, status) {
@@ -162,6 +163,124 @@ function incrementStatusCount(emp, status) {
 }
 
 /**
+ * Compute every employee's payroll for a given period window (live, from agreements).
+ * Returns { totals, employees } in the same shape the API exposes.
+ */
+async function computeEmployeesForPeriod(periodStart, periodEnd) {
+  const agreements = await CustomerHeaderDoc.find({
+    isDeleted: { $ne: true },
+    createdBy: { $nin: [null, ""], $exists: true },
+    createdAt: { $gte: periodStart, $lte: periodEnd }
+  })
+    .select({
+      _id: 1,
+      'payload.headerTitle': 1,
+      'payload.summary': 1,
+      'payload.commission': 1,
+      status: 1,
+      createdBy: 1,
+      createdAt: 1
+    })
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec();
+
+  const employeeMap = new Map();
+
+  agreements.forEach(a => {
+    const username = a.createdBy;
+    if (!username) return;
+
+    if (!employeeMap.has(username)) {
+      employeeMap.set(username, createEmployeeRecord(username));
+    }
+
+    const emp = employeeMap.get(username);
+    const summary = a.payload?.summary || {};
+    const savedCommission = a.payload?.commission || {};
+    const { annualCommission, weeklyCommission, monthlyValue } = calculateCommission(summary, savedCommission);
+
+    emp.totalAgreements++;
+    emp.totalMonthlyRevenue += monthlyValue;
+    emp.totalAnnualCommission += annualCommission;
+    emp.totalWeeklyCommission += weeklyCommission;
+
+    incrementStatusCount(emp, a.status);
+
+    emp.agreements.push({
+      id: a._id.toString(),
+      title: a.payload?.headerTitle || 'Untitled',
+      status: a.status,
+      createdAt: a.createdAt,
+      monthlyValue,
+      annualCommission,
+      weeklyCommission
+    });
+  });
+
+  const employees = Array.from(employeeMap.values())
+    .sort((a, b) => b.totalAnnualCommission - a.totalAnnualCommission);
+
+  const totals = employees.reduce((acc, emp) => {
+    acc.totalAgreements += emp.totalAgreements;
+    acc.totalMonthlyRevenue += emp.totalMonthlyRevenue;
+    acc.totalAnnualCommission += emp.totalAnnualCommission;
+    acc.totalWeeklyCommission += emp.totalWeeklyCommission;
+    return acc;
+  }, {
+    totalEmployees: employees.length,
+    totalAgreements: 0,
+    totalMonthlyRevenue: 0,
+    totalAnnualCommission: 0,
+    totalWeeklyCommission: 0
+  });
+
+  return { totals, employees };
+}
+
+/**
+ * For a CLOSED (already ended) period, return the stored snapshot, creating it on
+ * first access. Returns null for an open period (caller should live-compute).
+ */
+async function getOrCreateSnapshot(period, cycleType, now) {
+  if (period.end >= now) {
+    return null;
+  }
+
+  const existing = await PayrollSnapshot.findOne({
+    periodStart: period.start,
+    periodEnd: period.end,
+  }).lean().exec();
+
+  if (existing) {
+    return existing;
+  }
+
+  const { totals, employees } = await computeEmployeesForPeriod(period.start, period.end);
+
+  try {
+    const created = await PayrollSnapshot.create({
+      periodStart: period.start,
+      periodEnd: period.end,
+      periodLabel: formatPeriodLabel(period.start, period.end),
+      cycleType: cycleType || 'monthly',
+      totals,
+      employees,
+    });
+    return created.toObject();
+  } catch (err) {
+    // Concurrent request already created it (unique index) — read it back.
+    if (err && err.code === 11000) {
+      return await PayrollSnapshot.findOne({
+        periodStart: period.start,
+        periodEnd: period.end,
+      }).lean().exec();
+    }
+    throw err;
+  }
+}
+
+/**
  * Get all employees' payroll data for a specific period
  * GET /api/payroll/employees
  * Query params: periodStart, periodEnd (optional - defaults to current period)
@@ -170,77 +289,26 @@ export async function getEmployeesPayroll(req, res) {
   try {
     const settings = await AdminSettings.getSingleton();
     const periods = calculatePayrollPeriods(settings.payrollSettings);
+    const cycleType = settings.payrollSettings?.cycleType;
 
-    let periodStart = req.query.periodStart ? new Date(req.query.periodStart) : periods.current.start;
-    let periodEnd = req.query.periodEnd ? new Date(req.query.periodEnd) : periods.current.end;
+    const periodStart = req.query.periodStart ? new Date(req.query.periodStart) : periods.current.start;
+    const periodEnd = req.query.periodEnd ? new Date(req.query.periodEnd) : periods.current.end;
 
-    const agreements = await CustomerHeaderDoc.find({
-      isDeleted: { $ne: true },
-      createdBy: { $nin: [null, ""], $exists: true },
-      createdAt: { $gte: periodStart, $lte: periodEnd }
-    })
-      .select({
-        _id: 1,
-        'payload.headerTitle': 1,
-        'payload.summary': 1,
-        'payload.commission': 1,
-        status: 1,
-        createdBy: 1,
-        createdAt: 1
-      })
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
+    const now = new Date();
+    const period = { start: periodStart, end: periodEnd };
 
-    const employeeMap = new Map();
+    const snapshot = await getOrCreateSnapshot(period, cycleType, now);
 
-    agreements.forEach(a => {
-      const username = a.createdBy;
-      if (!username) return;
-
-      if (!employeeMap.has(username)) {
-        employeeMap.set(username, createEmployeeRecord(username));
-      }
-
-      const emp = employeeMap.get(username);
-      const summary = a.payload?.summary || {};
-      const savedCommission = a.payload?.commission || {};
-      const { annualCommission, weeklyCommission, monthlyValue } = calculateCommission(summary, savedCommission);
-
-      emp.totalAgreements++;
-      emp.totalMonthlyRevenue += monthlyValue;
-      emp.totalAnnualCommission += annualCommission;
-      emp.totalWeeklyCommission += weeklyCommission;
-
-      incrementStatusCount(emp, a.status);
-
-      emp.agreements.push({
-        id: a._id.toString(),
-        title: a.payload?.headerTitle || 'Untitled',
-        status: a.status,
-        createdAt: a.createdAt,
-        monthlyValue,
-        annualCommission,
-        weeklyCommission
-      });
-    });
-
-    const employees = Array.from(employeeMap.values())
-      .sort((a, b) => b.totalAnnualCommission - a.totalAnnualCommission);
-
-    const totals = employees.reduce((acc, emp) => {
-      acc.totalAgreements += emp.totalAgreements;
-      acc.totalMonthlyRevenue += emp.totalMonthlyRevenue;
-      acc.totalAnnualCommission += emp.totalAnnualCommission;
-      acc.totalWeeklyCommission += emp.totalWeeklyCommission;
-      return acc;
-    }, {
-      totalEmployees: employees.length,
-      totalAgreements: 0,
-      totalMonthlyRevenue: 0,
-      totalAnnualCommission: 0,
-      totalWeeklyCommission: 0
-    });
+    let resolvedTotals;
+    let resolvedEmployees;
+    if (snapshot) {
+      resolvedTotals = snapshot.totals;
+      resolvedEmployees = snapshot.employees;
+    } else {
+      const live = await computeEmployeesForPeriod(periodStart, periodEnd);
+      resolvedTotals = live.totals;
+      resolvedEmployees = live.employees;
+    }
 
     res.json({
       success: true,
@@ -249,8 +317,10 @@ export async function getEmployeesPayroll(req, res) {
         end: periodEnd.toISOString(),
         label: formatPeriodLabel(periodStart, periodEnd)
       },
-      totals,
-      employees
+      finalized: !!snapshot,
+      snapshotAt: snapshot?.snapshotAt || null,
+      totals: resolvedTotals,
+      employees: resolvedEmployees
     });
   } catch (err) {
     console.error("getEmployeesPayroll error:", err);
@@ -305,54 +375,28 @@ export async function getPayrollHistory(req, res) {
       periods.push({ start: periodStart, end: periodEnd });
     }
 
-    // For each period, get aggregate data
+    // For each period: closed periods read (and auto-create) a frozen snapshot;
+    // the current open period is computed live.
     const historyPromises = periods.map(async (period) => {
-      const result = await CustomerHeaderDoc.aggregate([
-        {
-          $match: {
-            isDeleted: { $ne: true },
-            createdBy: { $ne: null, $exists: true },
-            createdAt: { $gte: period.start, $lte: period.end }
-          }
-        },
-        {
-          $addFields: {
-            calculatedCommission: {
-              $cond: {
-                if: { $gt: ['$payload.commission.annualCommission', 0] },
-                then: '$payload.commission.annualCommission',
-                else: {
-                  $multiply: [
-                    { $ifNull: ['$payload.summary.serviceAgreementTotal', 0] },
-                    12,
-                    0.06
-                  ]
-                }
-              }
-            }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalAgreements: { $sum: 1 },
-            totalRevenue: {
-              $sum: { $ifNull: ['$payload.summary.serviceAgreementTotal', 0] }
-            },
-            totalCommission: {
-              $sum: '$calculatedCommission'
-            },
-            uniqueEmployees: { $addToSet: '$createdBy' }
-          }
-        }
-      ]).exec();
+      const snapshot = await getOrCreateSnapshot(period, cycleType, now);
 
-      const data = result[0] || {
-        totalAgreements: 0,
-        totalRevenue: 0,
-        totalCommission: 0,
-        uniqueEmployees: []
-      };
+      let totalAgreements;
+      let totalRevenue;
+      let totalCommission;
+      let employeeCount;
+
+      if (snapshot) {
+        totalAgreements = snapshot.totals.totalAgreements;
+        totalRevenue = snapshot.totals.totalMonthlyRevenue;
+        totalCommission = snapshot.totals.totalAnnualCommission;
+        employeeCount = snapshot.totals.totalEmployees;
+      } else {
+        const live = await computeEmployeesForPeriod(period.start, period.end);
+        totalAgreements = live.totals.totalAgreements;
+        totalRevenue = live.totals.totalMonthlyRevenue;
+        totalCommission = live.totals.totalAnnualCommission;
+        employeeCount = live.totals.totalEmployees;
+      }
 
       return {
         period: {
@@ -360,10 +404,12 @@ export async function getPayrollHistory(req, res) {
           end: period.end.toISOString(),
           label: formatPeriodLabel(period.start, period.end)
         },
-        totalAgreements: data.totalAgreements,
-        totalRevenue: data.totalRevenue,
-        totalCommission: data.totalCommission,
-        employeeCount: data.uniqueEmployees?.length || 0
+        totalAgreements,
+        totalRevenue,
+        totalCommission,
+        employeeCount,
+        finalized: !!snapshot,
+        snapshotAt: snapshot?.snapshotAt || null
       };
     });
 
