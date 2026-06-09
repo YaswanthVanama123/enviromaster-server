@@ -469,7 +469,8 @@ export async function createVersion(req, res) {
     const { agreementId } = req.params;
     const { changeNotes, createdBy: bodyCreatedBy, replaceRecent, isFirstTime, watermark = false } = req.body || {};
 
-    const createdBy = bodyCreatedBy || req.user?.username || req.admin?.username || null;
+    // The actual person generating this version (for edit history only).
+    const generatedBy = bodyCreatedBy || req.user?.username || req.admin?.username || null;
 
     if (!mongoose.isValidObjectId(agreementId)) {
       return res.status(400).json({
@@ -493,6 +494,11 @@ export async function createVersion(req, res) {
         error: "Agreement not found"
       });
     }
+
+    // Ownership ALWAYS belongs to the agreement's original creator, regardless of
+    // who edits or generates new versions. Version-level createdBy must never
+    // change attribution (commissions, quota, payroll all key off this).
+    const createdBy = agreement.createdBy || generatedBy;
 
     const existingVersions = await VersionPdf.find({
       agreementId: agreementId,
@@ -550,6 +556,7 @@ export async function createVersion(req, res) {
       fileName: `${agreement.payload?.headerTitle || 'Agreement'}_v${versionNumber}.pdf`,
       status: agreement.status || 'saved',
       createdBy: createdBy || null,
+      generatedBy: generatedBy || null,
       changeNotes: changeNotes || `Version ${versionNumber} - ${isFirstTime ? 'Initial version' : 'Updated agreement'}`,
       payloadSnapshot: agreement.payload,
       pdf_meta: {

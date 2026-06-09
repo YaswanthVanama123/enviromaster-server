@@ -75,6 +75,7 @@ const VersionPdfSchema = new mongoose.Schema(
     },
 
     createdBy: { type: String, default: null },
+    generatedBy: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
     creationReason: {
       type: String,
