@@ -42,17 +42,48 @@ function calculateQuotaLevel(percentage) {
   return "below";
 }
 
-// Quota credit for an agreement = FULL contract total × pricing-tier
-// (redline/greenline) multiplier, computed by the commission engine and persisted
-// on summary.quotaCredit (whole value — never divided/annualized). Legacy
-// agreements (no saved quotaCredit) fall back to the raw contract total (the
-// multiplier isn't available server-side, so re-save to get the multiplier).
+// Pricing-tier multiplier from the current/redline ratio (percentage), matching
+// the admin Pricing Tiers (Below Redline 0.5, Redline 1.0, 110% 1.25, 120% 1.5,
+// Greenline 130%+ → 2.0).
+function pricingMultiplierFromRatio(ratioPct) {
+  if (ratioPct < 100) return 0.5;
+  if (ratioPct <= 109) return 1.0;
+  if (ratioPct <= 119) return 1.25;
+  if (ratioPct <= 129) return 1.5;
+  return 2.0;
+}
+
+// Quota credit for an agreement = annualized contract (contract total ÷ years) ×
+// pricing-tier (redline/greenline) multiplier. e.g. $36,000 / 3yr × Greenline 2.0
+// = $24,000. Prefers the value persisted by the commission engine; otherwise
+// derives the multiplier from the saved services' current vs redline totals.
 function quotaCreditFromPayload(payload) {
   const s = payload?.summary || {};
-  if (typeof s.quotaCredit === "number") {
+  if (typeof s.quotaCredit === "number" && s.quotaCredit > 0) {
     return s.quotaCredit;
   }
-  return (s.serviceAgreementTotal || 0) + (s.productContractTotal || 0);
+
+  const services = payload?.services || {};
+  let current = 0;
+  let original = 0;
+  Object.values(services).forEach(sd => {
+    if (!sd || typeof sd !== "object" || sd.isActive === false) return;
+    const c = Number(sd.contractTotal) || 0;
+    const o = Number(sd.originalContractTotal) || c;
+    current += c;
+    original += o;
+  });
+
+  if (current <= 0) {
+    current = (s.serviceAgreementTotal || 0) + (s.productContractTotal || 0);
+    original = current;
+  }
+
+  const months = s.contractMonths || 12;
+  const years = months > 0 ? months / 12 : 1;
+  const annual = years > 0 ? current / years : current;
+  const ratioPct = original > 0 ? (current / original) * 100 : 100;
+  return annual * pricingMultiplierFromRatio(ratioPct);
 }
 
 // Helper: Get period boundaries from payroll settings
@@ -129,12 +160,6 @@ async function getWeeklyQuotaBoundaries(targetDate = new Date()) {
   const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   return { start, end, label: `${startStr} - ${endStr}` };
-}
-
-// Convert a stored monthly quota target into the weekly target used for the
-// weekly quota period (12 months / 52 weeks).
-function weeklyQuotaTarget(monthlyTarget) {
-  return Math.round(((monthlyTarget || 0) * 12) / 52);
 }
 
 // Helper: Get period boundaries (legacy - kept for backward compatibility)
@@ -755,8 +780,8 @@ export const getQuotaStatus = async (req, res) => {
     // Quota is WEEKLY and resets every week.
     const { start, end, label } = await getWeeklyQuotaBoundaries(targetDate);
 
-    // Weekly quota target derived from the stored monthly target.
-    const quotaTarget = weeklyQuotaTarget(employee.quota?.monthlyTarget || 50000);
+    // The stored quota target IS the weekly target (used as-is).
+    const quotaTarget = employee.quota?.monthlyTarget || 50000;
 
     // Query SavedPDFs (CustomerHeaderDoc) created by this user in the current period
     const savedPdfs = await CustomerHeaderDoc.find({
@@ -773,6 +798,9 @@ export const getQuotaStatus = async (req, res) => {
         'payload.summary.contractMonths': 1,
         'payload.summary.serviceAgreementTotal': 1,
         'payload.summary.productMonthlyTotal': 1,
+        'payload.summary.productContractTotal': 1,
+        'payload.summary.quotaCredit': 1,
+        'payload.services': 1,
         'payload.commission': 1,
         'payload.agreement.accountType': 1,
       })
@@ -876,7 +904,7 @@ export const getQuotaStatus = async (req, res) => {
           role: employee.salesRole || "field_sales",
         },
         period: {
-          type: cycleType,
+          type: "weekly",
           label,
           start: start.toISOString(),
           end: end.toISOString(),
@@ -993,6 +1021,9 @@ export const getQuotaHistory = async (req, res) => {
         'payload.summary.contractMonths': 1,
         'payload.summary.serviceAgreementTotal': 1,
         'payload.summary.productMonthlyTotal': 1,
+        'payload.summary.productContractTotal': 1,
+        'payload.summary.quotaCredit': 1,
+        'payload.services': 1,
         'payload.commission': 1,
       })
       .lean();
