@@ -780,8 +780,9 @@ export const getQuotaStatus = async (req, res) => {
     // Quota is WEEKLY and resets every week.
     const { start, end, label } = await getWeeklyQuotaBoundaries(targetDate);
 
-    // The stored quota target IS the weekly target (used as-is).
-    const quotaTarget = employee.quota?.monthlyTarget || 50000;
+    // Weekly target comes from admin commission rules (falls back to employee/default).
+    const statusRules = await CommissionRules.findOne({ isActive: true });
+    const quotaTarget = statusRules?.quotaTarget || employee.quota?.monthlyTarget || 50000;
 
     // Query SavedPDFs (CustomerHeaderDoc) created by this user in the current period
     const savedPdfs = await CustomerHeaderDoc.find({
@@ -1110,9 +1111,11 @@ export const getCurrentQuotaLevel = async (req, res) => {
       });
     }
 
-    // Use payroll settings for period boundaries
-    const { start, end } = await getPayrollPeriodBoundaries(new Date());
-    const quotaTarget = employee.quota?.monthlyTarget || 50000;
+    // Quota is WEEKLY and resets every week (mirror getQuotaStatus).
+    const { start, end } = await getWeeklyQuotaBoundaries(new Date());
+    // Weekly target comes from admin commission rules (falls back to employee/default).
+    const levelRules = await CommissionRules.findOne({ isActive: true });
+    const quotaTarget = levelRules?.quotaTarget || employee.quota?.monthlyTarget || 50000;
 
     // Query SavedPDFs for the current period
     const savedPdfs = await CustomerHeaderDoc.find({
@@ -1124,16 +1127,16 @@ export const getCurrentQuotaLevel = async (req, res) => {
         'payload.summary.contractMonths': 1,
         'payload.summary.serviceAgreementTotal': 1,
         'payload.summary.productMonthlyTotal': 1,
+        'payload.summary.productContractTotal': 1,
+        'payload.summary.quotaCredit': 1,
+        'payload.services': 1,
       })
       .lean();
 
-    // Calculate actual sales
+    // Quota credit = annualized contract × pricing multiplier (NOT raw monthly).
     let actualSales = 0;
     savedPdfs.forEach(pdf => {
-      // serviceAgreementTotal is already the MONTHLY value (same as My Commissions)
-      const serviceMonthlyValue = pdf.payload?.summary?.serviceAgreementTotal || 0;
-      const productMonthlyTotal = pdf.payload?.summary?.productMonthlyTotal || 0;
-      actualSales += serviceMonthlyValue + productMonthlyTotal;
+      actualSales += quotaCreditFromPayload(pdf.payload);
     });
 
     const quotaPercentage = quotaTarget > 0 ? (actualSales / quotaTarget) * 100 : 0;
@@ -1165,13 +1168,15 @@ export const getLeaderboard = async (req, res) => {
   try {
     const { date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
-    // Use payroll settings for period boundaries
-    const { start, end, label } = await getPayrollPeriodBoundaries(targetDate);
+    // Quota is WEEKLY and resets every week (mirror getQuotaStatus).
+    const { start, end, label } = await getWeeklyQuotaBoundaries(targetDate);
 
     // Get all active employees
     const employees = await Employee.find({ isActive: true })
       .select('username fullName quota')
       .lean();
+    // Weekly target comes from admin commission rules (falls back to employee/default).
+    const boardRules = await CommissionRules.findOne({ isActive: true });
 
     // Get all SavedPDFs in the current period
     const savedPdfs = await CustomerHeaderDoc.find({
@@ -1183,6 +1188,9 @@ export const getLeaderboard = async (req, res) => {
         'payload.summary.contractMonths': 1,
         'payload.summary.serviceAgreementTotal': 1,
         'payload.summary.productMonthlyTotal': 1,
+        'payload.summary.productContractTotal': 1,
+        'payload.summary.quotaCredit': 1,
+        'payload.services': 1,
         'payload.commission': 1,
       })
       .lean();
@@ -1200,10 +1208,8 @@ export const getLeaderboard = async (req, res) => {
       }
 
       const contractMonths = pdf.payload?.summary?.contractMonths || 12;
-      // serviceAgreementTotal is already the MONTHLY value (same as My Commissions)
-      const serviceMonthlyValue = pdf.payload?.summary?.serviceAgreementTotal || 0;
-      const productMonthlyTotal = pdf.payload?.summary?.productMonthlyTotal || 0;
-      const monthlyValue = serviceMonthlyValue + productMonthlyTotal;
+      // Quota credit = annualized contract × pricing multiplier (NOT raw monthly).
+      const monthlyValue = quotaCreditFromPayload(pdf.payload);
 
       salesByEmployee[creator].actualSales += monthlyValue;
       salesByEmployee[creator].agreementCount += 1;
@@ -1226,7 +1232,7 @@ export const getLeaderboard = async (req, res) => {
         agreementCount: 0,
         totalCommission: 0,
       };
-      const quotaTarget = emp.quota?.monthlyTarget || 50000;
+      const quotaTarget = boardRules?.quotaTarget || emp.quota?.monthlyTarget || 50000;
       const quotaPercentage = quotaTarget > 0 ? (sales.actualSales / quotaTarget) * 100 : 0;
 
       return {

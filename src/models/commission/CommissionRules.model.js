@@ -130,6 +130,10 @@ const CommissionRulesSchema = new mongoose.Schema(
     // (e.g. 50 to exclude holiday weeks) so the displayed weekly equals the
     // commission earned during a billed week, not a calendar week.
     weeksPerAnnualCommission: { type: Number, default: 52 },
+    // V2 — Weekly quota target ($). Drives the piecewise commission rate split:
+    //   [0, target) → quotaRates.below, [target, 2×target) → quotaRates.above,
+    //   [2×target, ∞) → quotaRates.double. Quota resets weekly.
+    quotaTarget: { type: Number, default: 50000 },
     // V2 — Quota tier cutoffs (admin-editable). Used for the piecewise
     // commission rate split: below cutoff → 3%, above → 6%, double → 9%.
     // Defaults match Solange Draft Month 5+ tier ($10K) and 2× ($20K).
@@ -215,6 +219,7 @@ export const DEFAULT_COMMISSION_RULES = {
     "one-time": 1,
   },
   weeksPerAnnualCommission: 52,
+  quotaTarget: 50000,
   quotaTierCutoffs: {
     aboveQuota: 10000,
     doubleQuota: 20000,
