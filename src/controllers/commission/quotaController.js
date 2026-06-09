@@ -42,6 +42,19 @@ function calculateQuotaLevel(percentage) {
   return "below";
 }
 
+// Quota credit for an agreement = FULL contract total × pricing-tier
+// (redline/greenline) multiplier, computed by the commission engine and persisted
+// on summary.quotaCredit (whole value — never divided/annualized). Legacy
+// agreements (no saved quotaCredit) fall back to the raw contract total (the
+// multiplier isn't available server-side, so re-save to get the multiplier).
+function quotaCreditFromPayload(payload) {
+  const s = payload?.summary || {};
+  if (typeof s.quotaCredit === "number") {
+    return s.quotaCredit;
+  }
+  return (s.serviceAgreementTotal || 0) + (s.productContractTotal || 0);
+}
+
 // Helper: Get period boundaries from payroll settings
 async function getPayrollPeriodBoundaries(targetDate = new Date()) {
   const settings = await AdminSettings.getSingleton();
@@ -95,6 +108,33 @@ async function getPayrollPeriodBoundaries(targetDate = new Date()) {
   }
 
   return { start, end, label, cycleType: cycleType || 'monthly' };
+}
+
+// Quota is WEEKLY and resets every week (2 weekly quota periods per biweekly
+// payroll). The week is anchored to the payroll cycle day-of-week.
+async function getWeeklyQuotaBoundaries(targetDate = new Date()) {
+  const settings = await AdminSettings.getSingleton();
+  const { cycleDayOfWeek } = settings.payrollSettings || {};
+  const now = new Date(targetDate);
+  const daysSinceCycleDay = (now.getDay() - (cycleDayOfWeek ?? 1) + 7) % 7;
+
+  const start = new Date(now);
+  start.setDate(now.getDate() - daysSinceCycleDay);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+
+  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return { start, end, label: `${startStr} - ${endStr}` };
+}
+
+// Convert a stored monthly quota target into the weekly target used for the
+// weekly quota period (12 months / 52 weeks).
+function weeklyQuotaTarget(monthlyTarget) {
+  return Math.round(((monthlyTarget || 0) * 12) / 52);
 }
 
 // Helper: Get period boundaries (legacy - kept for backward compatibility)
@@ -712,11 +752,11 @@ export const getQuotaStatus = async (req, res) => {
     }
 
     const targetDate = date ? new Date(date) : new Date();
-    // Use payroll settings for period boundaries
-    const { start, end, label, cycleType } = await getPayrollPeriodBoundaries(targetDate);
+    // Quota is WEEKLY and resets every week.
+    const { start, end, label } = await getWeeklyQuotaBoundaries(targetDate);
 
-    // Get quota target from employee
-    const quotaTarget = employee.quota?.monthlyTarget || 50000;
+    // Weekly quota target derived from the stored monthly target.
+    const quotaTarget = weeklyQuotaTarget(employee.quota?.monthlyTarget || 50000);
 
     // Query SavedPDFs (CustomerHeaderDoc) created by this user in the current period
     const savedPdfs = await CustomerHeaderDoc.find({
@@ -752,7 +792,8 @@ export const getQuotaStatus = async (req, res) => {
       const productMonthlyTotal = pdf.payload?.summary?.productMonthlyTotal || 0;
       const monthlyValue = serviceMonthlyValue + productMonthlyTotal;
 
-      actualSales += monthlyValue;
+      // Quota credit = annualized contract × greenline multiplier (NOT the raw total).
+      actualSales += quotaCreditFromPayload(pdf.payload);
 
       // Get commission earned - use annualCommission to match My Commissions page
       const commission = pdf.payload?.commission;
@@ -793,7 +834,8 @@ export const getQuotaStatus = async (req, res) => {
       const productMonthlyTotal = pdf.payload?.summary?.productMonthlyTotal || 0;
       const monthlyValue = serviceMonthlyValue + productMonthlyTotal;
 
-      actualSales += monthlyValue;
+      // Quota credit = annualized contract × greenline multiplier (NOT the raw total).
+      actualSales += quotaCreditFromPayload(pdf.payload);
 
       // Use annualCommission to match My Commissions page
       const commission = pdf.payload?.commission;
@@ -984,7 +1026,7 @@ export const getQuotaHistory = async (req, res) => {
           const productMonthlyTotal = pdf.payload?.summary?.productMonthlyTotal || 0;
           const monthlyValue = serviceMonthlyValue + productMonthlyTotal;
 
-          periodData.actualSales += monthlyValue;
+          periodData.actualSales += quotaCreditFromPayload(pdf.payload);
           periodData.agreementCount += 1;
           periodData.newBusinessCount += 1;
 

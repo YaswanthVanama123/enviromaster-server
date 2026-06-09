@@ -19,13 +19,13 @@ jobs:
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 138.197.64.229
-          username: ${{ secrets.DROPLET_USERNAME }}
-          key: ${{ secrets.DROPLET_SSH_KEY }}
-          port: ${{ secrets.DROPLET_PORT || 22 }}
+          username: ${{ secrets.PREPROD_DROPLET_USERNAME }}
+          key: ${{ secrets.PREPROD_DROPLET_SSH_KEY }}
+          port: ${{ secrets.PREPROD_DROPLET_PORT }}
           script: |
             set -e
 
-            cd /var/www/enviro-backend
+            cd /var/www/enviro-backend-preprod
 
             echo "Fetching latest code from GitHub..."
             git fetch origin
@@ -36,8 +36,8 @@ jobs:
             echo "Installing dependencies..."
             npm ci
 
-            echo "Restarting PM2 app..."
-            pm2 restart enviro-backend || pm2 start npm --name enviro-backend -- start
+            echo "Restarting PM2 preprod app..."
+            pm2 restart enviro-backend-preprod --update-env || pm2 start npm --name enviro-backend-preprod -- start
 
             echo "Saving PM2 process list..."
             pm2 save
@@ -49,4 +49,4 @@ jobs:
             sleep 15
 
             echo "Running health check..."
-            curl -f "http://localhost:${PORT:-5000}/health" || exit 1
+            curl -f "http://localhost:${PORT:-5002}/health" || exit 1 
