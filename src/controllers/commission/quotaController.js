@@ -789,6 +789,9 @@ export const getQuotaStatus = async (req, res) => {
       createdBy: employee.username,
       isDeleted: { $ne: true },
       createdAt: { $gte: start, $lte: end },
+      // Only Bigin-connected agreements count toward quota. Drafts saved before
+      // Bigin connect have no commission, so they must not inflate quota.
+      'payload.commission': { $ne: null },
     })
       .sort({ createdAt: -1 })
       .select({
@@ -1014,6 +1017,8 @@ export const getQuotaHistory = async (req, res) => {
     const savedPdfs = await CustomerHeaderDoc.find({
       createdBy: employee.username,
       isDeleted: { $ne: true },
+      // Only Bigin-connected agreements count toward quota (drafts excluded).
+      'payload.commission': { $ne: null },
     })
       .sort({ createdAt: -1 })
       .select({
@@ -1122,6 +1127,8 @@ export const getCurrentQuotaLevel = async (req, res) => {
       createdBy: employee.username,
       isDeleted: { $ne: true },
       createdAt: { $gte: start, $lte: end },
+      // Only Bigin-connected agreements count toward quota (drafts excluded).
+      'payload.commission': { $ne: null },
     })
       .select({
         'payload.summary.contractMonths': 1,
@@ -1182,6 +1189,8 @@ export const getLeaderboard = async (req, res) => {
     const savedPdfs = await CustomerHeaderDoc.find({
       isDeleted: { $ne: true },
       createdAt: { $gte: start, $lte: end },
+      // Only Bigin-connected agreements count toward quota (drafts excluded).
+      'payload.commission': { $ne: null },
     })
       .select({
         createdBy: 1,

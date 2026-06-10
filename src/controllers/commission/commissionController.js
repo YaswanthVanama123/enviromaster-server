@@ -96,12 +96,30 @@ export async function getAllRules(req, res) {
 }
 
 /**
+ * Normalize a rules payload before saving. JSON cannot represent Infinity, so the
+ * Greenline tier's `maxRatio: Infinity` arrives as null and fails the required
+ * validator. Coerce any null/non-finite ratio bounds to safe finite values
+ * (large sentinel = effectively "no upper bound").
+ */
+const RATIO_INFINITY = 999999;
+function normalizeRulesPayload(data) {
+  if (data && Array.isArray(data.pricingTiers)) {
+    data.pricingTiers = data.pricingTiers.map(t => ({
+      ...t,
+      minRatio: Number.isFinite(t?.minRatio) ? t.minRatio : 0,
+      maxRatio: Number.isFinite(t?.maxRatio) ? t.maxRatio : RATIO_INFINITY,
+    }));
+  }
+  return data;
+}
+
+/**
  * Update commission rules (admin only)
  */
 export async function updateRules(req, res) {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = normalizeRulesPayload(req.body);
 
     // Remove fields that shouldn't be updated directly
     delete updates._id;
@@ -130,7 +148,7 @@ export async function updateRules(req, res) {
  */
 export async function createRules(req, res) {
   try {
-    const rulesData = req.body;
+    const rulesData = normalizeRulesPayload(req.body);
 
     // If this is set as active, deactivate other rules
     if (rulesData.isActive) {
