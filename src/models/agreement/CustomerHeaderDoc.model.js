@@ -155,8 +155,10 @@ const GlobalSummarySchema = new mongoose.Schema(
     serviceAgreementTotal: { type: Number, default: null },
     productMonthlyTotal: { type: Number, default: null },
     productContractTotal: { type: Number, default: null },
+    quotaCredit: { type: Number, default: null },
+    priorQuotaCredit: { type: Number, default: null },
   },
-  { _id: false }
+  { _id: false, strict: false }
 );
 
 const CommissionInputSchema = new mongoose.Schema(
@@ -214,7 +216,7 @@ const CommissionSchema = new mongoose.Schema(
     annualCommission: { type: Number, default: 0 },
     contractCommission: { type: Number, default: 0 },
   },
-  { _id: false }
+  { _id: false, strict: false }
 );
 
 const HeaderRowSchema = new mongoose.Schema(
