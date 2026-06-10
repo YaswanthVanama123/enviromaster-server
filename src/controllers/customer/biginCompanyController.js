@@ -5,6 +5,7 @@
 
 import { BiginCompany } from "../../models/customer/index.js";
 import { v4 as uuidv4 } from "uuid";
+import { getAllBiginCompanies } from "../../services/zohoService.js";
 
 // Track fetch status in memory
 let fetchStatus = {
