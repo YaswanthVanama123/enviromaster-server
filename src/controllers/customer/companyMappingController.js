@@ -152,6 +152,31 @@ export const getMappingById = async (req, res) => {
 };
 
 /**
+ * Get the RouteStar mapping status for a single Bigin company.
+ * Used by the agreement form to decide whether commission/quota may be counted:
+ * an agreement only counts once its Bigin company is mapped to a RouteStar customer.
+ */
+export const getMappingStatusByBigin = async (req, res) => {
+  try {
+    const { biginId } = req.params;
+    const mapping = await CompanyMapping.findOne({ biginId }).lean();
+    const isMapped = !!(mapping && mapping.routeStarId && mapping.mappingStatus === "mapped");
+    res.json({
+      success: true,
+      data: {
+        biginId,
+        isMapped,
+        routeStarId: mapping?.routeStarId || null,
+        routeStarCustomerName: mapping?.routeStarCustomerName || null,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching mapping status:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch mapping status" });
+  }
+};
+
+/**
  * Create or update a mapping
  */
 export const saveMapping = async (req, res) => {

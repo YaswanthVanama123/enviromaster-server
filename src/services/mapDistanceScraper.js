@@ -71,6 +71,7 @@ class MapDistanceSession {
 
     this.browser = await puppeteer.launch({
       headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       protocolTimeout: 60000,
       args: [
         '--no-sandbox',

@@ -6,23 +6,70 @@
 import mongoose from "mongoose";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 
+const DONE_STATUSES = ['approved', 'approved_salesman', 'approved_admin', 'active', 'finalized'];
+
 export async function getDocumentStatusCounts(req, res) {
   try {
     if (mongoose.connection.readyState !== 1) {
       return res.json({ success: true, counts: { draft: 0, saved: 0, pending_approval: 0, approved: 0, total: 0 } });
     }
 
-    const [draftCount, savedCount, pendingCount, approvedCount, totalCount] = await Promise.all([
-      CustomerHeaderDoc.countDocuments({ status: 'draft', isDeleted: { $ne: true } }),
-      CustomerHeaderDoc.countDocuments({ status: 'saved', isDeleted: { $ne: true } }),
-      CustomerHeaderDoc.countDocuments({ status: 'pending_approval', isDeleted: { $ne: true } }),
-      CustomerHeaderDoc.countDocuments({ status: 'approved', isDeleted: { $ne: true } }),
-      CustomerHeaderDoc.countDocuments({ isDeleted: { $ne: true } })
+    const { startDate, endDate, groupBy } = req.query;
+
+    const match = { isDeleted: { $ne: true } };
+    if (startDate || endDate) {
+      match.createdAt = {};
+      if (startDate) match.createdAt.$gte = new Date(`${startDate}T00:00:00.000Z`);
+      if (endDate) match.createdAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
+    }
+
+    // Aggregate totals (respecting the date range)
+    const statusAgg = await CustomerHeaderDoc.aggregate([
+      { $match: match },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
+
+    const counts = { draft: 0, saved: 0, pending_approval: 0, approved: 0, total: 0 };
+    statusAgg.forEach(s => {
+      const st = s._id;
+      if (st === 'draft') counts.draft += s.count;
+      else if (st === 'saved') counts.saved += s.count;
+      else if (st === 'pending_approval') counts.pending_approval += s.count;
+      else counts.approved += s.count;
+      counts.total += s.count;
+    });
+
+    // Per-bucket time series when a grouping is requested (day / week / month)
+    let timeSeries = null;
+    if (groupBy) {
+      const format = groupBy === 'month' ? '%Y-%m' : groupBy === 'week' ? '%Y-%U' : '%Y-%m-%d';
+      const series = await CustomerHeaderDoc.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: { $dateToString: { format, date: '$createdAt' } },
+            saved: { $sum: { $cond: [{ $eq: ['$status', 'saved'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending_approval'] }, 1, 0] } },
+            drafts: { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
+            done: { $sum: { $cond: [{ $in: ['$status', DONE_STATUSES] }, 1, 0] } },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      timeSeries = series.map(s => ({
+        period: s._id,
+        saved: s.saved,
+        pending: s.pending,
+        drafts: s.drafts,
+        done: s.done,
+      }));
+    }
 
     res.json({
       success: true,
-      counts: { draft: draftCount, saved: savedCount, pending_approval: pendingCount, approved: approvedCount, total: totalCount }
+      counts,
+      ...(timeSeries ? { timeSeries } : {}),
     });
   } catch (err) {
     console.error("getDocumentStatusCounts error:", err);

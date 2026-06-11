@@ -8,6 +8,7 @@ import {
   getAllMappings,
   getMappingStats,
   getMappingById,
+  getMappingStatusByBigin,
   saveMapping,
   updateMapping,
   deleteMapping,
@@ -27,6 +28,9 @@ router.get("/stats", getMappingStats);
 
 // Get available RouteStar customers (not yet mapped)
 router.get("/routestar-available", getAvailableRouteStarCustomers);
+
+// Get RouteStar mapping status for a single Bigin company
+router.get("/status/:biginId", getMappingStatusByBigin);
 
 // Initialize mapping records from Bigin companies
 router.post("/initialize", initializeMappings);
