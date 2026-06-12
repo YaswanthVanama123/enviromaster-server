@@ -106,9 +106,11 @@ export async function getUserCommissions(req, res) {
         console.log(`[COMMISSION] Agreement ${a._id}: Not connected to Bigin - no commission`);
       }
 
-      // Get contract value from summary
-      const monthlyValue = summary.serviceAgreementTotal || 0;
-      const contractValue = monthlyValue * contractMonths;
+      // Contract value = the full contract total (services + products), matching
+      // form-filling. serviceAgreementTotal is already the contract total, NOT a
+      // monthly figure, so it must not be multiplied by contractMonths.
+      const contractValue = (summary.serviceAgreementTotal || 0) + (summary.productContractTotal || 0);
+      const monthlyValue = contractMonths > 0 ? contractValue / contractMonths : contractValue;
 
       totalWeeklyCommission += weeklyCommission;
       totalAnnualCommission += annualCommission;
@@ -364,9 +366,11 @@ export async function getEmployeeCommissions(req, res) {
         breakdown = {};
       }
 
-      // Get contract value from summary
-      const monthlyValue = summary.serviceAgreementTotal || 0;
-      const contractValue = monthlyValue * contractMonths;
+      // Contract value = the full contract total (services + products), matching
+      // form-filling. serviceAgreementTotal is already the contract total, NOT a
+      // monthly figure, so it must not be multiplied by contractMonths.
+      const contractValue = (summary.serviceAgreementTotal || 0) + (summary.productContractTotal || 0);
+      const monthlyValue = contractMonths > 0 ? contractValue / contractMonths : contractValue;
 
       totalWeeklyCommission += weeklyCommission;
       totalAnnualCommission += annualCommission;

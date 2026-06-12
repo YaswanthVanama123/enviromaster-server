@@ -215,6 +215,7 @@ const CommissionSchema = new mongoose.Schema(
     weeklyCommission: { type: Number, default: 0 },
     annualCommission: { type: Number, default: 0 },
     contractCommission: { type: Number, default: 0 },
+    rulesSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { _id: false, strict: false }
 );

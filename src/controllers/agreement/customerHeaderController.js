@@ -333,11 +333,13 @@ export async function updateCustomerHeader(req, res) {
     if (body.includeProductsTable !== undefined) doc.payload.includeProductsTable = body.includeProductsTable;
     if (body.commission !== undefined) {
       doc.payload.commission = body.commission;
+      doc.markModified('payload.commission');
       console.log('[COMMISSION-SAVE] Saving commission data:', {
         weeklyCommission: body.commission?.weeklyCommission,
         annualCommission: body.commission?.annualCommission,
         contractCommission: body.commission?.contractCommission,
         finalCommissionRate: body.commission?.finalCommissionRate,
+        hasRulesSnapshot: !!body.commission?.rulesSnapshot,
       });
     }
     // Save account type cache for commission calculations

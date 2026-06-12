@@ -4,7 +4,7 @@
  */
 
 import mongoose from "mongoose";
-import { CustomerHeaderDoc } from "../../models/agreement/index.js";
+import { VersionPdf } from "../../models/agreement/index.js";
 
 const DONE_STATUSES = ['approved', 'approved_salesman', 'approved_admin', 'active', 'finalized'];
 
@@ -16,7 +16,7 @@ export async function getDocumentStatusCounts(req, res) {
 
     const { startDate, endDate, groupBy } = req.query;
 
-    const match = { isDeleted: { $ne: true } };
+    const match = { isDeleted: { $ne: true }, status: { $nin: ['superseded', 'archived'] } };
     if (startDate || endDate) {
       match.createdAt = {};
       if (startDate) match.createdAt.$gte = new Date(`${startDate}T00:00:00.000Z`);
@@ -24,7 +24,7 @@ export async function getDocumentStatusCounts(req, res) {
     }
 
     // Aggregate totals (respecting the date range)
-    const statusAgg = await CustomerHeaderDoc.aggregate([
+    const statusAgg = await VersionPdf.aggregate([
       { $match: match },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
@@ -43,7 +43,7 @@ export async function getDocumentStatusCounts(req, res) {
     let timeSeries = null;
     if (groupBy) {
       const format = groupBy === 'month' ? '%Y-%m' : groupBy === 'week' ? '%Y-%U' : '%Y-%m-%d';
-      const series = await CustomerHeaderDoc.aggregate([
+      const series = await VersionPdf.aggregate([
         { $match: match },
         {
           $group: {
