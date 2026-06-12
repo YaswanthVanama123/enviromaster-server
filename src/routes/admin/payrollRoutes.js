@@ -3,7 +3,8 @@ import { requireAdminAuth } from "../../middleware/adminAuth.js";
 import {
   getPayrollPeriods,
   getEmployeesPayroll,
-  getPayrollHistory
+  getPayrollHistory,
+  downloadPayrollPdf
 } from "../../controllers/admin/payrollController.js";
 
 const router = express.Router();
@@ -16,5 +17,8 @@ router.get('/employees', requireAdminAuth, getEmployeesPayroll);
 
 // Get payroll history (past periods)
 router.get('/history', requireAdminAuth, getPayrollHistory);
+
+// Download a combined payroll PDF for a period (and record it in history)
+router.get('/download-pdf', requireAdminAuth, downloadPayrollPdf);
 
 export default router;

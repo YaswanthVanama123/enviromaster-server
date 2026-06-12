@@ -55,6 +55,8 @@ const PayrollSnapshotSchema = new mongoose.Schema(
     },
     employees: [SnapshotEmployeeSchema],
     snapshotAt: { type: Date, default: Date.now },
+    pdfGeneratedAt: { type: Date, default: null },
+    pdfCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

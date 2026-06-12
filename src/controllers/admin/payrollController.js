@@ -5,6 +5,7 @@
 
 import { AdminSettings, PayrollSnapshot } from "../../models/admin/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
+import { compileRawTex } from "../../services/pdfService.js";
 
 /**
  * Calculate the current and previous payroll periods based on settings
@@ -243,10 +244,8 @@ async function computeEmployeesForPeriod(periodStart, periodEnd) {
  * first access. Returns null for an open period (caller should live-compute).
  */
 async function getOrCreateSnapshot(period, cycleType, now) {
-  if (period.end >= now) {
-    return null;
-  }
-
+  // A snapshot may already exist for an OPEN period if its payroll PDF was
+  // downloaded (which finalizes/records it). Always honor an existing snapshot.
   const existing = await PayrollSnapshot.findOne({
     periodStart: period.start,
     periodEnd: period.end,
@@ -254,6 +253,11 @@ async function getOrCreateSnapshot(period, cycleType, now) {
 
   if (existing) {
     return existing;
+  }
+
+  // Otherwise only auto-create snapshots for CLOSED (already ended) periods.
+  if (period.end >= now) {
+    return null;
   }
 
   const { totals, employees } = await computeEmployeesForPeriod(period.start, period.end);
@@ -409,7 +413,9 @@ export async function getPayrollHistory(req, res) {
         totalCommission,
         employeeCount,
         finalized: !!snapshot,
-        snapshotAt: snapshot?.snapshotAt || null
+        snapshotAt: snapshot?.snapshotAt || null,
+        pdfGeneratedAt: snapshot?.pdfGeneratedAt || null,
+        pdfCount: snapshot?.pdfCount || 0
       };
     });
 
@@ -423,5 +429,287 @@ export async function getPayrollHistory(req, res) {
   } catch (err) {
     console.error("getPayrollHistory error:", err);
     res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+function texEscape(value) {
+  return String(value ?? "")
+    .replace(/[\x00-\x1F\x7F-\xFF]/g, "")
+    .replace(/\\/g, "\\textbackslash{}")
+    .replace(/([&%$#_{}])/g, "\\$1")
+    .replace(/~/g, "\\textasciitilde{}")
+    .replace(/\^/g, "\\textasciicircum{}");
+}
+
+function texMoney(amount) {
+  const num = Number(amount) || 0;
+  return `\\$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function texDate(dateStr) {
+  if (!dateStr) return "---";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "---";
+  return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+}
+
+function texDateLong(dateStr) {
+  if (!dateStr) return "---";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "---";
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+const STATUS_PILL = {
+  active: { bg: "stactivebg", fg: "stactivefg" },
+  finalized: { bg: "stactivebg", fg: "stactivefg" },
+  saved: { bg: "stsavedbg", fg: "stsavedfg" },
+  pending_approval: { bg: "stpendbg", fg: "stpendfg" },
+  approved: { bg: "stapprbg", fg: "stapprfg" },
+  approved_salesman: { bg: "stapprbg", fg: "stapprfg" },
+  approved_admin: { bg: "stapprbg", fg: "stapprfg" },
+  draft: { bg: "stdraftbg", fg: "stdraftfg" },
+};
+
+function statusPill(status) {
+  const key = String(status || "").toLowerCase();
+  const c = STATUS_PILL[key] || STATUS_PILL.draft;
+  const label = texEscape((status || "").replace(/_/g, " ").toUpperCase());
+  return `\\colorbox{${c.bg}}{\\textcolor{${c.fg}}{\\scriptsize\\bfseries ${label}}}`;
+}
+
+function buildInfoBox(title, pairs) {
+  const rows = pairs
+    .map(([label, value]) => `{\\color{emgray}${label}} & \\textbf{\\color{emdark}${value}} \\\\ \\hline`)
+    .join("\n");
+  return `{\\arrayrulecolor{emborder}\\setlength{\\arrayrulewidth}{0.6pt}
+\\begin{tabularx}{\\linewidth}{|@{\\hspace{8pt}}X >{\\RaggedLeft\\arraybackslash}p{3.7cm}@{\\hspace{8pt}}|}
+\\hline
+\\rowcolor{emindigo}\\multicolumn{2}{|@{\\hspace{8pt}}l@{\\hspace{8pt}}|}{\\color{white}\\bfseries\\footnotesize ${title}} \\\\ \\hline
+${rows}
+\\end{tabularx}}`;
+}
+
+/**
+ * Build one payroll-statement page for a single employee, matching the design of
+ * the individual payroll slip (header, info boxes, earnings table, NET PAY,
+ * signatures).
+ */
+function buildEmployeeSlip(emp, period, now, isFirst) {
+  const username = emp.username || "";
+  const usernameTex = texEscape(username);
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const checkNo = texEscape(`${yyyy}${mm}${username.toUpperCase().slice(0, 3)}`);
+  const empId = texEscape(`EMP-${username.toUpperCase().slice(0, 4)}-001`);
+  const payDate = texEscape(texDateLong(now.toISOString()));
+
+  const empInfo = buildInfoBox("EMPLOYEE INFORMATION", [
+    ["Employee Name", usernameTex],
+    ["Employee ID", empId],
+    ["Department", "Sales"],
+    ["Position", "Sales Representative"],
+  ]);
+  const payPeriod = buildInfoBox("PAY PERIOD", [
+    ["Period", texEscape(period.label)],
+    ["Start Date", texEscape(texDate(period.start))],
+    ["End Date", texEscape(texDate(period.end))],
+    ["Payment Date", texEscape(texDate(now.toISOString()))],
+  ]);
+
+  const agreementRows = (emp.agreements || [])
+    .filter(a => (Number(a.annualCommission) || 0) > 0)
+    .map(a => {
+      const name = texEscape(a.title || "Untitled");
+      const created = texEscape(texDate(a.createdAt));
+      return `\\textbf{\\color{emdark}${name}}\\newline{\\scriptsize\\color{emlight}Created: ${created}} & {\\color{emdark}${texMoney(a.monthlyValue)}/mo} & \\textcolor{empurple}{\\textbf{${texMoney(a.annualCommission)}}} \\\\ \\arrayrulecolor{emborder}\\hline`;
+    })
+    .join("\n");
+  const rowsBlock =
+    agreementRows ||
+    `\\multicolumn{3}{|@{\\hspace{8pt}}c@{\\hspace{8pt}}|}{\\textit{\\color{emlight}No commissionable agreements in this period}} \\\\ \\arrayrulecolor{emborder}\\hline`;
+
+  return `${isFirst ? "" : "\\newpage"}
+\\thispagestyle{empty}
+\\noindent
+\\begin{minipage}[t]{0.60\\textwidth}
+{\\fontsize{26}{28}\\selectfont\\bfseries\\color{emindigo}ENVIRO-MASTER}\\\\[4pt]
+{\\footnotesize\\color{emgray}SERVICES INTERNATIONAL}\\\\[8pt]
+{\\scriptsize\\color{emlight} 1234 Corporate Boulevard, Suite 500\\\\ Charlotte, NC 28202\\\\ Tel: (704) 555-0123}
+\\end{minipage}\\hfill
+\\begin{minipage}[t]{0.38\\textwidth}
+\\RaggedLeft
+{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emindigo}PAYROLL}\\\\[10pt]
+{\\small\\color{emgray}Pay Date: ${payDate}}\\\\[3pt]
+{\\small\\color{emgray}Check No: ${checkNo}}
+\\end{minipage}
+
+\\vspace{10pt}
+{\\color{emindigo}\\rule{\\textwidth}{2pt}}
+\\vspace{18pt}
+
+\\noindent
+\\begin{minipage}[t]{0.48\\textwidth}
+${empInfo}
+\\end{minipage}\\hfill
+\\begin{minipage}[t]{0.48\\textwidth}
+${payPeriod}
+\\end{minipage}
+
+\\vspace{20pt}
+
+\\noindent
+{\\arrayrulecolor{emborder}\\setlength{\\arrayrulewidth}{0.6pt}
+\\begin{longtable}{|@{\\hspace{8pt}}p{9.4cm} >{\\RaggedLeft\\arraybackslash}p{3.8cm} >{\\RaggedLeft\\arraybackslash}p{3.2cm}@{\\hspace{8pt}}|}
+\\hline
+\\rowcolor{emindigo}\\multicolumn{3}{|@{\\hspace{8pt}}l@{\\hspace{8pt}}|}{\\color{white}\\bfseries\\footnotesize COMMISSION EARNINGS} \\\\ \\hline
+\\rowcolor{emtablehdr}{\\color{emgray}\\bfseries\\scriptsize DESCRIPTION} & {\\color{emgray}\\bfseries\\scriptsize CONTRACT VALUE} & {\\color{emgray}\\bfseries\\scriptsize COMMISSION} \\\\ \\arrayrulecolor{emborder}\\hline
+\\endhead
+${rowsBlock}
+\\end{longtable}}
+
+\\vspace{18pt}
+
+\\noindent
+{\\arrayrulecolor{emindigo}\\setlength{\\arrayrulewidth}{1pt}
+\\begin{tabularx}{\\textwidth}{|@{\\hspace{14pt}}X >{\\RaggedLeft\\arraybackslash}p{6cm}@{\\hspace{14pt}}|}
+\\hline
+{\\color{emdark}Total Agreements} & \\textbf{${Number(emp.totalAgreements) || 0}} \\\\ \\hline
+{\\color{emdark}Total Monthly Revenue} & \\textbf{${texMoney(emp.totalMonthlyRevenue)}} \\\\ \\hline
+\\end{tabularx}}
+
+\\vspace{-1pt}
+\\noindent\\colorbox{emindigo}{\\parbox{\\dimexpr\\textwidth-2\\fboxsep\\relax}{\\vspace{3pt}\\hspace{8pt}{\\color{white}\\bfseries\\large NET PAY}\\hfill{\\color{white}\\bfseries\\LARGE ${texMoney(emp.totalAnnualCommission)}}\\hspace{8pt}\\vspace{3pt}}}
+
+\\vspace{55pt}
+
+\\noindent
+\\begin{minipage}[t]{0.46\\textwidth}\\centering
+\\rule{0.9\\linewidth}{0.6pt}\\\\[3pt]
+\\textbf{${usernameTex}}\\\\{\\scriptsize\\color{emlight}Employee}
+\\end{minipage}\\hfill
+\\begin{minipage}[t]{0.46\\textwidth}\\centering
+\\rule{0.9\\linewidth}{0.6pt}\\\\[3pt]
+\\textbf{Authorized Signatory}\\\\{\\scriptsize\\color{emlight}Payroll Department}
+\\end{minipage}
+`;
+}
+
+/**
+ * Build a single self-contained LaTeX document containing every employee's
+ * payroll statement (one slip per page), matching the individual slip design.
+ */
+function buildPayrollLatex(employees, totals, period) {
+  const now = new Date();
+  const slips = employees
+    .map((emp, idx) => buildEmployeeSlip(emp, period, now, idx === 0))
+    .join("\n");
+
+  return `\\documentclass[10pt]{article}
+\\usepackage[a4paper,margin=1.6cm]{geometry}
+\\usepackage[T1]{fontenc}
+\\usepackage{helvet}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\usepackage{xcolor}
+\\usepackage{array}
+\\usepackage{tabularx}
+\\usepackage{longtable}
+\\usepackage{colortbl}
+\\usepackage{ragged2e}
+\\definecolor{emindigo}{HTML}{6366F1}
+\\definecolor{emdark}{HTML}{1A202C}
+\\definecolor{emgray}{HTML}{4A5568}
+\\definecolor{emlight}{HTML}{718096}
+\\definecolor{emborder}{HTML}{E2E8F0}
+\\definecolor{empurple}{HTML}{7C3AED}
+\\definecolor{emtablehdr}{HTML}{F7FAFC}
+\\definecolor{stactivebg}{HTML}{EDE9FE}\\definecolor{stactivefg}{HTML}{7C3AED}
+\\definecolor{stsavedbg}{HTML}{DBEAFE}\\definecolor{stsavedfg}{HTML}{2563EB}
+\\definecolor{stpendbg}{HTML}{FEF3C7}\\definecolor{stpendfg}{HTML}{D97706}
+\\definecolor{stapprbg}{HTML}{E0E7FF}\\definecolor{stapprfg}{HTML}{4338CA}
+\\definecolor{stdraftbg}{HTML}{E2E8F0}\\definecolor{stdraftfg}{HTML}{4A5568}
+\\setlength{\\parindent}{0pt}
+\\renewcommand{\\arraystretch}{1.5}
+\\setlength{\\tabcolsep}{6pt}
+\\pagestyle{empty}
+\\begin{document}
+${slips}
+\\end{document}
+`;
+}
+
+/**
+ * Download a payroll PDF for a period and record the payroll run in history.
+ * Without `username` it produces one combined PDF for every employee; with
+ * `username` it produces that single employee's payroll slip. Either way the
+ * PDF is compiled on the LaTeX server.
+ * GET /api/payroll/download-pdf
+ * Query params: periodStart, periodEnd (optional), username (optional)
+ */
+export async function downloadPayrollPdf(req, res) {
+  try {
+    const settings = await AdminSettings.getSingleton();
+    const periods = calculatePayrollPeriods(settings.payrollSettings);
+    const cycleType = settings.payrollSettings?.cycleType || "monthly";
+
+    const periodStart = req.query.periodStart ? new Date(req.query.periodStart) : periods.current.start;
+    const periodEnd = req.query.periodEnd ? new Date(req.query.periodEnd) : periods.current.end;
+    const periodLabel = formatPeriodLabel(periodStart, periodEnd);
+    const username = req.query.username ? String(req.query.username) : null;
+
+    const { totals, employees } = await computeEmployeesForPeriod(periodStart, periodEnd);
+
+    if (!employees.length) {
+      return res.status(404).json({ success: false, error: "No payroll data for this period." });
+    }
+
+    const pdfEmployees = username
+      ? employees.filter(e => e.username === username)
+      : employees;
+
+    if (!pdfEmployees.length) {
+      return res.status(404).json({ success: false, error: "No payroll data for this employee." });
+    }
+
+    const latex = buildPayrollLatex(pdfEmployees, totals, {
+      start: periodStart.toISOString(),
+      end: periodEnd.toISOString(),
+      label: periodLabel,
+    });
+
+    const { buffer } = await compileRawTex(latex);
+
+    // Record this payroll run in history (creates/freezes the snapshot for the
+    // period and stamps when the PDF was generated). The snapshot always stores
+    // the full period, even for a single-employee download.
+    try {
+      await PayrollSnapshot.findOneAndUpdate(
+        { periodStart, periodEnd },
+        {
+          $set: {
+            periodLabel,
+            cycleType,
+            totals,
+            employees,
+            pdfGeneratedAt: new Date(),
+          },
+          $inc: { pdfCount: 1 },
+          $setOnInsert: { snapshotAt: new Date() },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+    } catch (snapErr) {
+      console.error("downloadPayrollPdf: failed to record snapshot:", snapErr.message);
+    }
+
+    const safeLabel = periodLabel.replace(/[^a-z0-9]+/gi, "-");
+    const namePart = username ? `${username.replace(/[^a-z0-9]+/gi, "-")}-` : "";
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="payroll-${namePart}${safeLabel}.pdf"`);
+    res.setHeader("Content-Length", buffer.length);
+    return res.send(buffer);
+  } catch (err) {
+    console.error("downloadPayrollPdf error:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to generate payroll PDF" });
   }
 }

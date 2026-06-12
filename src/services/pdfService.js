@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import path from "path";
-import zlib from "zlib";
 import Mustache from "mustache";
 import {
   PDF_REMOTE_BASE,
@@ -2959,30 +2958,6 @@ function _flattenConfig(obj, rows = [], depth = 0) {
   return rows;
 }
 
-function _htmlEsc(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function _getServiceIconSvg(label = '') {
-  const l = label.toLowerCase();
-  if (l.includes('restroom') || l.includes('toilet') || l.includes('bathroom')) {
-    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
-  }
-  if (l.includes('monthly') || l.includes('month') || l.includes('billing') || l.includes('schedule')) {
-    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`;
-  }
-  if (l.includes('sani') || l.includes('bin') || l.includes('feminine') || l.includes('hygiene') || l.includes('dispenser')) {
-    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>`;
-  }
-  if (l.includes('window') || l.includes('floor') || l.includes('carpet') || l.includes('cleaning')) {
-    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 2v7h-7V4h7zM4 4h6v7H4V4zM4 20v-7h6v7H4zm8 0v-7h7v7h-7z"/></svg>`;
-  }
-  if (l.includes('product') || l.includes('supply') || l.includes('stock') || l.includes('inventory')) {
-    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.33C18 2.99 16.21 1 13.72 1c-1.34 0-2.49.59-3.22 1.52L10 3.4l-.5-.89C8.77 1.59 7.62 1 6.28 1 3.79 1 2 2.99 2 4.67c0 .45.11.89.18 1.33H0v14c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7.28-3c.9 0 1.28.64 1.28 1.67 0 .56-.12 1.09-.3 1.33H13v-3h-.28zM4 4.67C4 3.64 4.38 3 5.28 3H6v3h-.7C5.12 5.76 4 5.23 4 4.67zm7 14H2V8h9v10.67zm2 0V8h9v10.67h-9z"/></svg>`;
-  }
-  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>`;
-}
-
 function _getCategoryTag(config) {
   for (const [key, val] of Object.entries(config || {})) {
     if (typeof val === 'object' && val !== null && !Array.isArray(val)) return _camelToLabel(key);
@@ -2990,244 +2965,154 @@ function _getCategoryTag(config) {
   return '';
 }
 
-function _serviceCardHtml(service) {
-  const rows = _flattenConfig(service.config || {});
-  if (rows.length === 0) return '';
-  const icon = _getServiceIconSvg(service.label || service.serviceId || '');
-  const categoryTag = _getCategoryTag(service.config || {});
-  const trs = rows.map(r => `
-      <tr>
-        <td class="fc">${_htmlEsc(r.field)}</td>
-        <td class="vc">${_htmlEsc(r.value)}</td>
-        <td class="uc">${_htmlEsc(r.unit)}</td>
-      </tr>`).join('');
-  return `
-  <div class="card">
-    <div class="card-top">
-      <div class="ci">${icon}</div>
-      <div>
-        <div class="csn">${_htmlEsc(service.label || service.serviceId)}</div>
-        ${categoryTag ? `<span class="ctag">${_htmlEsc(categoryTag)}</span>` : ''}
-      </div>
-    </div>
-    <table class="pt">
-      <thead><tr><th>Pricing Field</th><th>Value</th><th>Unit</th></tr></thead>
-      <tbody>${trs}</tbody>
-    </table>
-  </div>`;
-}
-
-function _productSectionsHtml(catalog) {
-  if (!catalog || !Array.isArray(catalog.families)) return '';
-  return catalog.families
-    .filter(f => f.products && f.products.length > 0)
-    .map(family => {
-      const trs = family.products
-        .filter(p => p.basePrice?.amount != null)
-        .map(p => {
-          const price = `$${fmtNum(Number(p.basePrice.amount))}`;
-          const warranty = p.warrantyPricePerUnit?.amount != null
-            ? `$${fmtNum(Number(p.warrantyPricePerUnit.amount))}/${p.warrantyPricePerUnit.billingPeriod || 'mo'}`
-            : '—';
-          return `
-      <tr>
-        <td class="fc">${_htmlEsc(p.name || '')}</td>
-        <td class="vc">${_htmlEsc(price)}</td>
-        <td class="uc">${_htmlEsc(p.basePrice.uom || 'each')}</td>
-        <td class="uc">${_htmlEsc(warranty)}</td>
-      </tr>`;
-        }).join('');
-      const productIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.33C18 2.99 16.21 1 13.72 1c-1.34 0-2.49.59-3.22 1.52L10 3.4l-.5-.89C8.77 1.59 7.62 1 6.28 1 3.79 1 2 2.99 2 4.67c0 .45.11.89.18 1.33H0v14c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM13 4v3h-.28c.9 0 1.28.64 1.28 1.67zM4 4.67C4 3.64 4.38 3 5.28 3H6v3h-.7C5.12 5.76 4 5.23 4 4.67zm7 14H2V8h9v10.67zm2 0V8h9v10.67h-9z"/></svg>`;
-      return `
-  <div class="card">
-    <div class="card-top">
-      <div class="ci">${productIcon}</div>
-      <div>
-        <div class="csn">${_htmlEsc(family.label || family.key)}</div>
-        <span class="ctag">${family.products.length} Products</span>
-      </div>
-    </div>
-    <table class="pt">
-      <thead><tr><th>Product Name</th><th>Base Price</th><th>UOM</th><th>Warranty/Unit</th></tr></thead>
-      <tbody>${trs}</tbody>
-    </table>
-  </div>`;
-    }).join('');
-}
-
 function _countPricingItems(services) {
   return services.reduce((sum, s) => sum + _flattenConfig(s.config || {}).length, 0);
 }
 
-function _buildPricingCatalogHtml({ exportDate, services, catalog, currency }) {
+function _latexPricingCard({ title, tag, headers, colspec, rows }) {
+  const esc = latexEscape;
+  const ncol = headers.length;
+  const headerCells = headers.map(h => `{\\color{white}\\bfseries\\footnotesize ${esc(h)}}`).join(' & ');
+  const tagTex = tag ? `\\quad\\colorbox{emaccent}{\\color{white}\\scriptsize ${esc(tag)}}` : '';
+  const dataRows = rows
+    .map((cells, i) => {
+      const shade = i % 2 === 1 ? '\\rowcolor{emrowalt}' : '';
+      return `${shade}${cells.join(' & ')} \\\\ \\arrayrulecolor{emborder}\\hline`;
+    })
+    .join('\n');
+  return `\\noindent
+{\\arrayrulecolor{emborder}\\setlength{\\arrayrulewidth}{0.6pt}
+\\begin{longtable}{|@{\\hspace{12pt}}${colspec}@{\\hspace{12pt}}|}
+\\hline
+\\rowcolor{emtitlebg}\\multicolumn{${ncol}}{|@{\\hspace{12pt}}l@{\\hspace{12pt}}|}{\\rule[-9pt]{0pt}{28pt}\\large\\bfseries\\color{emink}${esc(title)}${tagTex}} \\\\ \\hline
+\\rowcolor{emaccent}\\rule[-7pt]{0pt}{22pt}${headerCells} \\\\ \\arrayrulecolor{emborder}\\hline
+\\endhead
+${dataRows}
+\\end{longtable}}
+\\vspace{20pt}
+`;
+}
+
+function _buildPricingCatalogLatex({ exportDate, services, catalog, currency }) {
+  const esc = latexEscape;
   const totalPricingItems = _countPricingItems(services);
-  const serviceCards = services.map(_serviceCardHtml).join('');
-  const productCards = _productSectionsHtml(catalog);
-  const shieldSvg = (color, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6.5v5c0 5.25 3.5 10.15 8 11.35 4.5-1.2 8-6.1 8-11.35v-5L12 2z" fill="${color}" opacity="0.92"/><path d="M10 12.2l-2.1-2.1L9.3 8.7l.7.7 4.6-4.6 1.4 1.4-6 6z" fill="white" opacity="0.85"/></svg>`;
+  const categoryCount = services.length;
 
-  return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;background:#fff;color:#1e1b4b;font-size:13px}
-.ph{background:linear-gradient(135deg,#1e1b4b 0%,#3730a3 35%,#4f46e5 70%,#6366f1 100%);padding:28px 40px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden}
-.ph::before{content:'';position:absolute;right:-80px;top:-60px;width:220px;height:220px;background:rgba(255,255,255,0.05);border-radius:50%;pointer-events:none}
-.ph::after{content:'';position:absolute;right:80px;bottom:-80px;width:180px;height:180px;background:rgba(255,255,255,0.04);border-radius:50%;pointer-events:none}
-.hl{display:flex;align-items:center;gap:18px;position:relative;z-index:1}
-.lb{width:68px;height:68px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.htb h1{font-size:30px;font-weight:800;color:#fff;letter-spacing:-0.5px;line-height:1}
-.hs{font-size:14px;color:#a5b4fc;font-weight:500;margin-top:4px}
-.hu{width:44px;height:3px;background:#818cf8;border-radius:2px;margin-top:10px}
-.hm{display:flex;flex-direction:column;gap:10px;position:relative;z-index:1}
-.mr{display:flex;align-items:center;gap:10px}
-.mib{width:30px;height:30px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.mtb{display:flex;flex-direction:column}
-.ml{font-size:10px;color:#a5b4fc;font-weight:500}
-.mv{font-size:13px;color:#fff;font-weight:600}
-.sb{border:1px solid #e5e7eb;border-radius:0;margin:0;padding:18px 32px;display:flex;align-items:center;border-left:none;border-right:none}
-.si{flex:1;display:flex;align-items:center;gap:14px}
-.sic{width:46px;height:46px;background:#eef2ff;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.sl{font-size:12px;color:#6b7280;font-weight:500}
-.sn{font-size:26px;font-weight:800;color:#1e1b4b;line-height:1;margin-top:1px}
-.sd{width:1px;height:50px;background:#e5e7eb;margin:0 20px;flex-shrink:0}
-.slbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#6b7280;padding:16px 24px 8px;margin-top:0}
-.cw{padding:0 0 24px}
-.card{border:1px solid #e5e7eb;border-radius:0;margin-bottom:12px;overflow:hidden;page-break-inside:avoid;break-inside:avoid}
-.card-top{padding:16px 24px 12px;display:flex;align-items:flex-start;gap:14px}
-.ci{width:44px;height:44px;background:#4f46e5;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.csn{font-size:18px;font-weight:700;color:#1e1b4b;line-height:1.2}
-.ctag{display:inline-flex;align-items:center;background:#4f46e5;color:#fff;font-size:11px;font-weight:600;padding:4px 14px 4px 10px;border-radius:4px;margin-top:7px;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%)}
-.pt{width:100%;border-collapse:collapse;table-layout:fixed}
-.pt thead tr{background:#4f46e5}
-.pt thead th{padding:10px 16px;text-align:left;font-size:12px;font-weight:600;color:#fff}
-.pt tbody tr:nth-child(even){background:#fafafa}
-.pt tbody td{padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6}
-.pt tbody tr:last-child td{border-bottom:none}
-.fc{color:#374151}
-.vc{font-weight:700;color:#1e1b4b}
-.uc{color:#6b7280;font-size:12px}
-.pf{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-top:1px solid #e5e7eb;margin-top:8px}
-.fb{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#4f46e5}
-.fr{font-size:12px;color:#9ca3af}
-</style></head><body>
+  const serviceCards = services
+    .map(s => {
+      const rows = _flattenConfig(s.config || {});
+      if (!rows.length) return '';
+      const tag = _getCategoryTag(s.config || {});
+      return _latexPricingCard({
+        title: s.label || s.serviceId || 'Service',
+        tag,
+        headers: ['Pricing Field', 'Value', 'Unit'],
+        colspec: 'p{8.4cm} >{\\RaggedLeft\\arraybackslash}p{3.6cm} >{\\RaggedLeft\\arraybackslash}p{3.2cm}',
+        rows: rows.map(r => [esc(r.field), esc(r.value), esc(r.unit)]),
+      });
+    })
+    .filter(Boolean)
+    .join('\n');
 
-<div class="ph">
-  <div class="hl">
-    <div class="lb">${shieldSvg('white', 40)}</div>
-    <div class="htb">
-      <h1>Enviro-Master</h1>
-      <p class="hs">Service Pricing Report</p>
-      <div class="hu"></div>
-    </div>
-  </div>
-  <div class="hm">
-    <div class="mr">
-      <div class="mib"><svg width="16" height="16" viewBox="0 0 24 24" fill="#a5b4fc"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg></div>
-      <div class="mtb"><span class="ml">Generated on</span><span class="mv">${_htmlEsc(exportDate)}</span></div>
-    </div>
-    <div class="mr">
-      <div class="mib"><svg width="16" height="16" viewBox="0 0 24 24" fill="#a5b4fc"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
-      <div class="mtb"><span class="ml">Prepared by</span><span class="mv">Admin</span></div>
-    </div>
-  </div>
-</div>
-
-<div class="sb">
-  <div class="si">
-    <div class="sic"><svg width="22" height="22" viewBox="0 0 24 24" fill="#4f46e5"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg></div>
-    <div><div class="sl">Service Categories</div><div class="sn">${services.length}</div></div>
-  </div>
-  <div class="sd"></div>
-  <div class="si">
-    <div class="sic"><svg width="22" height="22" viewBox="0 0 24 24" fill="#4f46e5"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div>
-    <div><div class="sl">Pricing Items</div><div class="sn">${totalPricingItems}</div></div>
-  </div>
-  <div class="sd"></div>
-  <div class="si">
-    <div class="sic"><svg width="22" height="22" viewBox="0 0 24 24" fill="#4f46e5"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg></div>
-    <div><div class="sl">Currency</div><div class="sn">${_htmlEsc(currency)}</div></div>
-  </div>
-</div>
-
-${services.length > 0 ? '<div class="slbl">Service Configurations</div>' : ''}
-<div class="cw">
-  ${serviceCards}
-  ${productCards ? '<div style="height:8px"></div>' + productCards : ''}
-</div>
-
-<div class="pf">
-  <div class="fb">${shieldSvg('#4f46e5', 16)} Enviro-Master Pricing Report</div>
-  <div class="fr">Confidential — Internal Use Only</div>
-</div>
-</body></html>`;
-}
-
-// ── Puppeteer concurrency guard ───────────────────────────────────────────────
-// Max 1 Chromium instance at a time; callers beyond the limit get a clear error
-// instead of silently stacking up and exhausting RAM.
-const PUPPETEER_MAX_CONCURRENT = 1;
-const PUPPETEER_TIMEOUT_MS = 60_000; // 60 s hard limit per export
-let _puppeteerActive = 0;
-
-async function _withPuppeteer(fn) {
-  if (_puppeteerActive >= PUPPETEER_MAX_CONCURRENT) {
-    const err = new Error('A PDF export is already in progress. Please wait and try again.');
-    err.code = 'PUPPETEER_BUSY';
-    throw err;
+  let productCards = '';
+  if (catalog && Array.isArray(catalog.families)) {
+    productCards = catalog.families
+      .filter(f => f.products && f.products.length > 0)
+      .map(family => {
+        const rows = family.products
+          .filter(p => p.basePrice?.amount != null)
+          .map(p => {
+            const price = `$${fmtNum(Number(p.basePrice.amount))}`;
+            const warranty = p.warrantyPricePerUnit?.amount != null
+              ? `$${fmtNum(Number(p.warrantyPricePerUnit.amount))}/${p.warrantyPricePerUnit.billingPeriod || 'mo'}`
+              : '-';
+            return [esc(p.name || ''), esc(price), esc(p.basePrice.uom || 'each'), esc(warranty)];
+          });
+        if (!rows.length) return '';
+        return _latexPricingCard({
+          title: family.label || family.key || 'Products',
+          tag: `${family.products.length} Products`,
+          headers: ['Product Name', 'Base Price', 'UOM', 'Warranty/Unit'],
+          colspec: 'p{6.6cm} >{\\RaggedLeft\\arraybackslash}p{3cm} >{\\RaggedLeft\\arraybackslash}p{3cm} >{\\RaggedLeft\\arraybackslash}p{3.2cm}',
+          rows,
+        });
+      })
+      .filter(Boolean)
+      .join('\n');
   }
-  _puppeteerActive++;
 
-  // Hard timeout: if fn takes longer than PUPPETEER_TIMEOUT_MS we kill the browser
-  let browser;
-  const timeoutHandle = setTimeout(() => {
-    console.error('⏰ [PUPPETEER] Hard timeout reached — force-closing browser');
-    browser?.close().catch(() => {});
-  }, PUPPETEER_TIMEOUT_MS);
+  const sectionHeading = label =>
+    `{\\color{emaccent}\\rule[-2pt]{3.5pt}{14pt}}\\hspace{7pt}{\\large\\bfseries\\color{emink}${label}}\\par\\nobreak\\vspace{4pt}{\\color{emborder}\\rule{\\textwidth}{0.6pt}}\\par\\vspace{12pt}\n`;
 
-  try {
-    const puppeteer = (await import('puppeteer')).default;
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-    });
-    return await fn(browser);
-  } finally {
-    clearTimeout(timeoutHandle);
-    _puppeteerActive--;
-    if (browser) {
-      browser.close().catch(e => console.warn('⚠️ [PUPPETEER] browser.close() error:', e.message));
-    }
-  }
+  const body = `${categoryCount > 0 && serviceCards ? sectionHeading('Service Configurations') : ''}${serviceCards}${productCards ? `\n\\vspace{6pt}\n${sectionHeading('Product Catalog')}${productCards}` : ''}`;
+
+  return `\\documentclass[10pt]{article}
+\\usepackage[letterpaper,margin=1.4cm]{geometry}
+\\usepackage[T1]{fontenc}
+\\usepackage{helvet}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\usepackage{xcolor}
+\\usepackage{array}
+\\usepackage{tabularx}
+\\usepackage{longtable}
+\\usepackage{colortbl}
+\\usepackage{ragged2e}
+\\definecolor{emink}{HTML}{1E1B4B}
+\\definecolor{emhdr}{HTML}{3730A3}
+\\definecolor{emaccent}{HTML}{4F46E5}
+\\definecolor{emhdracc}{HTML}{A5B4FC}
+\\definecolor{emmuted}{HTML}{6B7280}
+\\definecolor{emborder}{HTML}{E5E7EB}
+\\definecolor{emrowalt}{HTML}{FAFAFA}
+\\definecolor{emtitlebg}{HTML}{EEF2FF}
+\\setlength{\\parindent}{0pt}
+\\renewcommand{\\arraystretch}{1.5}
+\\setlength{\\tabcolsep}{8pt}
+\\pagestyle{empty}
+\\begin{document}
+
+\\noindent\\colorbox{emhdr}{\\parbox[c]{\\dimexpr\\textwidth-2\\fboxsep\\relax}{\\vspace{14pt}
+\\begin{minipage}[c]{0.60\\linewidth}
+{\\fontsize{30}{32}\\selectfont\\bfseries\\color{white}Enviro-Master}\\\\[5pt]
+{\\color{emhdracc}\\large Service Pricing Report}
+\\end{minipage}\\hfill
+\\begin{minipage}[c]{0.38\\linewidth}\\RaggedLeft
+{\\scriptsize\\color{emhdracc}Generated on}\\\\{\\small\\color{white}${esc(exportDate)}}\\\\[6pt]
+{\\scriptsize\\color{emhdracc}Prepared by}\\\\{\\small\\color{white}Admin}
+\\end{minipage}
+\\vspace{14pt}}}
+
+\\vspace{18pt}
+\\noindent{\\setlength{\\fboxsep}{14pt}%
+\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Service Categories}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emink}${categoryCount}}}}\\hfill
+\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Pricing Items}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emink}${totalPricingItems}}}}\\hfill
+\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Currency}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emink}${esc(currency)}}}}}
+
+\\vspace{26pt}
+
+${body}
+
+\\vfill
+{\\color{emborder}\\rule{\\textwidth}{0.6pt}}
+\\vspace{6pt}
+\\noindent{\\footnotesize\\bfseries\\color{emaccent}Enviro-Master Pricing Report}\\hfill{\\footnotesize\\color{emmuted}Confidential --- Internal Use Only}
+
+\\end{document}
+`;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function compilePricingCatalogPdf({ services = [], catalog = null } = {}) {
   const exportDate = new Date().toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
-  const activeServices = services.filter(s => s.isActive);
+  const activeServices = (services || []).filter(s => s.isActive);
   const currency = catalog?.currency || 'USD';
-  const html = _buildPricingCatalogHtml({ exportDate, services: activeServices, catalog, currency });
+  const latex = _buildPricingCatalogLatex({ exportDate, services: activeServices, catalog, currency });
 
-  return _withPuppeteer(async (browser) => {
-    const page = await browser.newPage();
-
-    // Per-page navigation timeout so networkidle0 never hangs forever
-    page.setDefaultNavigationTimeout(PUPPETEER_TIMEOUT_MS);
-    page.setDefaultTimeout(PUPPETEER_TIMEOUT_MS);
-
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: PUPPETEER_TIMEOUT_MS });
-    const pdfUint8 = await page.pdf({
-      format: 'Letter',
-      printBackground: true,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' },
-    });
-    const rawBuffer = Buffer.from(pdfUint8);
-    const compressed = zlib.gzipSync(rawBuffer, { level: zlib.constants.Z_BEST_COMPRESSION });
-    const filename = `pricing-catalog-${new Date().toISOString().slice(0, 10)}.pdf`;
-    return { buffer: compressed, filename, encoding: 'gzip' };
-  });
+  const buffer = await remotePostPdf('pdf/compile', { template: latex });
+  await tidyTempArtifacts({ purgeAll: true });
+  const filename = `pricing-catalog-${new Date().toISOString().slice(0, 10)}.pdf`;
+  return { buffer, filename };
 }
 
 export async function getPdfHealth() {
