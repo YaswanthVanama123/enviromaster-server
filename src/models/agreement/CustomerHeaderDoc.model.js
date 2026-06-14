@@ -216,6 +216,8 @@ const CommissionSchema = new mongoose.Schema(
     annualCommission: { type: Number, default: 0 },
     contractCommission: { type: Number, default: 0 },
     rulesSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    isNewLocation: { type: Boolean, default: true },
+    priorQuotaCredit: { type: Number, default: null },
   },
   { _id: false, strict: false }
 );
