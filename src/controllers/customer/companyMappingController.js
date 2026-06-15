@@ -4,6 +4,22 @@
  */
 
 import { CompanyMapping, BiginCompany, RouteStarCustomer } from "../../models/customer/index.js";
+import { recalcCommissionForCompany } from "../../services/commissionAutomation.js";
+
+function triggerCommissionRecalc(biginId) {
+  if (!biginId) return;
+  Promise.resolve()
+    .then(() => recalcCommissionForCompany(biginId))
+    .then((summary) => {
+      const updated = summary.results.filter((r) => !r.skipped).length;
+      console.log(
+        `[COMMISSION-AUTO] Recalculated ${updated}/${summary.agreementCount} agreement(s) for Bigin company ${biginId}`,
+      );
+    })
+    .catch((err) => {
+      console.error(`[COMMISSION-AUTO] Recalc failed for Bigin company ${biginId}:`, err?.message);
+    });
+}
 
 /**
  * Get all company mappings with filters and pagination
@@ -253,6 +269,8 @@ export const saveMapping = async (req, res) => {
       data: mapping,
       message: routeStarId ? "Mapping created successfully" : "Mapping cleared successfully",
     });
+
+    if (routeStarId) triggerCommissionRecalc(biginId);
   } catch (error) {
     console.error("Error saving mapping:", error);
     res.status(500).json({
@@ -311,6 +329,8 @@ export const updateMapping = async (req, res) => {
       success: true,
       data: mapping,
     });
+
+    if (routeStarId) triggerCommissionRecalc(mapping.biginId);
   } catch (error) {
     console.error("Error updating mapping:", error);
     res.status(500).json({

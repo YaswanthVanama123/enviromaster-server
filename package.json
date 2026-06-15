@@ -19,7 +19,9 @@
     "run:docker": "docker run -p 5000:5000 --env-file .env enviro-backend",
     "chrome:install": "node node_modules/playwright-core/cli.js install chromium",
     "chrome:deps": "node node_modules/playwright-core/cli.js install-deps chromium",
-    "chrome:setup": "node node_modules/playwright-core/cli.js install --with-deps chromium"
+    "chrome:setup": "node node_modules/playwright-core/cli.js install --with-deps chromium",
+    "verify:commission-parity": "node scripts/verify-commission-parity.mjs",
+    "backfill:commission": "node scripts/backfill-commission.mjs"
   },
   "dependencies": {
     "axios": "^1.13.2",

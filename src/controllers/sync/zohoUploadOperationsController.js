@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import { ZohoMapping } from "../../models/sync/index.js";
 import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
+import { recalcCommissionForAgreement, recalcCommissionForAgreementById } from "../../services/commissionAutomation.js";
 import { compileCustomerHeader } from "../../services/pdfService.js";
 import {
   createBiginDeal,
@@ -303,6 +304,15 @@ export async function firstTimeUpload(req, res) {
         },
       },
     });
+
+    Promise.resolve()
+      .then(() => recalcCommissionForAgreement(agreementId, companyId))
+      .then((r) => {
+        console.log(`[COMMISSION-AUTO] connect recalc result for ${agreementId}:`, JSON.stringify(r));
+      })
+      .catch((err) => {
+        console.error(`[COMMISSION-AUTO] Recalc after Bigin connect failed for ${agreementId}:`, err?.message);
+      });
   } catch (error) {
     console.error("❌ First-time upload failed:", error.message);
     res.status(500).json({
@@ -507,6 +517,15 @@ export async function updateUpload(req, res) {
         } : null,
       },
     });
+
+    Promise.resolve()
+      .then(() => recalcCommissionForAgreementById(agreementId))
+      .then((r) => {
+        console.log(`[COMMISSION-AUTO] update-upload recalc result for ${agreementId}:`, JSON.stringify(r));
+      })
+      .catch((err) => {
+        console.error(`[COMMISSION-AUTO] Recalc after update-upload failed for ${agreementId}:`, err?.message);
+      });
   } catch (error) {
     console.error("❌ Update upload failed:", error.message);
     res.status(500).json({
