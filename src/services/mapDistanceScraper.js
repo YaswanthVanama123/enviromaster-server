@@ -4,7 +4,7 @@
  * Supports session reuse for batch operations (login once, fetch many)
  */
 
-import puppeteer from 'puppeteer';
+import { chromium } from 'playwright-core';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -34,6 +34,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
 class MapDistanceSession {
   constructor() {
     this.browser = null;
+    this.context = null;
     this.page = null;
     this.isInitialized = false;
     this.isOnMapDistancePage = false;
@@ -69,10 +70,9 @@ class MapDistanceSession {
     console.log('[Session] Initializing new session...');
     onProgress?.(5, 'Launching browser...');
 
-    this.browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      protocolTimeout: 60000,
+    this.browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -82,8 +82,8 @@ class MapDistanceSession {
       ],
     });
 
-    this.page = await this.browser.newPage();
-    await this.page.setViewport({ width: 1920, height: 1080 });
+    this.context = await this.browser.newContext({ viewport: { width: 1920, height: 1080 } });
+    this.page = await this.context.newPage();
     this.page.setDefaultTimeout(30000);
     this.page.setDefaultNavigationTimeout(30000);
 
@@ -161,6 +161,7 @@ class MapDistanceSession {
       console.log('[Session] Closing browser session');
       await this.browser.close();
       this.browser = null;
+      this.context = null;
       this.page = null;
       this.isInitialized = false;
       this.isOnMapDistancePage = false;
@@ -184,7 +185,7 @@ class MapDistanceSession {
     }
 
     await this.page.goto(`${BASE_URL}/web/login/`, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: 30000
     });
 
@@ -202,7 +203,7 @@ class MapDistanceSession {
 
     try {
       await Promise.race([
-        this.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
+        this.page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }),
         this.page.waitForSelector('.dashboard, #dashboard, .main-content, nav, .sidebar', { timeout: 30000 })
       ]);
     } catch (e) {
@@ -221,7 +222,7 @@ class MapDistanceSession {
     console.log('📍 Navigating to Map Distance page...');
 
     // Inject script to block bootbox modals
-    await this.page.evaluateOnNewDocument(() => {
+    await this.page.addInitScript(() => {
       window.addEventListener('DOMContentLoaded', () => {
         if (typeof bootbox !== 'undefined') {
           bootbox.alert = () => {};
@@ -233,7 +234,7 @@ class MapDistanceSession {
     });
 
     await this.page.goto(`${BASE_URL}/web/mapdistance/`, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: 30000
     });
 
@@ -370,18 +371,18 @@ class MapDistanceSession {
       // Select first result - MUST click the highlighted option
       console.log('   Selecting dropdown option...');
 
-      // Method 1: Click the highlighted option using Puppeteer (more reliable than evaluate)
+      // Method 1: Click the highlighted option using Playwright (more reliable than evaluate)
       try {
         const highlightedOption = await this.page.$('.select2-results__option--highlighted');
         if (highlightedOption) {
           await highlightedOption.click();
-          console.log('   ✓ Clicked highlighted option via Puppeteer');
+          console.log('   ✓ Clicked highlighted option via Playwright');
         } else {
           // Try clicking first valid option
           const firstOption = await this.page.$('.select2-results__option[role="option"]');
           if (firstOption) {
             await firstOption.click();
-            console.log('   ✓ Clicked first option via Puppeteer');
+            console.log('   ✓ Clicked first option via Playwright');
           } else {
             // Fallback: use keyboard to select
             console.log('   Using keyboard fallback...');
@@ -431,7 +432,7 @@ class MapDistanceSession {
     try {
       // Start waiting for navigation BEFORE clicking (form submission)
       const navigationPromise = this.page.waitForNavigation({
-        waitUntil: 'networkidle0',
+        waitUntil: 'networkidle',
         timeout: 30000
       });
 
@@ -465,7 +466,7 @@ class MapDistanceSession {
         if (firstRow.textContent.includes('No data found')) return false;
         const cells = firstRow.querySelectorAll('td');
         return cells.length >= 6;
-      }, { timeout: 10000 });
+      }, null, { timeout: 10000 });
       console.log('   ✓ Table data loaded');
     } catch (tableErr) {
       console.log('   ⚠️ Table wait timeout - checking results anyway');

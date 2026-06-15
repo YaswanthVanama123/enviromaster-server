@@ -1,9 +1,9 @@
 /**
  * RouteSTAR Customer Scraper Service
- * Scrapes customers from RouteStar using Puppeteer with pagination support
+ * Scrapes customers from RouteStar using Playwright with pagination support
  */
 
-import puppeteer from 'puppeteer';
+import { chromium } from 'playwright-core';
 
 const BASE_URL = process.env.ROUTESTAR_BASE_URL || 'https://emnrv.routestar.online';
 const USERNAME = process.env.ROUTESTAR_USERNAME || '';
@@ -22,7 +22,7 @@ async function login(page) {
   }
 
   await page.goto(`${BASE_URL}/web/login/`, {
-    waitUntil: 'networkidle2',
+    waitUntil: 'networkidle',
     timeout: 30000
   });
 
@@ -45,7 +45,7 @@ async function login(page) {
   // Wait for either redirect or dashboard element to appear
   try {
     await Promise.race([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }),
       page.waitForSelector('.dashboard, #dashboard, .main-content, nav, .sidebar', { timeout: 30000 })
     ]);
   } catch (e) {
@@ -72,7 +72,7 @@ async function login(page) {
 async function navigateToCustomers(page) {
   console.log('📍 Navigating to customers page...');
   await page.goto(`${BASE_URL}/web/customers/`, {
-    waitUntil: 'networkidle2',
+    waitUntil: 'networkidle',
     timeout: 30000
   });
 
@@ -86,9 +86,9 @@ async function navigateToCustomers(page) {
     const selectExists = await page.$('#items_per_page');
     if (selectExists) {
       // Use 20 items per page - no scrolling needed
-      await page.select('#items_per_page', '20');
+      await page.selectOption('#items_per_page', '20');
       await new Promise(resolve => setTimeout(resolve, 2000));
-      await page.waitForNetworkIdle({ timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       console.log('✅ Set to 20 items per page');
     } else {
       console.log('⚠️ Items per page dropdown not found, using default');
@@ -186,7 +186,7 @@ async function goToPage(page, pageNum) {
     if (clicked) {
       // Wait for table to reload
       await new Promise(resolve => setTimeout(resolve, 1500));
-      await page.waitForNetworkIdle({ timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       return true;
     }
 
@@ -420,9 +420,9 @@ export async function scrapeRouteStarCustomers(onProgress) {
     console.log('🚀 Starting RouteSTAR customer scrape...');
     onProgress?.(5, 'Launching browser...');
 
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -432,8 +432,8 @@ export async function scrapeRouteStarCustomers(onProgress) {
       ],
     });
 
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
+    const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+    const page = await context.newPage();
 
     // Set a longer default timeout
     page.setDefaultTimeout(30000);

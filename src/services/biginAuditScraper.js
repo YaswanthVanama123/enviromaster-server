@@ -1,10 +1,10 @@
 /**
  * Zoho Bigin Audit Log Scraper Service
- * Scrapes audit history from Zoho Bigin using Puppeteer
+ * Scrapes audit history from Zoho Bigin using Playwright
  * Stops when it reaches logs already in our database
  */
 
-import puppeteer from 'puppeteer';
+import { chromium } from 'playwright-core';
 import path from 'path';
 import fs from 'fs';
 import { BiginAuditLog } from "../models/logging/index.js";
@@ -190,7 +190,7 @@ async function login(page) {
   }
 
   await page.goto(BIGIN_SIGNIN_URL, {
-    waitUntil: 'networkidle2',
+    waitUntil: 'networkidle',
     timeout: 60000
   });
 
@@ -209,7 +209,7 @@ async function login(page) {
   await page.waitForFunction(() => {
     const container = document.querySelector('#password_container');
     return container && !container.classList.contains('zeroheight');
-  }, { timeout: 15000 });
+  }, null, { timeout: 15000 });
 
   await new Promise(resolve => setTimeout(resolve, 1000));
   await takeScreenshot(page, '03_password_field_visible');
@@ -223,7 +223,7 @@ async function login(page) {
 
   // Wait for navigation
   await Promise.race([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }),
+    page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
     page.waitForSelector('.bigin-home, .bigin-dashboard, .crm-header, [data-module], .zb-header', { timeout: 60000 })
   ]).catch(() => {});
 
@@ -336,6 +336,35 @@ async function closePromotionalModals(page) {
   return false;
 }
 
+async function dismissTimezonePopup(page) {
+  try {
+    await page.waitForSelector('.remind_later_link', { timeout: 4000 });
+  } catch (e) {
+    return false;
+  }
+
+  try {
+    const clicked = await page.evaluate(() => {
+      const link = document.querySelector('.remind_later_link');
+      if (link) {
+        link.click();
+        return true;
+      }
+      return false;
+    });
+
+    if (clicked) {
+      console.log('   ✓ Dismissed "Update your time zone" popup via Remind me later');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    return clicked;
+  } catch (e) {
+    console.log('   ⚠️ Could not dismiss time zone popup:', e.message);
+    return false;
+  }
+}
+
 /**
  * Navigate to audit logs page using UI navigation (not direct URL)
  * Direct URL navigation loses the session and redirects to public page
@@ -352,6 +381,7 @@ async function navigateToAuditLogs(page) {
 
     // Close any promotional modals that may appear
     await closePromotionalModals(page);
+    await dismissTimezonePopup(page);
 
     // Wait for the app to be fully loaded
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -696,7 +726,7 @@ async function clickViewMore(page) {
   if (clicked) {
     // Wait for new content to load
     await new Promise(resolve => setTimeout(resolve, 2000));
-    await page.waitForNetworkIdle({ timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   return clicked;
@@ -723,9 +753,9 @@ export async function scrapeBiginAuditLogs(onProgress) {
     // Get latest stored log to know when to stop
     const latestStored = await getLatestStoredLogTimestamp();
 
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -735,14 +765,19 @@ export async function scrapeBiginAuditLogs(onProgress) {
       ],
     });
 
-    page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    const context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
+    page = await context.newPage();
     page.setDefaultTimeout(60000);
 
     // Login
     onProgress?.(10, 'Logging into Zoho Bigin...');
     await login(page);
+
+    await dismissTimezonePopup(page);
+    await takeScreenshot(page, '05b_after_timezone_popup_check');
 
     // Navigate to audit logs
     onProgress?.(30, 'Navigating to audit logs...');

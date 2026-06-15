@@ -1,9 +1,9 @@
 /**
  * Zoho Bigin Company Scraper Service
- * Scrapes company data from Zoho Bigin using Puppeteer
+ * Scrapes company data from Zoho Bigin using Playwright
  */
 
-import puppeteer from 'puppeteer';
+import { chromium } from 'playwright-core';
 import { BiginCompany } from "../models/customer/index.js";
 
 const BIGIN_COMPANIES_URL = 'https://bigin.zoho.in/bigin/Home#/tab/Accounts/list';
@@ -22,7 +22,7 @@ async function login(page) {
   }
 
   await page.goto(BIGIN_SIGNIN_URL, {
-    waitUntil: 'networkidle2',
+    waitUntil: 'networkidle',
     timeout: 60000
   });
 
@@ -39,7 +39,7 @@ async function login(page) {
   await page.waitForFunction(() => {
     const container = document.querySelector('#password_container');
     return container && !container.classList.contains('zeroheight');
-  }, { timeout: 15000 });
+  }, null, { timeout: 15000 });
 
   await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -51,7 +51,7 @@ async function login(page) {
 
   // Wait for navigation
   await Promise.race([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }),
+    page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
     page.waitForSelector('.bigin-home, .bigin-dashboard, .crm-header, [data-module], .zb-header', { timeout: 60000 })
   ]).catch(() => {});
 
@@ -71,7 +71,7 @@ async function navigateToCompanies(page) {
   console.log('📍 Navigating to Companies (Accounts) list...');
 
   await page.goto(BIGIN_COMPANIES_URL, {
-    waitUntil: 'networkidle2',
+    waitUntil: 'networkidle',
     timeout: 60000
   });
 
@@ -211,7 +211,7 @@ async function getCompanyDetails(page, biginId) {
     });
 
     // Go back to list
-    await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
+    await page.goBack({ waitUntil: 'networkidle' }).catch(() => {});
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     return details;
@@ -240,7 +240,7 @@ async function scrollForMore(page) {
 
   if (scrolled) {
     await new Promise(resolve => setTimeout(resolve, 2000));
-    await page.waitForNetworkIdle({ timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   return scrolled;
@@ -281,9 +281,9 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
     console.log('🚀 Starting Zoho Bigin company scrape...');
     onProgress?.(5, 'Launching browser...');
 
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -293,9 +293,11 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
       ],
     });
 
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    const context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
+    const page = await context.newPage();
     page.setDefaultTimeout(60000);
 
     // Login
