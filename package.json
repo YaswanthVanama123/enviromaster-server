@@ -3,6 +3,19 @@
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
+  "imports": {
+    "#config/*": "./src/config/*",
+    "#constants/*": "./src/constants/*",
+    "#controllers/*": "./src/controllers/*",
+    "#routes/*": "./src/routes/*",
+    "#models": "./src/models/index.js",
+    "#models/*": "./src/models/*",
+    "#services/*": "./src/services/*",
+    "#middleware/*": "./src/middleware/*",
+    "#utils/*": "./src/utils/*",
+    "#validations/*": "./src/validations/*",
+    "#shared/*": "./src/shared/*"
+  },
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",

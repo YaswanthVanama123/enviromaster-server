@@ -62,7 +62,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '../../uploads/service-images');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
-app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads'), {
+  maxAge: process.env.UPLOADS_CACHE_MAX_AGE || '1d',
+  etag: true,
+  lastModified: true,
+}));
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -92,7 +96,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(compression({ threshold: 0 }));
+app.use(compression({ threshold: 1024 }));
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));

@@ -360,6 +360,7 @@ CustomerHeaderDocSchema.index({ createdAt: -1 });
 CustomerHeaderDocSchema.index({ isDeleted: 1, createdAt: -1 });
 CustomerHeaderDocSchema.index({ "payload.headerTitle": "text" });
 CustomerHeaderDocSchema.index({ status: 1, createdAt: -1 });
+CustomerHeaderDocSchema.index({ createdBy: 1, isDeleted: 1, createdAt: -1 });
 
 const CustomerHeaderDoc =
   mongoose.models.CustomerHeaderDoc ||

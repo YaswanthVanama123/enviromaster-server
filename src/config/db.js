@@ -9,7 +9,12 @@ const connectDB = async () => {
     }
 
     await mongoose.connect(uri, {
-      dbName: process.env.MONGO_DB || 'enviro_master'
+      dbName: process.env.MONGO_DB || 'enviro_master',
+      maxPoolSize: Number(process.env.MONGO_MAX_POOL) || 100,
+      minPoolSize: Number(process.env.MONGO_MIN_POOL) || 10,
+      serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 10000,
+      socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS) || 45000,
+      maxIdleTimeMS: Number(process.env.MONGO_MAX_IDLE_TIME_MS) || 60000,
     });
 
     console.log('✅ MongoDB connected successfully');
