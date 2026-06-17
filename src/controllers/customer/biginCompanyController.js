@@ -6,6 +6,10 @@
 import { BiginCompany } from "../../models/customer/index.js";
 import { v4 as uuidv4 } from "uuid";
 import { getAllBiginCompanies } from "../../services/zohoService.js";
+import {
+  refreshPendingLocationTypes,
+  refreshLocationTypeForCompany,
+} from "../../services/sync/locationTypeService.js";
 
 // Track fetch status in memory
 let fetchStatus = {
@@ -399,5 +403,79 @@ export const updateCompany = async (req, res) => {
       success: false,
       error: "Failed to update company",
     });
+  }
+};
+
+let locationTypeStatus = {
+  isRunning: false,
+  total: 0,
+  processed: 0,
+  markedExisting: 0,
+  failed: 0,
+  startedAt: null,
+  finishedAt: null,
+  message: "",
+};
+
+export const refreshLocationTypes = async (req, res) => {
+  try {
+    if (locationTypeStatus.isRunning) {
+      return res.json({ success: true, alreadyRunning: true, data: locationTypeStatus });
+    }
+    const limit = Number(req.query.limit) || 2000;
+    locationTypeStatus = {
+      isRunning: true,
+      total: 0,
+      processed: 0,
+      markedExisting: 0,
+      failed: 0,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      message: "Detecting new vs existing locations…",
+    };
+    res.json({ success: true, started: true, data: locationTypeStatus });
+
+    refreshPendingLocationTypes(limit, (p) => {
+      locationTypeStatus = { ...locationTypeStatus, ...p };
+    })
+      .then((summary) => {
+        locationTypeStatus = {
+          ...locationTypeStatus,
+          isRunning: false,
+          finishedAt: new Date().toISOString(),
+          message: `Done — ${summary.markedExisting} existing of ${summary.checked} checked${summary.failed ? `, ${summary.failed} failed` : ""}`,
+        };
+        console.log(`[LOCATION-TYPE] Batch done: checked ${summary.checked}, markedExisting ${summary.markedExisting}, failed ${summary.failed}`);
+      })
+      .catch((err) => {
+        locationTypeStatus = {
+          ...locationTypeStatus,
+          isRunning: false,
+          finishedAt: new Date().toISOString(),
+          message: `Failed: ${err?.message}`,
+        };
+        console.error("[LOCATION-TYPE] Batch failed:", err?.message);
+      });
+  } catch (error) {
+    locationTypeStatus = { ...locationTypeStatus, isRunning: false };
+    console.error("Error refreshing location types:", error);
+    res.status(500).json({ success: false, error: "Failed to refresh location types" });
+  }
+};
+
+export const getLocationTypeStatus = async (req, res) => {
+  res.json({ success: true, data: locationTypeStatus });
+};
+
+export const refreshLocationTypeById = async (req, res) => {
+  try {
+    const result = await refreshLocationTypeForCompany(req.params.biginId);
+    if (!result.success) {
+      return res.status(502).json({ success: false, error: result.error });
+    }
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("Error refreshing location type:", error);
+    res.status(500).json({ success: false, error: "Failed to refresh location type" });
   }
 };

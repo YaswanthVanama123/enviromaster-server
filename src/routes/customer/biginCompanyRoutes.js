@@ -12,6 +12,9 @@ import {
   getCompanyStats,
   deleteCompany,
   updateCompany,
+  refreshLocationTypes,
+  refreshLocationTypeById,
+  getLocationTypeStatus,
 } from "../../controllers/customer/biginCompanyController.js";
 
 const router = express.Router();
@@ -27,6 +30,15 @@ router.get("/fetch/status", getFetchStatus);
 
 // Start fetch from Bigin
 router.post("/fetch/start", startFetch);
+
+// Determine new-vs-existing location for all undetermined companies (pipeline count)
+router.post("/location-types/refresh", refreshLocationTypes);
+
+// Status of the location-type detection job (for progress polling)
+router.get("/location-types/status", getLocationTypeStatus);
+
+// Determine new-vs-existing location for a single company by Bigin id
+router.post("/location-types/refresh/:biginId", refreshLocationTypeById);
 
 // Get company by ID
 router.get("/:id", getCompanyById);

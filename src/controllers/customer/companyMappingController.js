@@ -177,6 +177,9 @@ export const getMappingStatusByBigin = async (req, res) => {
     const { biginId } = req.params;
     const mapping = await CompanyMapping.findOne({ biginId }).lean();
     const isMapped = !!(mapping && mapping.routeStarId && mapping.mappingStatus === "mapped");
+    const company = await BiginCompany.findOne({ biginId })
+      .select("isExistingLocation locationTypeCheckedAt")
+      .lean();
     res.json({
       success: true,
       data: {
@@ -184,6 +187,8 @@ export const getMappingStatusByBigin = async (req, res) => {
         isMapped,
         routeStarId: mapping?.routeStarId || null,
         routeStarCustomerName: mapping?.routeStarCustomerName || null,
+        isExistingLocation: !!company?.isExistingLocation,
+        locationTypeChecked: !!company?.locationTypeCheckedAt,
       },
     });
   } catch (error) {

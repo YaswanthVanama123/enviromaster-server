@@ -114,6 +114,16 @@ const BiginCompanySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    // Whether this company/location already had pipelines before the current
+    // agreement connected (>1 pipeline => existing location, <=1 => new location).
+    isExistingLocation: {
+      type: Boolean,
+      default: false,
+    },
+    locationTypeCheckedAt: {
+      type: Date,
+      default: null,
+    },
     // Sync tracking
     lastSyncedAt: {
       type: Date,
@@ -133,6 +143,7 @@ const BiginCompanySchema = new mongoose.Schema(
 BiginCompanySchema.index({ companyName: "text", email: "text", city: "text" });
 BiginCompanySchema.index({ stage: 1 });
 BiginCompanySchema.index({ owner: 1 });
+BiginCompanySchema.index({ isExistingLocation: 1 });
 
 const BiginCompany = mongoose.model("BiginCompany", BiginCompanySchema);
 

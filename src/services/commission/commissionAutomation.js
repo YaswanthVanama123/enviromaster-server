@@ -4,7 +4,8 @@ import {
   CommissionRules,
   Employee,
 } from "#models";
-import { CompanyMapping } from "#models/customer/index.js";
+import { CompanyMapping, BiginCompany } from "#models/customer/index.js";
+import { refreshLocationTypeForCompany } from "#services/sync/locationTypeService.js";
 import {
   computeGlobalCommission,
   resolveCommissionRules,
@@ -71,6 +72,7 @@ function buildCommissionObject(global, opts) {
     rulesSnapshot: rules,
     isNewLocation,
     priorQuotaCredit,
+    farAnnual: global.totalFarAnnual,
     breakdown: {
       baseRate,
       agreementMultiplier: global.agreementMultiplier,
@@ -96,7 +98,11 @@ export async function computeCommissionForDoc(doc, deps = {}) {
   const servicesState = payload.services || {};
   const accountTypeCache = payload.accountTypeCache || {};
   const contractMonths = Number(payload.summary?.contractMonths) || 12;
-  const isNewLocation = payload.commission?.isNewLocation ?? true;
+  const isNewLocation =
+    deps.isExistingLocation !== undefined
+      ? !deps.isExistingLocation
+      : payload.commission?.isNewLocation ?? true;
+  const priorLocationFarAnnual = Number(deps.priorLocationFarAnnual) || 0;
 
   const rules =
     payload.commission?.rulesSnapshot ||
@@ -117,10 +123,11 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     rules,
     priorQuotaCredit,
     isNewLocation,
+    priorLocationFarAnnual,
   );
 
   if (!global.serviceCount) {
-    return { commission: null, quotaCredit: 0, priorQuotaCredit, quotaLevel, global };
+    return { commission: null, quotaCredit: 0, priorQuotaCredit, quotaLevel, farAnnual: global.totalFarAnnual, global };
   }
 
   const commission = buildCommissionObject(global, {
@@ -137,6 +144,7 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     quotaCredit: Math.round((global.totalQuotaCredit || 0) * 100) / 100,
     priorQuotaCredit,
     quotaLevel,
+    farAnnual: global.totalFarAnnual,
     global,
   };
 }
@@ -162,6 +170,7 @@ export async function recalcCommissionForDoc(doc, deps = {}) {
     finalCommissionRate: result.commission.finalCommissionRate,
     quotaCredit: result.quotaCredit,
     quotaLevel: result.quotaLevel,
+    farAnnual: result.farAnnual || 0,
   };
 }
 
@@ -176,15 +185,27 @@ export async function recalcCommissionForCompany(biginCompanyId) {
 
   const agreementIds = mappings.map((m) => m.agreementId).filter(Boolean);
   const activeRules = await getActiveResolvedRules();
+
+  const company = await BiginCompany.findOne({ biginId: String(biginCompanyId) })
+    .select("isExistingLocation")
+    .lean();
+  const isExistingLocation = !!company?.isExistingLocation;
+
+  const docs = (await CustomerHeaderDoc.find({ _id: { $in: agreementIds }, isDeleted: { $ne: true } }))
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const farSumBySalesperson = {};
   const results = [];
 
-  for (const agreementId of agreementIds) {
+  for (const doc of docs) {
     try {
-      const doc = await CustomerHeaderDoc.findById(agreementId);
-      if (!doc || doc.isDeleted) continue;
-      results.push(await recalcCommissionForDoc(doc, { activeRules }));
+      const salesperson = doc.createdBy || "";
+      const priorLocationFarAnnual = isExistingLocation ? farSumBySalesperson[salesperson] || 0 : 0;
+      const r = await recalcCommissionForDoc(doc, { activeRules, isExistingLocation, priorLocationFarAnnual });
+      farSumBySalesperson[salesperson] = (farSumBySalesperson[salesperson] || 0) + (r.farAnnual || 0);
+      results.push(r);
     } catch (err) {
-      results.push({ agreementId: String(agreementId), skipped: true, error: err?.message });
+      results.push({ agreementId: String(doc._id), skipped: true, error: err?.message });
     }
   }
 
@@ -195,6 +216,27 @@ export async function isCompanyRouteStarMapped(biginId) {
   if (!biginId) return false;
   const mapping = await CompanyMapping.findOne({ biginId: String(biginId) }).lean();
   return !!(mapping && mapping.routeStarId && mapping.mappingStatus === "mapped");
+}
+
+export async function getPriorLocationFarAnnual(biginCompanyId, salesperson, excludeAgreementId) {
+  if (!biginCompanyId || !salesperson) return 0;
+  const mappings = await ZohoMapping.find({ "zohoCompany.id": String(biginCompanyId) })
+    .select("agreementId")
+    .lean();
+  const ids = mappings
+    .map((m) => m.agreementId)
+    .filter((id) => id && String(id) !== String(excludeAgreementId));
+  if (!ids.length) return 0;
+  const docs = await CustomerHeaderDoc.find({
+    _id: { $in: ids },
+    createdBy: salesperson,
+    isDeleted: { $ne: true },
+  })
+    .select("payload.commission.farAnnual")
+    .lean();
+  let sum = 0;
+  for (const d of docs) sum += Number(d.payload?.commission?.farAnnual) || 0;
+  return sum;
 }
 
 export async function recalcCommissionForAgreement(agreementId, biginCompanyId) {
@@ -215,7 +257,22 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
   if (!doc || doc.isDeleted) {
     return { agreementId: String(agreementId), skipped: true, reason: "not_found" };
   }
-  return recalcCommissionForDoc(doc);
+
+  try {
+    await refreshLocationTypeForCompany(biginCompanyId);
+  } catch (err) {
+    console.error(`[COMMISSION-AUTO] location-type refresh failed for ${biginCompanyId}:`, err?.message);
+  }
+
+  const company = await BiginCompany.findOne({ biginId: String(biginCompanyId) })
+    .select("isExistingLocation")
+    .lean();
+  const isExistingLocation = !!company?.isExistingLocation;
+  const priorLocationFarAnnual = isExistingLocation
+    ? await getPriorLocationFarAnnual(biginCompanyId, doc.createdBy, agreementId)
+    : 0;
+
+  return recalcCommissionForDoc(doc, { isExistingLocation, priorLocationFarAnnual });
 }
 
 export async function recalcCommissionForAgreementById(agreementId) {

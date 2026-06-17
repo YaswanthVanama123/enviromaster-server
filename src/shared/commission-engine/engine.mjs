@@ -163,11 +163,13 @@ var FREQUENCY_TO_BACKEND = {
   bimonthly: 14,
   quarterly: 4,
   semiannual: 5,
+  biannual: 5,
   annual: 6,
   onetime: 0,
   "bi-weekly": 2,
   "bi-monthly": 14,
   "semi-annual": 5,
+  "bi-annual": 5,
   "one-time": 0,
   "1time": 0,
   everyfourweeks: 3,
@@ -206,6 +208,22 @@ var ACCOUNT_TYPE_DEDUCTIONS = {
   Bread15: 75,
   Pit: 100
 };
+var FREQ_ORDER_BY_VISITS_ASC = [6, 0, 5, 4, 14, 3, 13, 2, 1];
+function findAccountEntry(cache, freqNum) {
+  if (cache[freqNum]) return cache[freqNum];
+  const idx = FREQ_ORDER_BY_VISITS_ASC.indexOf(freqNum);
+  if (idx === -1) {
+    for (const f of FREQ_ORDER_BY_VISITS_ASC) if (cache[f]) return cache[f];
+    return void 0;
+  }
+  for (let i = idx + 1; i < FREQ_ORDER_BY_VISITS_ASC.length; i++) {
+    if (cache[FREQ_ORDER_BY_VISITS_ASC[i]]) return cache[FREQ_ORDER_BY_VISITS_ASC[i]];
+  }
+  for (let i = idx - 1; i >= 0; i--) {
+    if (cache[FREQ_ORDER_BY_VISITS_ASC[i]]) return cache[FREQ_ORDER_BY_VISITS_ASC[i]];
+  }
+  return void 0;
+}
 function getAgreementTerm(contractMonths) {
   if (contractMonths >= 36) return "3-year";
   if (contractMonths >= 12) return "1-year";
@@ -291,7 +309,7 @@ function computeCommissionTiers(priorQuotaCredit, commissionableBase, quotaTarge
     return { ...d, effectiveRate, base, commission: base * (effectiveRate / 100) };
   });
 }
-function computeGlobalCommission(servicesState, accountTypeCache, globalContractMonths, commissionRate, rules, priorQuotaCredit = 0, isNewLocation = true) {
+function computeGlobalCommission(servicesState, accountTypeCache, globalContractMonths, commissionRate, rules, priorQuotaCredit = 0, isNewLocation = true, priorLocationFarAnnual = 0) {
   const visitsPerYearOf = (freqStr) => {
     const v = rules.frequencyVisitsPerYear;
     const norm = (freqStr || "monthly").toLowerCase().replace(/-/g, "");
@@ -314,7 +332,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     if (serviceCurrent <= 0) return;
     const annualCurrent = globalContractMonths > 0 ? serviceCurrent / globalContractMonths * 12 : serviceCurrent;
     const annualOriginal = globalContractMonths > 0 ? serviceOriginal / globalContractMonths * 12 : serviceOriginal;
-    const cacheEntry = accountTypeCache[freqNum];
+    const cacheEntry = findAccountEntry(accountTypeCache, freqNum);
     const accountType = cacheEntry?.accountType || null;
     const freqStr = backendFrequencyToServiceFrequency(freqNum);
     const freqLabel = BACKEND_TO_FREQUENCY[freqNum] || "Unknown";
@@ -332,7 +350,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   });
   const groups = /* @__PURE__ */ new Map();
   rows.forEach((row) => {
-    const key = row.freqStr;
+    const key = row.serviceName;
     if (!groups.has(key)) {
       groups.set(key, {
         freqStr: row.freqStr,
@@ -359,6 +377,12 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   });
   let totalCommissionableAnnual = 0;
   let totalQuotaCredit = 0;
+  let totalFarAnnual = 0;
+  let numFarGroups = 0;
+  groups.forEach((g) => {
+    if (g.accountType === "Anchor" || g.accountType === "Pit") numFarGroups++;
+  });
+  const perFarGroupPrior = !isNewLocation && numFarGroups > 0 ? priorLocationFarAnnual / numFarGroups : 0;
   let agreementCurrentAnnual = 0;
   let agreementOriginalAnnual = 0;
   rows.forEach((r) => {
@@ -388,41 +412,26 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     const pitAnnual = pen.Pit * visits;
     const adjusted = g.adjustedAnnual;
     switch (g.accountType) {
-      case "Anchor": {
-        if (isNewLocation) {
-          const pitPart = Math.min(adjusted, pitZoneAnnual);
-          const stdPart = Math.min(Math.max(0, adjusted - pitZoneAnnual), anchorZoneAnnual - pitZoneAnnual);
-          const anchorPart = Math.max(0, adjusted - anchorZoneAnnual);
-          g.commissionableAnnual = Math.max(0, stdPart) + anchorPart * rules.anchorBonusMultiplier;
-          g.revenueDeduction = pitPart;
-          g.anchorBonus = anchorPart * (rules.anchorBonusMultiplier - 1);
-        } else {
-          const stdPart = Math.min(adjusted, anchorZoneAnnual);
-          const anchorPart = Math.max(0, adjusted - anchorZoneAnnual);
-          g.commissionableAnnual = stdPart + anchorPart * rules.anchorBonusMultiplier;
-          g.revenueDeduction = 0;
-          g.anchorBonus = anchorPart * (rules.anchorBonusMultiplier - 1);
-        }
+      case "Anchor":
+      case "Pit": {
+        totalFarAnnual += adjusted;
+        const adjForTier = adjusted + perFarGroupPrior;
+        const pitPart = Math.min(adjForTier, pitZoneAnnual);
+        const stdPart = Math.min(Math.max(0, adjForTier - pitZoneAnnual), Math.max(0, anchorZoneAnnual - pitZoneAnnual));
+        const anchorPart = Math.max(0, adjForTier - anchorZoneAnnual);
+        g.commissionableAnnual = stdPart + anchorPart * rules.anchorBonusMultiplier;
+        g.revenueDeduction = pitPart;
+        g.anchorBonus = anchorPart * (rules.anchorBonusMultiplier - 1);
         break;
       }
       case "Bread5": {
-        g.revenueDeduction = isNewLocation ? bread5Annual : 0;
+        g.revenueDeduction = bread5Annual;
         g.commissionableAnnual = Math.max(0, adjusted - g.revenueDeduction);
         break;
       }
       case "Bread15": {
-        g.revenueDeduction = isNewLocation ? bread15Annual : 0;
+        g.revenueDeduction = bread15Annual;
         g.commissionableAnnual = Math.max(0, adjusted - g.revenueDeduction);
-        break;
-      }
-      case "Pit": {
-        if (isNewLocation || adjusted <= pitAnnual) {
-          g.revenueDeduction = pitAnnual;
-          g.commissionableAnnual = Math.max(0, adjusted - pitAnnual);
-        } else {
-          g.revenueDeduction = 0;
-          g.commissionableAnnual = adjusted;
-        }
         break;
       }
       default: {
@@ -516,6 +525,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     totalPerVisitRevenue,
     totalCommissionableRevenue,
     totalQuotaCredit,
+    totalFarAnnual,
     agreementMultiplier,
     effectiveCommissionRate,
     priorQuotaCredit,
