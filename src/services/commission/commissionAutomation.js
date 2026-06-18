@@ -73,7 +73,8 @@ function buildCommissionObject(global, opts) {
     isNewLocation,
     priorQuotaCredit,
     farAnnual: global.totalFarAnnual,
-    farIsGreenline: global.farIsGreenline,
+    farAnnualRedline: global.totalFarAnnualRedline,
+    farAnnualGreenline: global.totalFarAnnualGreenline,
     priorFarRedline: Number(priorFarRedline) || 0,
     priorFarGreenline: Number(priorFarGreenline) || 0,
     breakdown: {
@@ -140,7 +141,7 @@ export async function computeCommissionForDoc(doc, deps = {}) {
   );
 
   if (!global.serviceCount) {
-    return { commission: null, quotaCredit: 0, priorQuotaCredit, quotaLevel, farAnnual: global.totalFarAnnual, farIsGreenline: global.farIsGreenline, global };
+    return { commission: null, quotaCredit: 0, priorQuotaCredit, quotaLevel, farAnnualRedline: global.totalFarAnnualRedline, farAnnualGreenline: global.totalFarAnnualGreenline, global };
   }
 
   const commission = buildCommissionObject(global, {
@@ -159,8 +160,8 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     quotaCredit: Math.round((global.totalQuotaCredit || 0) * 100) / 100,
     priorQuotaCredit,
     quotaLevel,
-    farAnnual: global.totalFarAnnual,
-    farIsGreenline: global.farIsGreenline,
+    farAnnualRedline: global.totalFarAnnualRedline,
+    farAnnualGreenline: global.totalFarAnnualGreenline,
     global,
   };
 }
@@ -186,8 +187,8 @@ export async function recalcCommissionForDoc(doc, deps = {}) {
     finalCommissionRate: result.commission.finalCommissionRate,
     quotaCredit: result.quotaCredit,
     quotaLevel: result.quotaLevel,
-    farAnnual: result.farAnnual || 0,
-    farIsGreenline: !!result.farIsGreenline,
+    farAnnualRedline: result.farAnnualRedline || 0,
+    farAnnualGreenline: result.farAnnualGreenline || 0,
   };
 }
 
@@ -233,8 +234,8 @@ export async function recalcCommissionForCompany(biginCompanyId) {
         priorLocationFarAnnualRedline,
         priorLocationFarAnnualGreenline,
       });
-      if (r.farIsGreenline) farSumGreenline += r.farAnnual || 0;
-      else farSumRedline += r.farAnnual || 0;
+      farSumRedline += r.farAnnualRedline || 0;
+      farSumGreenline += r.farAnnualGreenline || 0;
       results.push(r);
     } catch (err) {
       results.push({ agreementId: String(doc._id), skipped: true, error: err?.message });
@@ -263,14 +264,20 @@ export async function getPriorLocationFarAnnual(biginCompanyId, excludeAgreement
     _id: { $in: ids },
     isDeleted: { $ne: true },
   })
-    .select("payload.commission.farAnnual payload.commission.farIsGreenline")
+    .select("payload.commission.farAnnual payload.commission.farAnnualRedline payload.commission.farAnnualGreenline payload.commission.farIsGreenline")
     .lean();
   let redline = 0;
   let greenline = 0;
   for (const d of docs) {
-    const far = Number(d.payload?.commission?.farAnnual) || 0;
-    if (d.payload?.commission?.farIsGreenline) greenline += far;
-    else redline += far;
+    const c = d.payload?.commission || {};
+    if (c.farAnnualRedline != null || c.farAnnualGreenline != null) {
+      redline += Number(c.farAnnualRedline) || 0;
+      greenline += Number(c.farAnnualGreenline) || 0;
+    } else {
+      const far = Number(c.farAnnual) || 0;
+      if (c.farIsGreenline) greenline += far;
+      else redline += far;
+    }
   }
   return { redline, greenline };
 }
