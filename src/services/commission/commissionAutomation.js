@@ -6,6 +6,7 @@ import {
 } from "#models";
 import { CompanyMapping, BiginCompany } from "#models/customer/index.js";
 import { refreshLocationTypeForCompany } from "#services/sync/locationTypeService.js";
+import { runAccountTypeBatch } from "../../controllers/sync/mapDistanceController.js";
 import {
   computeGlobalCommission,
   resolveCommissionRules,
@@ -13,6 +14,69 @@ import {
 
 const QUOTA_COMMISSION_RATES = { below: 3, above: 6, double: 9 };
 const DEFAULT_QUOTA_TARGET = 50000;
+
+const FREQUENCY_TO_BACKEND = {
+  weekly: 1, biweekly: 2, twicepermonth: 13, monthly: 3, bimonthly: 14,
+  quarterly: 4, semiannual: 5, biannual: 5, annual: 6, onetime: 0,
+  everyfourweeks: 3,
+};
+
+function frequencyNumberFromService(sd) {
+  if (!sd) return null;
+  const candidates = [
+    sd.frequency, sd.frequencyKey,
+    sd.frequency?.frequencyKey, sd.frequency?.value, sd.frequency?.label,
+    sd.frequencyDisplay?.frequencyKey, sd.frequencyDisplay?.value,
+  ];
+  for (const c of candidates) {
+    if (c === undefined || c === null) continue;
+    const raw = typeof c === "object" ? (c.frequencyKey ?? c.value ?? c.label ?? c.name ?? c.frequency ?? "") : c;
+    const key = String(raw).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (key && FREQUENCY_TO_BACKEND[key] !== undefined) return FREQUENCY_TO_BACKEND[key];
+  }
+  return null;
+}
+
+/**
+ * Detect & store account types for any active-service frequency missing from the
+ * agreement's cache. Lets connect/save compute Pit/far without needing the user to
+ * open the agreement first. Mutates doc.payload.accountTypeCache in place.
+ */
+async function ensureAccountTypeCache(doc, biginCompanyId) {
+  if (!biginCompanyId) return;
+  const payload = doc.payload && typeof doc.payload.toObject === "function" ? doc.payload.toObject() : doc.payload || {};
+  const services = payload.services || {};
+  const existing = payload.accountTypeCache || {};
+  const needed = new Set();
+  for (const sd of Object.values(services)) {
+    if (!sd?.isActive) continue;
+    const fn = frequencyNumberFromService(sd);
+    if (fn === null || fn === 0) continue;
+    if (existing[fn] && existing[fn].accountType) continue;
+    needed.add(fn);
+  }
+  if (needed.size === 0) return;
+  try {
+    const batch = await runAccountTypeBatch(biginCompanyId, [...needed]);
+    if (!batch?.results) return;
+    const merged = { ...existing };
+    for (const [freq, r] of Object.entries(batch.results)) {
+      merged[freq] = {
+        accountType: r.accountType,
+        confidence: r.confidence ?? null,
+        reason: r.reason ?? null,
+        drivingTimeMinutes: r.drivingTimeMinutes ?? null,
+        nearestDestination: r.nearestDestination ?? null,
+        usedFallback: r.usedFallback ?? false,
+      };
+    }
+    doc.payload.accountTypeCache = merged;
+    doc.markModified("payload.accountTypeCache");
+    console.log(`[COMMISSION-AUTO] detected account types for agreement ${doc._id}: ${[...needed].join(",")}`);
+  } catch (err) {
+    console.error(`[COMMISSION-AUTO] account-type detect failed for ${doc._id}:`, err?.message);
+  }
+}
 
 function calculateQuotaLevel(percentage) {
   if (percentage >= 200) return "double";
@@ -108,12 +172,13 @@ export async function computeCommissionForDoc(doc, deps = {}) {
       : doc.isNewLocation ?? payload.commission?.isNewLocation ?? true;
   const frozenPriorRedline = payload.commission?.priorFarRedline;
   const frozenPriorGreenline = payload.commission?.priorFarGreenline;
+  const useFrozen = !deps.forcePrior;
   const priorLocationFarAnnualRedline =
-    frozenPriorRedline != null && frozenPriorRedline !== undefined
+    useFrozen && frozenPriorRedline != null && frozenPriorRedline !== undefined
       ? Number(frozenPriorRedline) || 0
       : Number(deps.priorLocationFarAnnualRedline) || 0;
   const priorLocationFarAnnualGreenline =
-    frozenPriorGreenline != null && frozenPriorGreenline !== undefined
+    useFrozen && frozenPriorGreenline != null && frozenPriorGreenline !== undefined
       ? Number(frozenPriorGreenline) || 0
       : Number(deps.priorLocationFarAnnualGreenline) || 0;
 
@@ -228,11 +293,13 @@ export async function recalcCommissionForCompany(biginCompanyId) {
       }
       const priorLocationFarAnnualRedline = docIsExisting ? farSumRedline : 0;
       const priorLocationFarAnnualGreenline = docIsExisting ? farSumGreenline : 0;
+      await ensureAccountTypeCache(doc, biginCompanyId);
       const r = await recalcCommissionForDoc(doc, {
         activeRules,
         isExistingLocation: docIsExisting,
         priorLocationFarAnnualRedline,
         priorLocationFarAnnualGreenline,
+        forcePrior: true,
       });
       farSumRedline += r.farAnnualRedline || 0;
       farSumGreenline += r.farAnnualGreenline || 0;
@@ -325,6 +392,11 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
   }
 
   const isExistingLocation = !doc.isNewLocation;
+
+  // Detect & store account types for active services so Pit/far is computed even
+  // when the agreement was bulk-connected without ever being opened/detected.
+  await ensureAccountTypeCache(doc, biginCompanyId);
+
   const prior = isExistingLocation
     ? await getPriorLocationFarAnnual(biginCompanyId, agreementId)
     : { redline: 0, greenline: 0 };

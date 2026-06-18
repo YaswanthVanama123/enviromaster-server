@@ -1489,195 +1489,116 @@ export const detectAccountTypeWithMapbox = async (req, res) => {
  * Detect account types for multiple frequencies in one call
  * Optimized for form filling where multiple services have different frequencies
  */
-export const detectAccountTypeBatch = async (req, res) => {
-  try {
-    const { biginCompanyId, frequencies } = req.body;
+export async function runAccountTypeBatch(biginCompanyId, frequencies) {
+  if (!biginCompanyId) {
+    return { success: false, error: 'biginCompanyId is required', results: {} };
+  }
+  if (!Array.isArray(frequencies) || frequencies.length === 0) {
+    return { success: false, error: 'frequencies array is required', results: {} };
+  }
 
-    if (!biginCompanyId) {
-      return res.status(400).json({
-        success: false,
-        error: 'biginCompanyId is required'
-      });
-    }
+  console.log(`[BATCH-DETECT] Detecting account types for ${frequencies.length} frequencies`);
 
-    if (!Array.isArray(frequencies) || frequencies.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'frequencies array is required'
-      });
-    }
+  // 1. Find mapping for Bigin company (once for all frequencies)
+  const mapping = await CompanyMapping.findOne({
+    biginId: biginCompanyId,
+    mappingStatus: 'mapped'
+  }).lean();
 
-    console.log(`[BATCH-DETECT] Detecting account types for ${frequencies.length} frequencies`);
-
-    // 1. Find mapping for Bigin company (once for all frequencies)
-    const mapping = await CompanyMapping.findOne({
-      biginId: biginCompanyId,
-      mappingStatus: 'mapped'
-    }).lean();
-
-    if (!mapping || !mapping.routeStarCustomerId) {
-      // Return Pit for all frequencies if no mapping
-      const results = {};
-      frequencies.forEach(freq => {
-        results[freq] = {
-          accountType: 'Pit',
-          confidence: 'low',
-          reason: 'No RouteStar mapping found',
-          drivingTimeMinutes: null,
-          nearestDestination: null
-        };
-      });
-
-      return res.json({
-        success: false,
-        error: 'No RouteStar mapping found for this Bigin company',
-        biginCompanyName: mapping?.biginCompanyName || null,
-        results
-      });
-    }
-
-    // 2. Get the mapped RouteStar customer with address (once)
-    const customer = await RouteStarCustomer.findById(mapping.routeStarCustomerId).lean();
-
-    if (!customer) {
-      const results = {};
-      frequencies.forEach(freq => {
-        results[freq] = {
-          accountType: 'Pit',
-          confidence: 'low',
-          reason: 'Mapped RouteStar customer not found',
-          drivingTimeMinutes: null,
-          nearestDestination: null
-        };
-      });
-
-      return res.json({
-        success: false,
-        error: 'Mapped RouteStar customer not found',
-        results
-      });
-    }
-
-    const fromAddress = buildAddressString(customer);
-
-    if (!fromAddress || fromAddress.trim() === '') {
-      const results = {};
-      frequencies.forEach(freq => {
-        results[freq] = {
-          accountType: 'Pit',
-          confidence: 'low',
-          reason: 'Customer does not have a valid address',
-          drivingTimeMinutes: null,
-          nearestDestination: null
-        };
-      });
-
-      return res.json({
-        success: false,
-        error: 'Customer does not have a valid address',
-        biginCompany: mapping.biginCompanyName,
-        routeStarCustomer: customer.name,
-        results
-      });
-    }
-
-    // 3. Process each frequency
+  if (!mapping || !mapping.routeStarCustomerId) {
     const results = {};
+    frequencies.forEach(freq => {
+      results[freq] = { accountType: 'Pit', confidence: 'low', reason: 'No RouteStar mapping found', drivingTimeMinutes: null, nearestDestination: null };
+    });
+    return { success: false, error: 'No RouteStar mapping found for this Bigin company', biginCompanyName: mapping?.biginCompanyName || null, results };
+  }
 
-    for (const frequency of frequencies) {
-      const freqNum = parseInt(frequency, 10);
-      console.log(`  📊 Processing frequency: ${freqNum} (${FREQUENCY_MAP[freqNum] || 'Unknown'})`);
+  // 2. Get the mapped RouteStar customer with address (once)
+  const customer = await RouteStarCustomer.findById(mapping.routeStarCustomerId).lean();
 
-      try {
-        // Build query for this frequency
-        const distanceQuery = {
+  if (!customer) {
+    const results = {};
+    frequencies.forEach(freq => {
+      results[freq] = { accountType: 'Pit', confidence: 'low', reason: 'Mapped RouteStar customer not found', drivingTimeMinutes: null, nearestDestination: null };
+    });
+    return { success: false, error: 'Mapped RouteStar customer not found', results };
+  }
+
+  const fromAddress = buildAddressString(customer);
+
+  if (!fromAddress || fromAddress.trim() === '') {
+    const results = {};
+    frequencies.forEach(freq => {
+      results[freq] = { accountType: 'Pit', confidence: 'low', reason: 'Customer does not have a valid address', drivingTimeMinutes: null, nearestDestination: null };
+    });
+    return { success: false, error: 'Customer does not have a valid address', biginCompany: mapping.biginCompanyName, routeStarCustomer: customer.name, results };
+  }
+
+  // 3. Process each frequency
+  const results = {};
+
+  for (const frequency of frequencies) {
+    const freqNum = parseInt(frequency, 10);
+    console.log(`  📊 Processing frequency: ${freqNum} (${FREQUENCY_MAP[freqNum] || 'Unknown'})`);
+
+    try {
+      const distanceQuery = {
+        customerId: mapping.routeStarCustomerId,
+        destinationCustomerName: { $nin: [customer.name, ""], $exists: true },
+        distanceMiles: { $gt: 0 },
+        frequency: freqNum
+      };
+
+      const distanceRecords = await MapDistanceRecord.find(distanceQuery)
+        .sort({ distanceMiles: 1 })
+        .limit(3)
+        .lean();
+
+      if (!distanceRecords || distanceRecords.length === 0) {
+        const fallbackQuery = {
           customerId: mapping.routeStarCustomerId,
           destinationCustomerName: { $nin: [customer.name, ""], $exists: true },
-          distanceMiles: { $gt: 0 },
-          frequency: freqNum
+          distanceMiles: { $gt: 0 }
         };
 
-        // Get top 3 lowest distance destinations for this frequency
-        const distanceRecords = await MapDistanceRecord.find(distanceQuery)
+        const fallbackRecords = await MapDistanceRecord.find(fallbackQuery)
           .sort({ distanceMiles: 1 })
           .limit(3)
           .lean();
 
-        if (!distanceRecords || distanceRecords.length === 0) {
-          // Fallback: try without frequency filter
-          const fallbackQuery = {
-            customerId: mapping.routeStarCustomerId,
-            destinationCustomerName: { $nin: [customer.name, ""], $exists: true },
-            distanceMiles: { $gt: 0 }
-          };
-
-          const fallbackRecords = await MapDistanceRecord.find(fallbackQuery)
-            .sort({ distanceMiles: 1 })
-            .limit(3)
-            .lean();
-
-          if (!fallbackRecords || fallbackRecords.length === 0) {
-            results[freqNum] = {
-              accountType: 'Pit',
-              confidence: 'low',
-              reason: `No distance data available for frequency ${FREQUENCY_MAP[freqNum] || freqNum}`,
-              drivingTimeMinutes: null,
-              nearestDestination: null,
-              usedFallback: false
-            };
-            continue;
-          }
-
-          // Use fallback records
-          const fallbackResult = await processDistanceRecords(fallbackRecords, fromAddress);
-          results[freqNum] = {
-            ...fallbackResult,
-            usedFallback: true,
-            fallbackReason: `No data for ${FREQUENCY_MAP[freqNum] || freqNum}, using general distances`
-          };
+        if (!fallbackRecords || fallbackRecords.length === 0) {
+          results[freqNum] = { accountType: 'Pit', confidence: 'low', reason: `No distance data available for frequency ${FREQUENCY_MAP[freqNum] || freqNum}`, drivingTimeMinutes: null, nearestDestination: null, usedFallback: false };
           continue;
         }
 
-        // Process distance records for this frequency
-        const result = await processDistanceRecords(distanceRecords, fromAddress);
-        results[freqNum] = {
-          ...result,
-          usedFallback: false
-        };
-
-      } catch (freqError) {
-        console.error(`Error processing frequency ${freqNum}:`, freqError.message);
-        results[freqNum] = {
-          accountType: 'Pit',
-          confidence: 'low',
-          reason: `Error: ${freqError.message}`,
-          drivingTimeMinutes: null,
-          nearestDestination: null,
-          error: freqError.message
-        };
+        const fallbackResult = await processDistanceRecords(fallbackRecords, fromAddress);
+        results[freqNum] = { ...fallbackResult, usedFallback: true, fallbackReason: `No data for ${FREQUENCY_MAP[freqNum] || freqNum}, using general distances` };
+        continue;
       }
+
+      const result = await processDistanceRecords(distanceRecords, fromAddress);
+      results[freqNum] = { ...result, usedFallback: false };
+
+    } catch (freqError) {
+      console.error(`Error processing frequency ${freqNum}:`, freqError.message);
+      results[freqNum] = { accountType: 'Pit', confidence: 'low', reason: `Error: ${freqError.message}`, drivingTimeMinutes: null, nearestDestination: null, error: freqError.message };
     }
+  }
 
-    console.log(`[BATCH-DETECT] Completed - processed ${Object.keys(results).length} frequencies`);
+  console.log(`[BATCH-DETECT] Completed - processed ${Object.keys(results).length} frequencies`);
 
-    res.json({
-      success: true,
-      biginCompany: mapping.biginCompanyName,
-      routeStarCustomer: customer.name,
-      fromAddress,
-      results,
-      thresholds: {
-        bread5MaxMinutes: 5,
-        bread15MaxMinutes: 15
-      }
-    });
+  return { success: true, biginCompany: mapping.biginCompanyName, routeStarCustomer: customer.name, fromAddress, results, thresholds: { bread5MaxMinutes: 5, bread15MaxMinutes: 15 } };
+}
 
+export const detectAccountTypeBatch = async (req, res) => {
+  try {
+    const { biginCompanyId, frequencies } = req.body;
+    const out = await runAccountTypeBatch(biginCompanyId, frequencies);
+    const status = !out.success && typeof out.error === 'string' && out.error.includes('is required') ? 400 : 200;
+    return res.status(status).json(out);
   } catch (error) {
     console.error('Error in batch account type detection:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to detect account types'
-    });
+    res.status(500).json({ success: false, error: error.message || 'Failed to detect account types' });
   }
 };
 

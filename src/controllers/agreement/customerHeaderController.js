@@ -314,6 +314,13 @@ export async function saveAccountTypeCache(req, res) {
     console.log('[ACCOUNT-TYPE-SAVE] Saved accountTypeCache to agreement:', id, 'keys:', accountTypeCache ? Object.keys(accountTypeCache) : 'null');
 
     res.json({ success: true });
+
+    // Account types just changed — recompute commission so Pit/far values are
+    // stored with the detected account types (the connect recalc may have run
+    // before detection finished). Self-gates: skips unless RouteStar-mapped.
+    recalcCommissionForAgreementById(String(id)).catch((err) =>
+      console.error(`[COMMISSION-AUTO] post-account-type recalc failed for ${id}:`, err?.message),
+    );
   } catch (err) {
     console.error("saveAccountTypeCache error:", err);
     res.status(500).json({ error: "server_error", detail: err?.message || String(err) });
