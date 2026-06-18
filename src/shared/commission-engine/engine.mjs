@@ -309,7 +309,7 @@ function computeCommissionTiers(priorQuotaCredit, commissionableBase, quotaTarge
     return { ...d, effectiveRate, base, commission: base * (effectiveRate / 100) };
   });
 }
-function computeGlobalCommission(servicesState, accountTypeCache, globalContractMonths, commissionRate, rules, priorQuotaCredit = 0, isNewLocation = true, priorLocationFarAnnual = 0) {
+function computeGlobalCommission(servicesState, accountTypeCache, globalContractMonths, commissionRate, rules, priorQuotaCredit = 0, isNewLocation = true, priorLocationFarAnnualRedline = 0, priorLocationFarAnnualGreenline = 0) {
   const visitsPerYearOf = (freqStr) => {
     const v = rules.frequencyVisitsPerYear;
     const norm = (freqStr || "monthly").toLowerCase().replace(/-/g, "");
@@ -350,7 +350,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   });
   const groups = /* @__PURE__ */ new Map();
   rows.forEach((row) => {
-    const key = row.serviceName;
+    const key = `${row.accountType || "none"}|${row.freqStr}`;
     if (!groups.has(key)) {
       groups.set(key, {
         freqStr: row.freqStr,
@@ -366,7 +366,8 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
         revenueDeduction: 0,
         anchorBonus: 0,
         commissionableAnnual: 0,
-        annualCommission: 0
+        annualCommission: 0,
+        farTiers: null
       });
     }
     const g = groups.get(key);
@@ -382,7 +383,6 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   groups.forEach((g) => {
     if (g.accountType === "Anchor" || g.accountType === "Pit") numFarGroups++;
   });
-  const perFarGroupPrior = !isNewLocation && numFarGroups > 0 ? priorLocationFarAnnual / numFarGroups : 0;
   let agreementCurrentAnnual = 0;
   let agreementOriginalAnnual = 0;
   rows.forEach((r) => {
@@ -397,6 +397,8 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   );
   const agreementPricingMultiplier = agreementPricingTier.quotaMultiplier;
   const agreementIsGreenline = agreementPricingTier.label === "Greenline (130%+)";
+  const priorLocationFarAnnual = agreementIsGreenline ? priorLocationFarAnnualGreenline : priorLocationFarAnnualRedline;
+  const perFarGroupPrior = !isNewLocation && numFarGroups > 0 ? priorLocationFarAnnual / numFarGroups : 0;
   groups.forEach((g) => {
     g.pricingTier = agreementPricingTier;
     g.pricingMultiplier = agreementPricingMultiplier;
@@ -415,13 +417,30 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
       case "Anchor":
       case "Pit": {
         totalFarAnnual += adjusted;
-        const adjForTier = adjusted + perFarGroupPrior;
-        const pitPart = Math.min(adjForTier, pitZoneAnnual);
-        const stdPart = Math.min(Math.max(0, adjForTier - pitZoneAnnual), Math.max(0, anchorZoneAnnual - pitZoneAnnual));
-        const anchorPart = Math.max(0, adjForTier - anchorZoneAnnual);
-        g.commissionableAnnual = stdPart + anchorPart * rules.anchorBonusMultiplier;
-        g.revenueDeduction = pitPart;
-        g.anchorBonus = anchorPart * (rules.anchorBonusMultiplier - 1);
+        const prior = perFarGroupPrior;
+        const comb = adjusted + prior;
+        const tieredFar = (v) => Math.min(Math.max(0, v - pitZoneAnnual), Math.max(0, anchorZoneAnnual - pitZoneAnnual)) + Math.max(0, v - anchorZoneAnnual) * rules.anchorBonusMultiplier;
+        g.commissionableAnnual = Math.max(0, tieredFar(comb) - tieredFar(prior));
+        g.revenueDeduction = Math.max(0, Math.min(comb, pitZoneAnnual) - Math.min(prior, pitZoneAnnual));
+        const anchorOfThis = Math.max(0, comb - anchorZoneAnnual) - Math.max(0, prior - anchorZoneAnnual);
+        g.anchorBonus = anchorOfThis * (rules.anchorBonusMultiplier - 1);
+        const visitsF = visits > 0 ? visits : 1;
+        const bandNoComm = Math.max(0, Math.min(comb, pitZoneAnnual) - Math.min(prior, pitZoneAnnual));
+        const bandNormal = Math.max(0, Math.min(comb, anchorZoneAnnual) - Math.max(prior, pitZoneAnnual));
+        const bandAnchor = anchorOfThis;
+        g.farTiers = {
+          originalPerVisit: g.annualOriginal / visitsF,
+          currentPerVisit: adjusted / visitsF,
+          priorPerVisit: prior / visitsF,
+          combinedPerVisit: comb / visitsF,
+          pitThreshold: rules.pitPerVisitThreshold,
+          anchorThreshold: isGreenline ? rules.anchorMinGreenline : rules.anchorPerVisitThreshold,
+          isGreenline,
+          noCommPerVisit: bandNoComm / visitsF,
+          normalPerVisit: bandNormal / visitsF,
+          anchorPerVisit: bandAnchor / visitsF,
+          commissionablePerVisit: g.commissionableAnnual / visitsF
+        };
         break;
       }
       case "Bread5": {
@@ -503,6 +522,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
         perVisitCommission: rowPerVisit,
         weeklyCommission: rowWeekly,
         annualCommission: rowAnnualCommission,
+        farTiers: g.farTiers,
         formatted: {
           perVisitRevenue: formatCurrency(row.annualCurrent),
           revenueDeduction: formatCurrency(rowDeduction),
@@ -526,6 +546,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     totalCommissionableRevenue,
     totalQuotaCredit,
     totalFarAnnual,
+    farIsGreenline: agreementIsGreenline,
     agreementMultiplier,
     effectiveCommissionRate,
     priorQuotaCredit,

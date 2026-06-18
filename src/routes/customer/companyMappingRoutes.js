@@ -9,6 +9,7 @@ import {
   getMappingStats,
   getMappingById,
   getMappingStatusByBigin,
+  getPriorFarByBigin,
   saveMapping,
   updateMapping,
   deleteMapping,
@@ -31,6 +32,9 @@ router.get("/routestar-available", getAvailableRouteStarCustomers);
 
 // Get RouteStar mapping status for a single Bigin company
 router.get("/status/:biginId", getMappingStatusByBigin);
+
+// Prior same-location far revenue (redline/greenline) for a company
+router.get("/prior-far/:biginId", getPriorFarByBigin);
 
 // Initialize mapping records from Bigin companies
 router.post("/initialize", initializeMappings);

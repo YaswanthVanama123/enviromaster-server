@@ -4,7 +4,7 @@
  */
 
 import { CompanyMapping, BiginCompany, RouteStarCustomer } from "../../models/customer/index.js";
-import { recalcCommissionForCompany } from "../../services/commissionAutomation.js";
+import { recalcCommissionForCompany, getPriorLocationFarAnnual } from "../../services/commissionAutomation.js";
 
 function triggerCommissionRecalc(biginId) {
   if (!biginId) return;
@@ -194,6 +194,22 @@ export const getMappingStatusByBigin = async (req, res) => {
   } catch (error) {
     console.error("Error fetching mapping status:", error);
     res.status(500).json({ success: false, error: "Failed to fetch mapping status" });
+  }
+};
+
+/**
+ * Prior same-location far (>15 min) revenue for a company, split by pricing line.
+ * Used by the live form to show the prior per-visit total in the Pit/Anchor breakdown.
+ */
+export const getPriorFarByBigin = async (req, res) => {
+  try {
+    const { biginId } = req.params;
+    const { excludeAgreementId } = req.query;
+    const prior = await getPriorLocationFarAnnual(biginId, excludeAgreementId || null);
+    res.json({ success: true, data: prior });
+  } catch (error) {
+    console.error("Error fetching prior far revenue:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch prior far revenue" });
   }
 };
 

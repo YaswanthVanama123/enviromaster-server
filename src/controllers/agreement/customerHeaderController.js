@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import { compileCustomerHeader } from "../../services/pdfService.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { ZohoMapping } from "../../models/sync/index.js";
+import { recalcCommissionForAgreementById } from "../../services/commissionAutomation.js";
 
 export async function compileAndStoreCustomerHeader(req, res) {
   try {
@@ -258,6 +259,21 @@ export async function getCustomerHeaderForEdit(req, res) {
         lastUploadedAt: zohoMapping.lastUploadedAt
       } : null,
     });
+
+    if (
+      (doc.isNewLocation === null || doc.isNewLocation === undefined) &&
+      isConnectedToBigin
+    ) {
+      recalcCommissionForAgreementById(String(doc._id))
+        .then((r) => {
+          if (!r?.skipped) {
+            console.log(`[COMMISSION-AUTO] edit-open backfill froze isNewLocation for agreement ${doc._id}`);
+          }
+        })
+        .catch((err) => {
+          console.error(`[COMMISSION-AUTO] edit-open backfill failed for ${doc._id}:`, err?.message);
+        });
+    }
 
     // Debug: Log if accountTypeCache exists
     if (doc.payload?.accountTypeCache) {

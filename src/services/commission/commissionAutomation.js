@@ -61,7 +61,7 @@ async function getQuotaContext(salesPersonUsername, excludeAgreementId) {
 }
 
 function buildCommissionObject(global, opts) {
-  const { baseRate, quotaLevel, rules, isNewLocation, priorQuotaCredit, contractMonths } = opts;
+  const { baseRate, quotaLevel, rules, isNewLocation, priorQuotaCredit, contractMonths, priorFarRedline, priorFarGreenline } = opts;
   const years = contractMonths > 0 ? contractMonths / 12 : 1;
 
   return {
@@ -73,6 +73,9 @@ function buildCommissionObject(global, opts) {
     isNewLocation,
     priorQuotaCredit,
     farAnnual: global.totalFarAnnual,
+    farIsGreenline: global.farIsGreenline,
+    priorFarRedline: Number(priorFarRedline) || 0,
+    priorFarGreenline: Number(priorFarGreenline) || 0,
     breakdown: {
       baseRate,
       agreementMultiplier: global.agreementMultiplier,
@@ -101,8 +104,17 @@ export async function computeCommissionForDoc(doc, deps = {}) {
   const isNewLocation =
     deps.isExistingLocation !== undefined
       ? !deps.isExistingLocation
-      : payload.commission?.isNewLocation ?? true;
-  const priorLocationFarAnnual = Number(deps.priorLocationFarAnnual) || 0;
+      : doc.isNewLocation ?? payload.commission?.isNewLocation ?? true;
+  const frozenPriorRedline = payload.commission?.priorFarRedline;
+  const frozenPriorGreenline = payload.commission?.priorFarGreenline;
+  const priorLocationFarAnnualRedline =
+    frozenPriorRedline != null && frozenPriorRedline !== undefined
+      ? Number(frozenPriorRedline) || 0
+      : Number(deps.priorLocationFarAnnualRedline) || 0;
+  const priorLocationFarAnnualGreenline =
+    frozenPriorGreenline != null && frozenPriorGreenline !== undefined
+      ? Number(frozenPriorGreenline) || 0
+      : Number(deps.priorLocationFarAnnualGreenline) || 0;
 
   const rules =
     payload.commission?.rulesSnapshot ||
@@ -123,11 +135,12 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     rules,
     priorQuotaCredit,
     isNewLocation,
-    priorLocationFarAnnual,
+    priorLocationFarAnnualRedline,
+    priorLocationFarAnnualGreenline,
   );
 
   if (!global.serviceCount) {
-    return { commission: null, quotaCredit: 0, priorQuotaCredit, quotaLevel, farAnnual: global.totalFarAnnual, global };
+    return { commission: null, quotaCredit: 0, priorQuotaCredit, quotaLevel, farAnnual: global.totalFarAnnual, farIsGreenline: global.farIsGreenline, global };
   }
 
   const commission = buildCommissionObject(global, {
@@ -137,6 +150,8 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     isNewLocation,
     priorQuotaCredit,
     contractMonths,
+    priorFarRedline: priorLocationFarAnnualRedline,
+    priorFarGreenline: priorLocationFarAnnualGreenline,
   });
 
   return {
@@ -145,6 +160,7 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     priorQuotaCredit,
     quotaLevel,
     farAnnual: global.totalFarAnnual,
+    farIsGreenline: global.farIsGreenline,
     global,
   };
 }
@@ -171,6 +187,7 @@ export async function recalcCommissionForDoc(doc, deps = {}) {
     quotaCredit: result.quotaCredit,
     quotaLevel: result.quotaLevel,
     farAnnual: result.farAnnual || 0,
+    farIsGreenline: !!result.farIsGreenline,
   };
 }
 
@@ -194,15 +211,30 @@ export async function recalcCommissionForCompany(biginCompanyId) {
   const docs = (await CustomerHeaderDoc.find({ _id: { $in: agreementIds }, isDeleted: { $ne: true } }))
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-  const farSumBySalesperson = {};
+  let farSumRedline = 0;
+  let farSumGreenline = 0;
   const results = [];
 
   for (const doc of docs) {
     try {
-      const salesperson = doc.createdBy || "";
-      const priorLocationFarAnnual = isExistingLocation ? farSumBySalesperson[salesperson] || 0 : 0;
-      const r = await recalcCommissionForDoc(doc, { activeRules, isExistingLocation, priorLocationFarAnnual });
-      farSumBySalesperson[salesperson] = (farSumBySalesperson[salesperson] || 0) + (r.farAnnual || 0);
+      const docIsExisting =
+        doc.isNewLocation === null || doc.isNewLocation === undefined
+          ? isExistingLocation
+          : !doc.isNewLocation;
+      if (doc.isNewLocation === null || doc.isNewLocation === undefined) {
+        doc.isNewLocation = !docIsExisting;
+        doc.locationTypeCheckedAt = new Date();
+      }
+      const priorLocationFarAnnualRedline = docIsExisting ? farSumRedline : 0;
+      const priorLocationFarAnnualGreenline = docIsExisting ? farSumGreenline : 0;
+      const r = await recalcCommissionForDoc(doc, {
+        activeRules,
+        isExistingLocation: docIsExisting,
+        priorLocationFarAnnualRedline,
+        priorLocationFarAnnualGreenline,
+      });
+      if (r.farIsGreenline) farSumGreenline += r.farAnnual || 0;
+      else farSumRedline += r.farAnnual || 0;
       results.push(r);
     } catch (err) {
       results.push({ agreementId: String(doc._id), skipped: true, error: err?.message });
@@ -218,25 +250,29 @@ export async function isCompanyRouteStarMapped(biginId) {
   return !!(mapping && mapping.routeStarId && mapping.mappingStatus === "mapped");
 }
 
-export async function getPriorLocationFarAnnual(biginCompanyId, salesperson, excludeAgreementId) {
-  if (!biginCompanyId || !salesperson) return 0;
+export async function getPriorLocationFarAnnual(biginCompanyId, excludeAgreementId) {
+  if (!biginCompanyId) return { redline: 0, greenline: 0 };
   const mappings = await ZohoMapping.find({ "zohoCompany.id": String(biginCompanyId) })
     .select("agreementId")
     .lean();
   const ids = mappings
     .map((m) => m.agreementId)
     .filter((id) => id && String(id) !== String(excludeAgreementId));
-  if (!ids.length) return 0;
+  if (!ids.length) return { redline: 0, greenline: 0 };
   const docs = await CustomerHeaderDoc.find({
     _id: { $in: ids },
-    createdBy: salesperson,
     isDeleted: { $ne: true },
   })
-    .select("payload.commission.farAnnual")
+    .select("payload.commission.farAnnual payload.commission.farIsGreenline")
     .lean();
-  let sum = 0;
-  for (const d of docs) sum += Number(d.payload?.commission?.farAnnual) || 0;
-  return sum;
+  let redline = 0;
+  let greenline = 0;
+  for (const d of docs) {
+    const far = Number(d.payload?.commission?.farAnnual) || 0;
+    if (d.payload?.commission?.farIsGreenline) greenline += far;
+    else redline += far;
+  }
+  return { redline, greenline };
 }
 
 export async function recalcCommissionForAgreement(agreementId, biginCompanyId) {
@@ -258,21 +294,38 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
     return { agreementId: String(agreementId), skipped: true, reason: "not_found" };
   }
 
+  let ltResult = null;
   try {
-    await refreshLocationTypeForCompany(biginCompanyId);
+    ltResult = await refreshLocationTypeForCompany(biginCompanyId);
   } catch (err) {
     console.error(`[COMMISSION-AUTO] location-type refresh failed for ${biginCompanyId}:`, err?.message);
   }
 
-  const company = await BiginCompany.findOne({ biginId: String(biginCompanyId) })
-    .select("isExistingLocation")
-    .lean();
-  const isExistingLocation = !!company?.isExistingLocation;
-  const priorLocationFarAnnual = isExistingLocation
-    ? await getPriorLocationFarAnnual(biginCompanyId, doc.createdBy, agreementId)
-    : 0;
+  if (doc.isNewLocation === null || doc.isNewLocation === undefined) {
+    let existing;
+    if (ltResult && ltResult.success) {
+      existing = ltResult.isExistingLocation;
+    } else {
+      const company = await BiginCompany.findOne({ biginId: String(biginCompanyId) })
+        .select("isExistingLocation")
+        .lean();
+      existing = !!company?.isExistingLocation;
+    }
+    doc.isNewLocation = !existing;
+    doc.locationTypeCheckedAt = new Date();
+    console.log(`[COMMISSION-AUTO] agreement ${agreementId}: froze isNewLocation=${doc.isNewLocation} at link time`);
+  }
 
-  return recalcCommissionForDoc(doc, { isExistingLocation, priorLocationFarAnnual });
+  const isExistingLocation = !doc.isNewLocation;
+  const prior = isExistingLocation
+    ? await getPriorLocationFarAnnual(biginCompanyId, agreementId)
+    : { redline: 0, greenline: 0 };
+
+  return recalcCommissionForDoc(doc, {
+    isExistingLocation,
+    priorLocationFarAnnualRedline: prior.redline,
+    priorLocationFarAnnualGreenline: prior.greenline,
+  });
 }
 
 export async function recalcCommissionForAgreementById(agreementId) {
