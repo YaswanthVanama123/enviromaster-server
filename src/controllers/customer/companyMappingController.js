@@ -4,6 +4,8 @@
  */
 
 import { CompanyMapping, BiginCompany, RouteStarCustomer } from "../../models/customer/index.js";
+import { ZohoMapping } from "../../models/sync/index.js";
+import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { recalcCommissionForCompany, getPriorLocationFarAnnual } from "../../services/commissionAutomation.js";
 
 function triggerCommissionRecalc(biginId) {
@@ -210,6 +212,93 @@ export const getPriorFarByBigin = async (req, res) => {
   } catch (error) {
     console.error("Error fetching prior far revenue:", error);
     res.status(500).json({ success: false, error: "Failed to fetch prior far revenue" });
+  }
+};
+
+/**
+ * Recompute every agreement for a company with the current engine, then return the
+ * refreshed prior far totals. Used by the admin Pit Far Totals screen.
+ */
+export const recalcCompanyFar = async (req, res) => {
+  try {
+    const { biginId } = req.params;
+    const result = await recalcCommissionForCompany(biginId);
+    const prior = await getPriorLocationFarAnnual(biginId, null);
+    res.json({ success: true, prior, agreementCount: result.agreementCount });
+  } catch (error) {
+    console.error("Error recalculating company far:", error);
+    res.status(500).json({ success: false, error: "Failed to recalculate" });
+  }
+};
+
+/**
+ * List of companies that have agreements connected to Bigin (distinct from ZohoMapping).
+ */
+export const getConnectedCompanies = async (req, res) => {
+  try {
+    const rows = await ZohoMapping.aggregate([
+      { $match: { "zohoCompany.id": { $nin: [null, ""] } } },
+      {
+        $group: {
+          _id: "$zohoCompany.id",
+          companyName: { $first: "$zohoCompany.name" },
+          agreementCount: { $sum: 1 },
+        },
+      },
+      { $sort: { companyName: 1 } },
+    ]);
+    res.json({
+      success: true,
+      data: rows.map((r) => ({
+        biginId: r._id,
+        companyName: r.companyName || r._id,
+        agreementCount: r.agreementCount,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching connected companies:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch connected companies" });
+  }
+};
+
+/**
+ * Per-agreement Pit far breakdown for a company (diagnostic for the admin screen).
+ */
+export const getFarBreakdown = async (req, res) => {
+  try {
+    const { biginId } = req.params;
+    const mappings = await ZohoMapping.find({ "zohoCompany.id": String(biginId) })
+      .select("agreementId")
+      .lean();
+    const ids = mappings.map((m) => m.agreementId).filter(Boolean);
+    const docs = await CustomerHeaderDoc.find({ _id: { $in: ids }, isDeleted: { $ne: true } })
+      .select("payload.headerTitle payload.commission.farAnnualRedline payload.commission.farAnnualGreenline payload.commission.farAnnual payload.commission.farIsGreenline status createdAt")
+      .lean();
+    const agreements = docs.map((d) => {
+      const c = d.payload?.commission || {};
+      let redline = 0;
+      let greenline = 0;
+      if (c.farAnnualRedline != null || c.farAnnualGreenline != null) {
+        redline = Number(c.farAnnualRedline) || 0;
+        greenline = Number(c.farAnnualGreenline) || 0;
+      } else {
+        const far = Number(c.farAnnual) || 0;
+        if (c.farIsGreenline) greenline = far;
+        else redline = far;
+      }
+      return {
+        agreementId: String(d._id),
+        title: d.payload?.headerTitle || String(d._id),
+        status: d.status,
+        hasCommission: !!d.payload?.commission,
+        redline,
+        greenline,
+      };
+    });
+    res.json({ success: true, agreements });
+  } catch (error) {
+    console.error("Error fetching far breakdown:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch far breakdown" });
   }
 };
 

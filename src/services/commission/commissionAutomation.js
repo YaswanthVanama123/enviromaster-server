@@ -301,14 +301,15 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
     return { agreementId: String(agreementId), skipped: true, reason: "not_found" };
   }
 
-  let ltResult = null;
-  try {
-    ltResult = await refreshLocationTypeForCompany(biginCompanyId);
-  } catch (err) {
-    console.error(`[COMMISSION-AUTO] location-type refresh failed for ${biginCompanyId}:`, err?.message);
-  }
-
+  // Only hit the Bigin pipeline API to freeze isNewLocation the first time. Once
+  // frozen it never changes, so skip the call on every subsequent save/recalc.
   if (doc.isNewLocation === null || doc.isNewLocation === undefined) {
+    let ltResult = null;
+    try {
+      ltResult = await refreshLocationTypeForCompany(biginCompanyId);
+    } catch (err) {
+      console.error(`[COMMISSION-AUTO] location-type refresh failed for ${biginCompanyId}:`, err?.message);
+    }
     let existing;
     if (ltResult && ltResult.success) {
       existing = ltResult.isExistingLocation;

@@ -407,13 +407,13 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     switch (g.accountType) {
       case "Anchor":
       case "Pit": {
-        if (isGreenline) totalFarAnnualGreenline += adjusted;
-        else totalFarAnnualRedline += adjusted;
-        const prior = perFarGroupPrior;
-        const comb = adjusted + prior;
-        const tieredFar = (v) => Math.min(Math.max(0, v - pitZoneAnnual), Math.max(0, anchorZoneAnnual - pitZoneAnnual)) + Math.max(0, v - anchorZoneAnnual) * rules.anchorBonusMultiplier;
         const visitsF = visits > 0 ? visits : 1;
         const round2 = (x) => Math.round(x * 100) / 100;
+        const prior = perFarGroupPrior * visitsF;
+        if (isGreenline) totalFarAnnualGreenline += adjusted / visitsF;
+        else totalFarAnnualRedline += adjusted / visitsF;
+        const comb = adjusted + prior;
+        const tieredFar = (v) => Math.min(Math.max(0, v - pitZoneAnnual), Math.max(0, anchorZoneAnnual - pitZoneAnnual)) + Math.max(0, v - anchorZoneAnnual) * rules.anchorBonusMultiplier;
         const cpv = round2(Math.max(0, tieredFar(comb) - tieredFar(prior)) / visitsF);
         g.commissionableAnnual = cpv * visitsF;
         g.revenueDeduction = Math.max(0, Math.min(comb, pitZoneAnnual) - Math.min(prior, pitZoneAnnual));

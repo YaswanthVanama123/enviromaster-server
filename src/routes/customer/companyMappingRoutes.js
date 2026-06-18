@@ -10,6 +10,9 @@ import {
   getMappingById,
   getMappingStatusByBigin,
   getPriorFarByBigin,
+  getConnectedCompanies,
+  recalcCompanyFar,
+  getFarBreakdown,
   saveMapping,
   updateMapping,
   deleteMapping,
@@ -29,6 +32,15 @@ router.get("/stats", getMappingStats);
 
 // Get available RouteStar customers (not yet mapped)
 router.get("/routestar-available", getAvailableRouteStarCustomers);
+
+// Companies that have agreements connected to Bigin
+router.get("/connected-companies", getConnectedCompanies);
+
+// Recompute a company's agreements and return refreshed prior far totals
+router.post("/recalc-far/:biginId", recalcCompanyFar);
+
+// Per-agreement Pit far breakdown for a company
+router.get("/far-breakdown/:biginId", getFarBreakdown);
 
 // Get RouteStar mapping status for a single Bigin company
 router.get("/status/:biginId", getMappingStatusByBigin);

@@ -415,6 +415,13 @@ export async function updateCustomerHeader(req, res) {
 
     console.log(`Document ${id} updated, status: ${doc.status}, compiled: ${shouldCompilePdf}`);
 
+    // Recompute & store commission (incl. Pit far redline/greenline split) via the
+    // authoritative engine. Self-gates: skips if the agreement isn't connected to
+    // Bigin + RouteStar-mapped, so unmapped drafts add nothing to the prior.
+    recalcCommissionForAgreementById(String(doc._id)).catch((err) =>
+      console.error(`[COMMISSION-AUTO] post-save recalc failed for ${doc._id}:`, err?.message),
+    );
+
     if (buffer) {
       console.log("✅ [UPDATE SUCCESS] Returning PDF response");
       res.setHeader("Content-Type", "application/pdf");
