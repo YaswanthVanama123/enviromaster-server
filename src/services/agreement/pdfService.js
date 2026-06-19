@@ -941,6 +941,9 @@ const productsHeaderRowLatex =
 function buildServiceRows(rows = []) {
   let out = "";
   for (const r of rows) {
+    // Never print the "Minimum" floor row in the agreement PDF — it's an
+    // internal pricing input, not a line item the customer should see.
+    if (String(r?.label || "").trim().toLowerCase() === "minimum") continue;
     const type = r.type || "line";
     const label = r.label || "";
     const value = r.value || "";
@@ -2925,6 +2928,12 @@ function _isMonetaryKey(key) {
   return /price|rate|fee|charge|cost|minimum|amount|credit|weekly|monthly|annual|per|factor|multiplier/i.test(key);
 }
 
+// Keys excluded from the pricing catalog even though they look monetary —
+// "minimum" floors/thresholds are internal calc inputs, not catalog pricing.
+function _isExcludedPricingKey(key) {
+  return /minimum/i.test(key);
+}
+
 function _formatConfigValue(key, val) {
   const k = key.toLowerCase();
   if (k.includes('multiplier') || k.includes('factor') || (k.includes('weeks') && val < 100) || k.includes('ratio')) {
@@ -2949,7 +2958,7 @@ function _flattenConfig(obj, rows = [], depth = 0) {
   if (depth > 2 || !obj || typeof obj !== 'object') return rows;
   for (const [key, val] of Object.entries(obj)) {
     if (Array.isArray(val)) continue;
-    if (typeof val === 'number' && val > 0 && _isMonetaryKey(key)) {
+    if (typeof val === 'number' && val > 0 && _isMonetaryKey(key) && !_isExcludedPricingKey(key)) {
       rows.push({ field: _camelToLabel(key), value: _formatConfigValue(key, val), unit: _detectUnit(key) });
     } else if (typeof val === 'object' && val !== null) {
       _flattenConfig(val, rows, depth + 1);
