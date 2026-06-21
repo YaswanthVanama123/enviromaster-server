@@ -38,7 +38,9 @@
     "modelmigration": "node scripts/migrate-string-dates-to-date.mjs",
     "modelmigration:apply": "node scripts/migrate-string-dates-to-date.mjs --apply",
     "archivemigration": "node scripts/migrate-archive-array-overflow.mjs",
-    "archivemigration:apply": "node scripts/migrate-archive-array-overflow.mjs --apply"
+    "archivemigration:apply": "node scripts/migrate-archive-array-overflow.mjs --apply",
+    "syncindexes": "node scripts/sync-indexes.mjs",
+    "syncindexes:apply": "node scripts/sync-indexes.mjs --apply"
   },
   "dependencies": {
     "axios": "^1.13.2",
