@@ -59,11 +59,11 @@ const AdminSettingsSchema = new mongoose.Schema(
 
 // Static: Get-or-create the singleton
 AdminSettingsSchema.statics.getSingleton = async function () {
-  let doc = await this.findOne({ key: "global" });
-  if (!doc) {
-    doc = await this.create({ key: "global" });
-  }
-  return doc;
+  return this.findOneAndUpdate(
+    { key: "global" },
+    { $setOnInsert: { key: "global" } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
 };
 
 // Static: Update settings

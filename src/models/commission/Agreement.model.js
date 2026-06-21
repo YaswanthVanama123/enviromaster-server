@@ -29,7 +29,7 @@ const CustomerSchema = new mongoose.Schema(
 
 const SalesPersonRefSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true, ref: "SalesPerson" },
+    id: { type: String, required: true },
     name: { type: String, required: true },
   },
   { _id: false }
@@ -171,7 +171,6 @@ const AgreementSchema = new mongoose.Schema(
 
 // Indexes
 AgreementSchema.index({ "salesPerson.id": 1, signedDate: -1 });
-AgreementSchema.index({ agreementNumber: 1 });
 AgreementSchema.index({ status: 1, startDate: -1 });
 AgreementSchema.index({ "customer.name": "text" });
 

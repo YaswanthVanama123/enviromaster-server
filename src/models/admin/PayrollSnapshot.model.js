@@ -45,7 +45,7 @@ const PayrollSnapshotSchema = new mongoose.Schema(
     periodStart: { type: Date, required: true },
     periodEnd: { type: Date, required: true },
     periodLabel: { type: String },
-    cycleType: { type: String },
+    cycleType: { type: String, enum: ["weekly", "biweekly", "monthly"] },
     totals: {
       totalEmployees: { type: Number, default: 0 },
       totalAgreements: { type: Number, default: 0 },

@@ -38,7 +38,7 @@ const AuditLogSchema = new mongoose.Schema(
     },
     entityId: { type: mongoose.Schema.Types.ObjectId, required: true },
     entityName: { type: String },
-    payload: { type: Object, default: {} },
+    payload: { type: mongoose.Schema.Types.Mixed, default: {} },
     ipAddress: { type: String },
     userAgent: { type: String },
   },

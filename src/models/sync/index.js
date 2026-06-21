@@ -19,6 +19,7 @@ import {
 } from "./MapDistance.model.js";
 
 import ZohoMapping from "./ZohoMapping.model.js";
+import ZohoUploadArchive from "./ZohoUploadArchive.model.js";
 
 export {
   // Models
@@ -26,6 +27,7 @@ export {
   MapDistanceRecord,
   MapDistanceSyncJob,
   ZohoMapping,
+  ZohoUploadArchive,
 
   // Constants
   SCRAPE_SESSION_STATUS,
@@ -42,4 +44,5 @@ export default {
   MapDistanceRecord,
   MapDistanceSyncJob,
   ZohoMapping,
+  ZohoUploadArchive,
 };

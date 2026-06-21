@@ -72,7 +72,7 @@ const FamilySchema = new mongoose.Schema(
 const ProductCatalogSchema = new mongoose.Schema(
   {
     version: { type: String, required: true },
-    lastUpdated: { type: String },
+    lastUpdated: { type: Date },
     currency: { type: String, default: "USD" },
 
     families: [FamilySchema],
@@ -84,7 +84,7 @@ const ProductCatalogSchema = new mongoose.Schema(
 );
 
 // Indexes
-ProductCatalogSchema.index({ isActive: 1 });
+ProductCatalogSchema.index({ isActive: 1, createdAt: -1 });
 ProductCatalogSchema.index({ version: 1 });
 
 // Static: Get active catalog

@@ -63,8 +63,8 @@ const FieldChangeSchema = new mongoose.Schema(
     quantity: { type: Number, default: 0 },
     frequency: { type: String, default: "" },
     timestamp: {
-      type: String,
-      default: () => new Date().toISOString(),
+      type: Date,
+      default: Date.now,
     },
   },
   { _id: false }
@@ -76,7 +76,6 @@ const LogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "CustomerHeaderDoc",
       required: [true, "Agreement ID is required"],
-      index: true,
     },
     agreementTitle: { type: String, default: "" },
 
@@ -84,7 +83,6 @@ const LogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "VersionPdf",
       required: [true, "Version ID is required"],
-      index: true,
     },
     versionNumber: {
       type: Number,
@@ -98,7 +96,6 @@ const LogSchema = new mongoose.Schema(
     salespersonId: {
       type: String,
       required: [true, "Salesperson ID is required"],
-      index: true,
     },
     salespersonName: {
       type: String,
@@ -173,7 +170,6 @@ LogSchema.pre("save", function (next) {
 });
 
 // Indexes
-LogSchema.index({ agreementId: 1, versionNumber: -1 });
 LogSchema.index({ agreementId: 1, createdAt: -1 });
 LogSchema.index({ versionId: 1 });
 LogSchema.index({ salespersonId: 1, createdAt: -1 });

@@ -1,4 +1,8 @@
 import { Proposal, Catalog, FileAsset } from "../../models/proposal/index.js";
+import { archiveOverflowAndTrim } from "../../utils/archiveOverflow.js";
+
+const PROPOSAL_PDF_HISTORY_CAP = 10;
+const PROPOSAL_CRM_ATTEMPTS_CAP = 20;
 
 export const createProposal = async (req, res) => {
   try {
@@ -146,6 +150,27 @@ export const attachPdfAndMarkForZoho = async (req, res) => {
 
     if (!doc)
       return res.status(404).json({ ok: false, error: 'Proposal not found' });
+
+    const archiveRef = { proposalId: doc._id };
+    await archiveOverflowAndTrim({
+      parentModelName: 'Proposal',
+      parentId: doc._id,
+      archiveModelName: 'ProposalHistoryArchive',
+      baseRef: archiveRef,
+      doc,
+      field: 'pdfHistory',
+      cap: PROPOSAL_PDF_HISTORY_CAP,
+    });
+    await archiveOverflowAndTrim({
+      parentModelName: 'Proposal',
+      parentId: doc._id,
+      archiveModelName: 'ProposalHistoryArchive',
+      baseRef: archiveRef,
+      doc,
+      field: 'crm.attempts',
+      cap: PROPOSAL_CRM_ATTEMPTS_CAP,
+    });
+
     return res.json({ ok: true, pdfAssetId: asset._id });
   } catch (err) {
     console.error('attachPdfAndMarkForZoho error:', err);

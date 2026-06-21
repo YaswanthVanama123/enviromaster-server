@@ -10,7 +10,6 @@ const PriceFixItemSchema = new Schema(
       type: String,
       enum: PRICE_CATEGORIES,
       required: true,
-      index: true,
     },
 
     serviceName: {

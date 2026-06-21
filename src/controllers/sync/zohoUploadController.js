@@ -251,7 +251,7 @@ export async function getUploadHistory(req, res) {
         uploadedAt: upload.uploadedAt,
         uploadedBy: upload.uploadedBy,
       })),
-      totalVersions: mapping.uploads.length,
+      totalVersions: mapping.currentVersion,
       currentVersion: mapping.currentVersion,
       lastUploadedAt: mapping.lastUploadedAt,
     });

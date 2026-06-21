@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import app from './app.js';
 import connectDB from './config/db.js';
 import { cleanupTemporaryArtifacts } from './utils/tmpCleanup.js';
+import logger from './utils/logger.js';
 
 dotenv.config();
 
@@ -11,24 +12,23 @@ const PORT = process.env.PORT || 5000;
   try {
     const dbConnected = await connectDB();
     if (dbConnected) {
-      console.log('✅ Database connection successful');
-      // Initialize job status (mark any interrupted jobs as failed)
+      logger.info('Database connection successful');
       try {
         const { initializeJobStatus } = await import('./controllers/mapDistanceController.js');
         await initializeJobStatus();
       } catch (initErr) {
-        console.warn('⚠️ Could not initialize map distance job status:', initErr.message);
+        logger.warn('Could not initialize map distance job status:', initErr.message);
       }
     } else {
-      console.log('⚠️ Running without database - some features may not work');
+      logger.warn('Running without database - some features may not work');
     }
 
     await cleanupTemporaryArtifacts({ purgeAll: true });
     app.listen(PORT, () =>
-      console.log(`🚀 API listening on http://localhost:${PORT}`)
+      logger.info(`API listening on port ${PORT} (log level: ${logger.level()}, env: ${process.env.NODE_ENV || 'development'})`)
     );
   } catch (err) {
-    console.error('❌ Server start error:', err);
+    logger.error('Server start error:', err);
     process.exit(1);
   }
 })();

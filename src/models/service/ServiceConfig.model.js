@@ -76,6 +76,7 @@ const ServiceConfigSchema = new mongoose.Schema(
 // Indexes
 ServiceConfigSchema.index({ serviceId: 1, isActive: 1 });
 ServiceConfigSchema.index({ serviceId: 1, version: 1 }, { unique: true });
+ServiceConfigSchema.index({ serviceId: 1, createdAt: -1 });
 
 // Static: Get active config for a service
 ServiceConfigSchema.statics.getActiveConfig = function (serviceId) {

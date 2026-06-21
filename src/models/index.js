@@ -63,7 +63,6 @@ export {
 export {
   CommissionRules,
   CommissionRecord,
-  SalesPerson,
   Agreement,
   QuotaPeriod,
   QUOTA_LEVELS,
@@ -73,7 +72,6 @@ export {
   BUSINESS_TYPES,
   DEFAULT_COMMISSION_RULES,
   COMMISSION_RECORD_STATUS,
-  SALES_PERSON_ROLES,
   AGREEMENT_STATUS,
   QUOTA_PERIOD_STATUS,
 } from "./commission/index.js";
@@ -124,6 +122,7 @@ export {
   MapDistanceRecord,
   MapDistanceSyncJob,
   ZohoMapping,
+  ZohoUploadArchive,
   SCRAPE_SESSION_STATUS,
   FREQUENCY_MAP,
   FREQUENCY_REVERSE_MAP,
@@ -140,6 +139,7 @@ export {
   Proposal,
   Catalog,
   FileAsset,
+  ProposalHistoryArchive,
   APPROVAL_STATUS,
   SYNC_STATUS,
   FILE_KINDS,
@@ -199,7 +199,6 @@ export default {
   // Commission
   CommissionRules: CommissionModels.CommissionRules,
   CommissionRecord: CommissionModels.CommissionRecord,
-  SalesPerson: CommissionModels.SalesPerson,
   Agreement: CommissionModels.Agreement,
   QuotaPeriod: CommissionModels.QuotaPeriod,
 
@@ -225,9 +224,11 @@ export default {
   MapDistanceRecord: SyncModels.MapDistanceRecord,
   MapDistanceSyncJob: SyncModels.MapDistanceSyncJob,
   ZohoMapping: SyncModels.ZohoMapping,
+  ZohoUploadArchive: SyncModels.ZohoUploadArchive,
 
   // Proposal
   Proposal: ProposalModels.Proposal,
   Catalog: ProposalModels.Catalog,
   FileAsset: ProposalModels.FileAsset,
+  ProposalHistoryArchive: ProposalModels.ProposalHistoryArchive,
 };

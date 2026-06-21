@@ -83,13 +83,11 @@ const AdminHeaderDocSchema = new Schema(
     },
 
     createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: "AdminUser",
+      type: String,
       default: null,
     },
     updatedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "AdminUser",
+      type: String,
       default: null,
     },
 
@@ -107,6 +105,8 @@ const AdminHeaderDocSchema = new Schema(
     timestamps: true,
   }
 );
+
+AdminHeaderDocSchema.index({ createdAt: -1 });
 
 const AdminHeaderDoc = mongoose.model("AdminHeaderDoc", AdminHeaderDocSchema);
 

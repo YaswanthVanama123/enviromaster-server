@@ -513,7 +513,7 @@ export async function updateUpload(req, res) {
         mapping: mapping ? {
           id: mapping._id,
           version: nextVersion,
-          totalVersions: mapping.uploads.length,
+          totalVersions: mapping.currentVersion,
         } : null,
       },
     });

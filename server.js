@@ -1,3 +1,2 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import './src/config/initLogging.js';
 import './src/server.js';

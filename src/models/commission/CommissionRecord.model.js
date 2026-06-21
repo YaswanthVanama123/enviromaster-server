@@ -44,7 +44,7 @@ const CommissionRecordSchema = new mongoose.Schema(
       weeklyCommission: Number,
       annualCommission: Number,
       firstYearCommission: Number,
-      calculatedAt: String,
+      calculatedAt: Date,
     },
     // Sales person info
     salesPersonId: {

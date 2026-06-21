@@ -39,7 +39,7 @@ const BiginScrapeSessionSchema = new mongoose.Schema(
 
     // Error info if failed
     error: { type: String },
-    errorDetails: { type: Object },
+    errorDetails: { type: mongoose.Schema.Types.Mixed },
 
     // Who triggered the scrape
     triggeredBy: { type: String, default: "manual" },
@@ -52,7 +52,6 @@ const BiginScrapeSessionSchema = new mongoose.Schema(
 
 // Indexes
 BiginScrapeSessionSchema.index({ status: 1, createdAt: -1 });
-BiginScrapeSessionSchema.index({ sessionId: 1 });
 
 const BiginScrapeSession = mongoose.model(
   "BiginScrapeSession",

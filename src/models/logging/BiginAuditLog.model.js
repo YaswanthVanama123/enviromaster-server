@@ -34,7 +34,7 @@ const BiginAuditLogSchema = new mongoose.Schema(
     ipAddress: { type: String },
 
     // Additional metadata from scraping
-    rawData: { type: Object, default: {} },
+    rawData: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // Scrape session info
     scrapeSessionId: { type: String },
@@ -50,6 +50,7 @@ const BiginAuditLogSchema = new mongoose.Schema(
 BiginAuditLogSchema.index({ timestamp: -1, user: 1 });
 BiginAuditLogSchema.index({ module: 1, action: 1 });
 BiginAuditLogSchema.index({ scrapedAt: -1 });
+BiginAuditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 31536000 });
 
 const BiginAuditLog = mongoose.model("BiginAuditLog", BiginAuditLogSchema);
 

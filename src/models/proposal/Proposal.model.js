@@ -132,5 +132,7 @@ const ProposalSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+ProposalSchema.index({ createdAt: -1 });
+
 const Proposal = mongoose.model("Proposal", ProposalSchema);
 export default Proposal;

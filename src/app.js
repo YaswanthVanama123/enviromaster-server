@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { PDF_MAX_BODY_MB } from "./config/pdfConfig.js";
+import logger from "./utils/logger.js";
 
 // Agreement Domain Routes
 import pdfRoutes from "./routes/agreement/pdfRoutes.js";
@@ -98,7 +99,14 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(compression({ threshold: 1024 }));
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV === 'production') {
+  app.use(
+    morgan('combined', {
+      stream: logger.stream,
+      skip: (req) => req.path === '/health',
+    })
+  );
+} else {
   app.use(morgan('dev'));
 }
 
@@ -187,5 +195,22 @@ app.use("/api/bigin-companies", biginCompanyRoutes);
 app.use("/api/company-mappings", companyMappingRoutes);
 app.use("/api/map-distance", mapDistanceRoutes);
 app.use("/api/payroll", payrollRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ ok: false, error: "Not found" });
+});
+
+app.use((err, req, res, next) => {
+  logger.error("Unhandled request error:", err);
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    ok: false,
+    error:
+      process.env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err.message || "Internal server error",
+  });
+});
 
 export default app;

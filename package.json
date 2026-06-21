@@ -34,7 +34,11 @@
     "chrome:deps": "node node_modules/playwright-core/cli.js install-deps chromium",
     "chrome:setup": "node node_modules/playwright-core/cli.js install --with-deps chromium",
     "verify:commission-parity": "node scripts/verify-commission-parity.mjs",
-    "backfill:commission": "node scripts/backfill-commission.mjs"
+    "backfill:commission": "node scripts/backfill-commission.mjs",
+    "modelmigration": "node scripts/migrate-string-dates-to-date.mjs",
+    "modelmigration:apply": "node scripts/migrate-string-dates-to-date.mjs --apply",
+    "archivemigration": "node scripts/migrate-archive-array-overflow.mjs",
+    "archivemigration:apply": "node scripts/migrate-archive-array-overflow.mjs --apply"
   },
   "dependencies": {
     "axios": "^1.13.2",

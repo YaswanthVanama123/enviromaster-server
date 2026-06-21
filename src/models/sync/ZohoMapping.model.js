@@ -1,4 +1,8 @@
 import mongoose from 'mongoose';
+import { archiveOverflowInPlace } from '../../utils/archiveOverflow.js';
+
+const ZOHO_UPLOADS_CAP = 50;
+const ZOHO_FAILED_UPLOADS_CAP = 50;
 
 const zohoMappingSchema = new mongoose.Schema({
   agreementId: {
@@ -146,16 +150,38 @@ const zohoMappingSchema = new mongoose.Schema({
   }
 });
 
-zohoMappingSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  if (this.uploads && this.uploads.length > 0) {
-    this.lastUploadedAt = this.uploads[this.uploads.length - 1].uploadedAt;
-    this.currentVersion = Math.max(...this.uploads.map(u => u.version));
+zohoMappingSchema.pre('save', async function(next) {
+  try {
+    this.updatedAt = new Date();
+    if (this.uploads && this.uploads.length > 0) {
+      this.lastUploadedAt = this.uploads[this.uploads.length - 1].uploadedAt;
+      this.currentVersion = Math.max(...this.uploads.map(u => u.version));
+    }
+    const baseRef = { mappingId: this._id, agreementId: this.agreementId };
+    if (this.uploads && this.uploads.length > ZOHO_UPLOADS_CAP) {
+      this.uploads = await archiveOverflowInPlace({
+        archiveModelName: 'ZohoUploadArchive',
+        baseRef,
+        arr: this.uploads,
+        field: 'uploads',
+        cap: ZOHO_UPLOADS_CAP,
+      });
+    }
+    if (this.failedUploads && this.failedUploads.length > ZOHO_FAILED_UPLOADS_CAP) {
+      this.failedUploads = await archiveOverflowInPlace({
+        archiveModelName: 'ZohoUploadArchive',
+        baseRef,
+        arr: this.failedUploads,
+        field: 'failedUploads',
+        cap: ZOHO_FAILED_UPLOADS_CAP,
+      });
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
 
-zohoMappingSchema.index({ agreementId: 1 }, { unique: true });
 zohoMappingSchema.index({ 'zohoCompany.id': 1 });
 zohoMappingSchema.index({ 'zohoDeal.id': 1 });
 zohoMappingSchema.index({ createdAt: -1 });

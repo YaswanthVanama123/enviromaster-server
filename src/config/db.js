@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import logger from '../utils/logger.js';
 
 const connectDB = async () => {
   try {
@@ -17,17 +18,18 @@ const connectDB = async () => {
       maxIdleTimeMS: Number(process.env.MONGO_MAX_IDLE_TIME_MS) || 60000,
     });
 
-    console.log('✅ MongoDB connected successfully');
-    console.log(`📊 Database: ${process.env.MONGO_DB || 'enviro_master'}`);
+    logger.info(`MongoDB connected (database: ${process.env.MONGO_DB || 'enviro_master'})`);
+    return true;
   } catch (err) {
-    console.error('❌ MongoDB connection failed:', err.message);
+    logger.error('MongoDB connection failed:', err.message);
 
     if (process.env.NODE_ENV === 'production') {
-      console.error('⚠️  Cannot start server without database in production mode');
+      logger.error('Cannot start server without database in production mode');
       process.exit(1);
     } else {
-      console.log('⚠️  Server will continue without MongoDB for testing purposes (development only)');
+      logger.warn('Server will continue without MongoDB for testing purposes (development only)');
     }
+    return false;
   }
 };
 

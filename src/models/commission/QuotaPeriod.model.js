@@ -17,7 +17,6 @@ const QuotaPeriodSchema = new mongoose.Schema(
     salesPersonId: {
       type: String,
       required: true,
-      ref: "SalesPerson",
     },
     salesPersonName: {
       type: String,

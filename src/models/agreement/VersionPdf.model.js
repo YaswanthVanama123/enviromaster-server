@@ -117,7 +117,6 @@ const VersionPdfSchema = new mongoose.Schema(
 VersionPdfSchema.index({ agreementId: 1, versionNumber: 1 }, { unique: true });
 VersionPdfSchema.index({ agreementId: 1, createdAt: -1 });
 VersionPdfSchema.index({ agreementId: 1, status: 1, isDeleted: 1 });
-VersionPdfSchema.index({ agreementId: 1, versionNumber: -1 });
 
 // Static: Get next version number
 VersionPdfSchema.statics.getNextVersionNumber = async function (agreementId) {
