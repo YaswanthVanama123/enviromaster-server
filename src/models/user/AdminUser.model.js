@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import logger from "../../utils/logger.js";
 
 const AdminUserSchema = new mongoose.Schema(
   {
@@ -41,7 +42,7 @@ AdminUserSchema.statics.ensureDefaultAdmin = async function () {
 
   const existing = await this.findOne({ username: DEFAULT_USERNAME }).exec();
   if (existing) {
-    console.log("[AdminUser] Default admin already exists");
+    logger.debug("[AdminUser] Default admin already exists");
     return;
   }
 
@@ -53,7 +54,7 @@ AdminUserSchema.statics.ensureDefaultAdmin = async function () {
     isActive: true,
   });
 
-  console.log(
+  logger.debug(
     "[AdminUser] Default admin created:",
     `username='${DEFAULT_USERNAME}' password='${DEFAULT_PASSWORD}'`
   );

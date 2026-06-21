@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import { CustomerHeaderDoc, ManualUploadDocument } from "../../models/agreement/index.js";
+import logger from "../../utils/logger.js";
 
 export async function getSavedFilesList(req, res) {
   try {
@@ -15,7 +16,7 @@ export async function getSavedFilesList(req, res) {
     );
 
     if (mongoose.connection.readyState === 0) {
-      console.log('Database not connected, returning empty list for saved files');
+      logger.debug('Database not connected, returning empty list for saved files');
       return res.json({
         total: 0,
         page,
@@ -108,10 +109,10 @@ export async function getSavedFilesList(req, res) {
     });
 
   } catch (err) {
-    console.error("getSavedFilesList error:", err);
+    logger.error("getSavedFilesList error:", err);
 
     if (err.message.includes('buffering timed out')) {
-      console.log('Database timeout, returning empty list for saved files');
+      logger.debug('Database timeout, returning empty list for saved files');
       return res.json({
         success: true,
         total: 0,
@@ -140,7 +141,7 @@ export async function getSavedFilesGrouped(req, res) {
     const startTime = Date.now();
 
     if (mongoose.connection.readyState === 0) {
-      console.log('Database not connected, returning empty list for grouped files');
+      logger.debug('Database not connected, returning empty list for grouped files');
       return res.json({
         success: true,
         total: 0,
@@ -391,7 +392,7 @@ export async function getSavedFilesGrouped(req, res) {
       }
     });
   } catch (error) {
-    console.error("Error fetching agreements with attached files:", error.message);
+    logger.error("Error fetching agreements with attached files:", error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -434,7 +435,7 @@ export async function getSavedFileDetails(req, res) {
 
     res.json({ success: true, file: transformedFile });
   } catch (err) {
-    console.error("getSavedFileDetails error:", err);
+    logger.error("getSavedFileDetails error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -511,7 +512,7 @@ export async function addFileToAgreement(req, res) {
       addedFiles: insertedDocs.map((doc, i) => ({ id: doc._id, fileName: files[i].fileName, fileSize: files[i].fileSize }))
     });
   } catch (err) {
-    console.error("addFileToAgreement error:", err.message);
+    logger.error("addFileToAgreement error:", err.message);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -542,7 +543,7 @@ export async function downloadAttachedFile(req, res) {
 
     res.send(manualDoc.pdfBuffer);
   } catch (err) {
-    console.error("downloadAttachedFile error:", err);
+    logger.error("downloadAttachedFile error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -574,7 +575,7 @@ export async function getCustomerHeadersHighLevel(req, res) {
       }))
     });
   } catch (err) {
-    console.error("getCustomerHeadersHighLevel error:", err);
+    logger.error("getCustomerHeadersHighLevel error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -593,7 +594,7 @@ export async function getCustomerHeaderViewerById(req, res) {
 
     res.json({ success: true, document: doc });
   } catch (err) {
-    console.error("getCustomerHeaderViewerById error:", err);
+    logger.error("getCustomerHeaderViewerById error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -622,7 +623,7 @@ export async function downloadCustomerHeaderPdf(req, res) {
     });
     res.send(doc.pdf_meta.pdfBuffer);
   } catch (err) {
-    console.error("downloadCustomerHeaderPdf error:", err);
+    logger.error("downloadCustomerHeaderPdf error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 }

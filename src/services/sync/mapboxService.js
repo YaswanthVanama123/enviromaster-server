@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import logger from "../../utils/logger.js";
 
 const MAPBOX_GEOCODING_URL = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
 const MAPBOX_DIRECTIONS_URL = 'https://api.mapbox.com/directions/v5/mapbox/driving';
@@ -105,7 +106,7 @@ export async function getDrivingTimesToMultiple(fromAddress, destinations) {
         distanceMiles: result.distanceMiles
       });
     } catch (error) {
-      console.error(`Error getting driving time to ${dest.name}:`, error.message);
+      logger.error(`Error getting driving time to ${dest.name}:`, error.message);
       results.push({
         name: dest.name,
         address: dest.address,

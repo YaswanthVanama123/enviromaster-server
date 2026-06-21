@@ -6,6 +6,7 @@
 import { AdminSettings, PayrollSnapshot } from "../../models/admin/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { compileRawTex } from "../../services/pdfService.js";
+import logger from "../../utils/logger.js";
 
 /**
  * Calculate the current and previous payroll periods based on settings
@@ -107,7 +108,7 @@ export async function getPayrollPeriods(req, res) {
       }
     });
   } catch (err) {
-    console.error("getPayrollPeriods error:", err);
+    logger.error("getPayrollPeriods error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -327,7 +328,7 @@ export async function getEmployeesPayroll(req, res) {
       employees: resolvedEmployees
     });
   } catch (err) {
-    console.error("getEmployeesPayroll error:", err);
+    logger.error("getEmployeesPayroll error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -427,7 +428,7 @@ export async function getPayrollHistory(req, res) {
       history
     });
   } catch (err) {
-    console.error("getPayrollHistory error:", err);
+    logger.error("getPayrollHistory error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -699,7 +700,7 @@ export async function downloadPayrollPdf(req, res) {
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );
     } catch (snapErr) {
-      console.error("downloadPayrollPdf: failed to record snapshot:", snapErr.message);
+      logger.error("downloadPayrollPdf: failed to record snapshot:", snapErr.message);
     }
 
     const safeLabel = periodLabel.replace(/[^a-z0-9]+/gi, "-");
@@ -709,7 +710,7 @@ export async function downloadPayrollPdf(req, res) {
     res.setHeader("Content-Length", buffer.length);
     return res.send(buffer);
   } catch (err) {
-    console.error("downloadPayrollPdf error:", err);
+    logger.error("downloadPayrollPdf error:", err);
     res.status(500).json({ success: false, error: err.message || "Failed to generate payroll PDF" });
   }
 }

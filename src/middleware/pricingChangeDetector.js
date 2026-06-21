@@ -1,4 +1,5 @@
 import PricingBackupService from '../services/pricingBackupService.js';
+import logger from "../utils/logger.js";
 
 class PricingChangeDetector {
 
@@ -11,7 +12,7 @@ class PricingChangeDetector {
 
       const changeDescription = `PriceFix update by ${adminUsername}: ${changedAreas.join(', ')}`;
 
-      console.log(`[Pricing Backup] Triggering backup before PriceFix update by ${adminUsername}`);
+      logger.debug(`[Pricing Backup] Triggering backup before PriceFix update by ${adminUsername}`);
 
       const backupResult = await PricingBackupService.createBackupIfNeeded({
         trigger: 'pricefix_update',
@@ -23,22 +24,22 @@ class PricingChangeDetector {
 
       if (backupResult.success) {
         if (backupResult.created) {
-          console.log(`[Pricing Backup] Backup created: ${backupResult.backup.changeDayId}`);
+          logger.debug(`[Pricing Backup] Backup created: ${backupResult.backup.changeDayId}`);
           req.pricingBackupCreated = true;
           req.pricingBackupId = backupResult.backup.changeDayId;
         } else if (backupResult.skipped) {
-          console.log(`[Pricing Backup] Backup skipped: ${backupResult.message}`);
+          logger.debug(`[Pricing Backup] Backup skipped: ${backupResult.message}`);
           req.pricingBackupSkipped = true;
         }
       } else {
-        console.error(`[Pricing Backup] Backup failed: ${backupResult.message}`);
+        logger.error(`[Pricing Backup] Backup failed: ${backupResult.message}`);
         req.pricingBackupError = backupResult.error;
       }
 
       next();
 
     } catch (error) {
-      console.error('[Pricing Backup] Middleware error:', error);
+      logger.error('[Pricing Backup] Middleware error:', error);
       req.pricingBackupError = error.message;
       next();
     }
@@ -54,11 +55,11 @@ class PricingChangeDetector {
 
       const changeDescription = `ProductCatalog ${isPartialUpdate ? 'partial' : 'full'} update by ${adminUsername}: ${changedAreas.join(', ')}`;
 
-      console.log(`[Pricing Backup] *** PRODUCT CATALOG UPDATE DETECTED ***`);
-      console.log(`[Pricing Backup] Route: ${req.method} ${req.route.path}`);
-      console.log(`[Pricing Backup] Admin: ${adminUsername}`);
-      console.log(`[Pricing Backup] Request body keys: ${Object.keys(req.body).join(', ')}`);
-      console.log(`[Pricing Backup] Triggering backup before ProductCatalog update by ${adminUsername}`);
+      logger.debug(`[Pricing Backup] *** PRODUCT CATALOG UPDATE DETECTED ***`);
+      logger.debug(`[Pricing Backup] Route: ${req.method} ${req.route.path}`);
+      logger.debug(`[Pricing Backup] Admin: ${adminUsername}`);
+      logger.debug(`[Pricing Backup] Request body keys: ${Object.keys(req.body).join(', ')}`);
+      logger.debug(`[Pricing Backup] Triggering backup before ProductCatalog update by ${adminUsername}`);
 
       const backupResult = await PricingBackupService.createBackupIfNeeded({
         trigger: 'product_catalog_update',
@@ -70,22 +71,22 @@ class PricingChangeDetector {
 
       if (backupResult.success) {
         if (backupResult.created) {
-          console.log(`[Pricing Backup] Backup created: ${backupResult.backup.changeDayId}`);
+          logger.debug(`[Pricing Backup] Backup created: ${backupResult.backup.changeDayId}`);
           req.pricingBackupCreated = true;
           req.pricingBackupId = backupResult.backup.changeDayId;
         } else if (backupResult.skipped) {
-          console.log(`[Pricing Backup] Backup skipped: ${backupResult.message}`);
+          logger.debug(`[Pricing Backup] Backup skipped: ${backupResult.message}`);
           req.pricingBackupSkipped = true;
         }
       } else {
-        console.error(`[Pricing Backup] Backup failed: ${backupResult.message}`);
+        logger.error(`[Pricing Backup] Backup failed: ${backupResult.message}`);
         req.pricingBackupError = backupResult.error;
       }
 
       next();
 
     } catch (error) {
-      console.error('[Pricing Backup] Middleware error:', error);
+      logger.error('[Pricing Backup] Middleware error:', error);
       req.pricingBackupError = error.message;
       next();
     }
@@ -102,7 +103,7 @@ class PricingChangeDetector {
 
       const changeDescription = `ServiceConfig ${isPartialUpdate ? 'partial' : 'full'} update for ${serviceId} by ${adminUsername}`;
 
-      console.log(`[Pricing Backup] Triggering backup before ServiceConfig update by ${adminUsername}`);
+      logger.debug(`[Pricing Backup] Triggering backup before ServiceConfig update by ${adminUsername}`);
 
       const backupResult = await PricingBackupService.createBackupIfNeeded({
         trigger: 'service_config_update',
@@ -114,22 +115,22 @@ class PricingChangeDetector {
 
       if (backupResult.success) {
         if (backupResult.created) {
-          console.log(`[Pricing Backup] Backup created: ${backupResult.backup.changeDayId}`);
+          logger.debug(`[Pricing Backup] Backup created: ${backupResult.backup.changeDayId}`);
           req.pricingBackupCreated = true;
           req.pricingBackupId = backupResult.backup.changeDayId;
         } else if (backupResult.skipped) {
-          console.log(`[Pricing Backup] Backup skipped: ${backupResult.message}`);
+          logger.debug(`[Pricing Backup] Backup skipped: ${backupResult.message}`);
           req.pricingBackupSkipped = true;
         }
       } else {
-        console.error(`[Pricing Backup] Backup failed: ${backupResult.message}`);
+        logger.error(`[Pricing Backup] Backup failed: ${backupResult.message}`);
         req.pricingBackupError = backupResult.error;
       }
 
       next();
 
     } catch (error) {
-      console.error('[Pricing Backup] Middleware error:', error);
+      logger.error('[Pricing Backup] Middleware error:', error);
       req.pricingBackupError = error.message;
       next();
     }

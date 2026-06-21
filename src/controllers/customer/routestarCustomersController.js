@@ -5,6 +5,7 @@
 
 import { RouteStarCustomer } from "../../models/customer/index.js";
 import { scrapeRouteStarCustomers } from "../../services/routestarScraper.js";
+import logger from "../../utils/logger.js";
 
 // Track sync status in memory
 let syncStatus = {
@@ -53,7 +54,7 @@ export const getAllCustomers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching customers:", error);
+    logger.error("Error fetching customers:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch customers",
@@ -84,7 +85,7 @@ export const getCustomerById = async (req, res) => {
       data: customer,
     });
   } catch (error) {
-    console.error("Error fetching customer:", error);
+    logger.error("Error fetching customer:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch customer",
@@ -107,7 +108,7 @@ export const getSyncStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting sync status:", error);
+    logger.error("Error getting sync status:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get sync status",
@@ -146,7 +147,7 @@ export const startSync = async (req, res) => {
     // Run scraper in background (don't await)
     runSyncInBackground();
   } catch (error) {
-    console.error("Error starting sync:", error);
+    logger.error("Error starting sync:", error);
     syncStatus.isRunning = false;
     res.status(500).json({
       success: false,
@@ -160,7 +161,7 @@ export const startSync = async (req, res) => {
  */
 async function runSyncInBackground() {
   try {
-    console.log("🚀 Starting RouteStar customer sync...");
+    logger.debug("🚀 Starting RouteStar customer sync...");
 
     // Progress callback
     const onProgress = (progress, message) => {
@@ -188,9 +189,9 @@ async function runSyncInBackground() {
     syncStatus.progress = 100;
     syncStatus.message = `Synced ${result.customers.length} customers`;
 
-    console.log(`✅ Sync completed: ${result.customers.length} customers`);
+    logger.debug(`✅ Sync completed: ${result.customers.length} customers`);
   } catch (error) {
-    console.error("❌ Sync failed:", error);
+    logger.error("❌ Sync failed:", error);
     syncStatus.isRunning = false;
     syncStatus.lastSyncAt = new Date();
     syncStatus.lastSyncResult = "failed";
@@ -203,7 +204,7 @@ async function runSyncInBackground() {
  * Save scraped customers to database
  */
 async function saveCustomersToDatabase(customers) {
-  console.log(`💾 Saving ${customers.length} customers to database...`);
+  logger.debug(`💾 Saving ${customers.length} customers to database...`);
 
   let saved = 0;
   let updated = 0;
@@ -254,7 +255,7 @@ async function saveCustomersToDatabase(customers) {
         saved++;
       }
     } catch (err) {
-      console.error(`Error saving customer ${customer.name}:`, err.message);
+      logger.error(`Error saving customer ${customer.name}:`, err.message);
       errors++;
     }
 
@@ -264,7 +265,7 @@ async function saveCustomersToDatabase(customers) {
     syncStatus.message = `Saving customers... ${i + 1}/${customers.length}`;
   }
 
-  console.log(`✅ Save complete: ${saved} new, ${updated} updated, ${errors} errors`);
+  logger.debug(`✅ Save complete: ${saved} new, ${updated} updated, ${errors} errors`);
 
   if (errors > 0) {
     syncStatus.lastSyncResult = "partial";
@@ -304,7 +305,7 @@ export const getCustomerStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting customer stats:", error);
+    logger.error("Error getting customer stats:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get customer stats",

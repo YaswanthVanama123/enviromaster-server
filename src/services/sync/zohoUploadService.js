@@ -5,12 +5,13 @@
 
 import mongoose from "mongoose";
 import { CustomerHeaderDoc, VersionPdf } from "#models/agreement/index.js";
+import logger from "../../utils/logger.js";
 
 /**
  * Convert text log content to PDF using remote LaTeX service
  */
 export async function convertTextLogToPdf(textContent, fileName = "log.txt") {
-  console.log(`📄 [TEXT-TO-PDF] Converting log text to PDF: ${fileName}`);
+  logger.debug(`📄 [TEXT-TO-PDF] Converting log text to PDF: ${fileName}`);
 
   const latexContent = `\\documentclass[11pt]{article}
 \\usepackage[utf8]{inputenc}
@@ -36,7 +37,7 @@ ${textContent}
     const PDF_REMOTE_BASE = process.env.PDF_REMOTE_BASE || "http://45.55.208.199:3000";
     const timeoutMs = 30000;
 
-    console.log(`🌐 [TEXT-TO-PDF] Calling remote LaTeX service: ${PDF_REMOTE_BASE}`);
+    logger.debug(`🌐 [TEXT-TO-PDF] Calling remote LaTeX service: ${PDF_REMOTE_BASE}`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -55,16 +56,16 @@ ${textContent}
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      console.error(`❌ [TEXT-TO-PDF] Remote service error (${response.status}): ${errorText}`);
+      logger.error(`❌ [TEXT-TO-PDF] Remote service error (${response.status}): ${errorText}`);
       throw new Error(`Remote LaTeX service failed: ${response.status} ${errorText}`);
     }
 
     const pdfBuffer = Buffer.from(await response.arrayBuffer());
-    console.log(`✅ [TEXT-TO-PDF] Generated PDF: ${pdfBuffer.length} bytes`);
+    logger.debug(`✅ [TEXT-TO-PDF] Generated PDF: ${pdfBuffer.length} bytes`);
 
     return pdfBuffer;
   } catch (error) {
-    console.error(`❌ [TEXT-TO-PDF] Failed to convert log to PDF: ${error.message}`);
+    logger.error(`❌ [TEXT-TO-PDF] Failed to convert log to PDF: ${error.message}`);
     throw error;
   }
 }
@@ -77,7 +78,7 @@ export async function getPdfForAgreement(agreementId, options = {}) {
   const cachedAgreement = options?.agreementDoc || null;
 
   const versionIdDisplay = requestedVersionId ? ` (versionId: ${requestedVersionId})` : "";
-  console.log(`📎 [PDF-LOOKUP] Searching for PDF data in VersionPdf collection for agreement: ${agreementId}${versionIdDisplay}`);
+  logger.debug(`📎 [PDF-LOOKUP] Searching for PDF data in VersionPdf collection for agreement: ${agreementId}${versionIdDisplay}`);
 
   let versionDoc = null;
 
@@ -90,12 +91,12 @@ export async function getPdfForAgreement(agreementId, options = {}) {
       }).select("_id versionNumber pdf_meta fileName createdAt");
 
       if (versionDoc) {
-        console.log(`📎 [PDF-LOOKUP] Found requested VersionPdf v${versionDoc.versionNumber} (ID: ${versionDoc._id})`);
+        logger.debug(`📎 [PDF-LOOKUP] Found requested VersionPdf v${versionDoc.versionNumber} (ID: ${versionDoc._id})`);
       } else {
-        console.warn(`⚠️ [PDF-LOOKUP] Requested VersionPdf not found for agreement: ${agreementId} (id: ${requestedVersionId})`);
+        logger.warn(`⚠️ [PDF-LOOKUP] Requested VersionPdf not found for agreement: ${agreementId} (id: ${requestedVersionId})`);
       }
     } else {
-      console.warn(`⚠️ [PDF-LOOKUP] Invalid requested versionId format: ${requestedVersionId}`);
+      logger.warn(`⚠️ [PDF-LOOKUP] Invalid requested versionId format: ${requestedVersionId}`);
     }
   }
 
@@ -108,7 +109,7 @@ export async function getPdfForAgreement(agreementId, options = {}) {
       .select("_id versionNumber pdf_meta fileName createdAt");
 
     if (!versionDoc) {
-      console.error(`❌ [PDF-LOOKUP] No VersionPdf documents found for agreement: ${agreementId}`);
+      logger.error(`❌ [PDF-LOOKUP] No VersionPdf documents found for agreement: ${agreementId}`);
 
       const customerDoc = cachedAgreement ||
         (await CustomerHeaderDoc.findById(agreementId).select("pdf_meta fileName currentVersionNumber"));
@@ -119,7 +120,7 @@ export async function getPdfForAgreement(agreementId, options = {}) {
           : Buffer.from(customerDoc.pdf_meta.pdfBuffer);
         const resolvedFileName = customerDoc.fileName || customerDoc.pdf_meta.fileName || `agreement_${customerDoc.currentVersionNumber || 1}.pdf`;
 
-        console.log(`📄 [PDF-LOOKUP] Falling back to CustomerHeaderDoc PDF: ${resolvedFileName} (${fallbackBuffer.length} bytes)`);
+        logger.debug(`📄 [PDF-LOOKUP] Falling back to CustomerHeaderDoc PDF: ${resolvedFileName} (${fallbackBuffer.length} bytes)`);
 
         return {
           pdfBuffer: fallbackBuffer,
@@ -152,11 +153,11 @@ export async function getPdfForAgreement(agreementId, options = {}) {
       };
     }
 
-    console.log(`📎 [PDF-LOOKUP] Found VersionPdf v${versionDoc.versionNumber} (ID: ${versionDoc._id})`);
+    logger.debug(`📎 [PDF-LOOKUP] Found VersionPdf v${versionDoc.versionNumber} (ID: ${versionDoc._id})`);
   }
 
   if (!versionDoc.pdf_meta?.pdfBuffer) {
-    console.error(`❌ [PDF-LOOKUP] VersionPdf v${versionDoc.versionNumber} has no pdfBuffer field`);
+    logger.error(`❌ [PDF-LOOKUP] VersionPdf v${versionDoc.versionNumber} has no pdfBuffer field`);
 
     return {
       pdfBuffer: null,
@@ -178,7 +179,7 @@ export async function getPdfForAgreement(agreementId, options = {}) {
   const actualSize = mongoBuffer.length || mongoBuffer.buffer?.length || 0;
 
   if (actualSize === 0) {
-    console.error(`❌ [PDF-LOOKUP] VersionPdf v${versionDoc.versionNumber} has empty pdfBuffer (0 bytes)`);
+    logger.error(`❌ [PDF-LOOKUP] VersionPdf v${versionDoc.versionNumber} has empty pdfBuffer (0 bytes)`);
 
     const versionCount = await VersionPdf.countDocuments({
       agreementId: agreementId,
@@ -225,7 +226,7 @@ export async function getPdfForAgreement(agreementId, options = {}) {
   }
 
   const sourceLabel = requestedVersionId ? "VersionPdf (requested)" : "VersionPdf";
-  console.log(`📄 [PDF-LOOKUP] Found valid PDF in ${sourceLabel} v${versionDoc.versionNumber}: ${properBuffer.length} bytes`);
+  logger.debug(`📄 [PDF-LOOKUP] Found valid PDF in ${sourceLabel} v${versionDoc.versionNumber}: ${properBuffer.length} bytes`);
 
   return {
     pdfBuffer: properBuffer,

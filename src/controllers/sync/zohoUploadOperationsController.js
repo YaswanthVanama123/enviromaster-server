@@ -8,6 +8,7 @@ import { ZohoMapping } from "../../models/sync/index.js";
 import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
 import { recalcCommissionForAgreement, recalcCommissionForAgreementById } from "../../services/commissionAutomation.js";
 import { compileCustomerHeader } from "../../services/pdfService.js";
+import logger from "../../utils/logger.js";
 import {
   createBiginDeal,
   createBiginNote,
@@ -36,10 +37,10 @@ export async function firstTimeUpload(req, res) {
       skipFileUpload = false,
     } = req.body;
 
-    console.log(`🚀 Starting first-time upload for agreement: ${agreementId}`);
+    logger.debug(`🚀 Starting first-time upload for agreement: ${agreementId}`);
 
     if (!mongoose.Types.ObjectId.isValid(agreementId)) {
-      console.error(`❌ Invalid ObjectId format: ${agreementId}`);
+      logger.error(`❌ Invalid ObjectId format: ${agreementId}`);
       return res.status(400).json({
         success: false,
         error: "Invalid agreement ID format",
@@ -53,7 +54,7 @@ export async function firstTimeUpload(req, res) {
       });
     }
 
-    console.log(`🔍 Validating pipeline and stage values...`);
+    logger.debug(`🔍 Validating pipeline and stage values...`);
     const validationResult = await validatePipelineStage(pipelineName, stage);
 
     let validatedPipeline = pipelineName;
@@ -62,19 +63,19 @@ export async function firstTimeUpload(req, res) {
     if (validationResult.success && validationResult.valid) {
       validatedPipeline = validationResult.correctedPipeline;
       validatedStage = validationResult.correctedStage;
-      console.log(`✅ Pipeline/stage validation successful: "${validatedPipeline}" / "${validatedStage}"`);
+      logger.debug(`✅ Pipeline/stage validation successful: "${validatedPipeline}" / "${validatedStage}"`);
     } else {
-      console.warn(`⚠️ Pipeline/stage validation failed, using fallback values:`, validationResult.error);
+      logger.warn(`⚠️ Pipeline/stage validation failed, using fallback values:`, validationResult.error);
       validatedPipeline = validationResult.correctedPipeline || "Sales Pipeline";
       validatedStage = validationResult.correctedStage || "Proposal/Price Quote";
-      console.log(`🔧 Using validated fallback: "${validatedPipeline}" / "${validatedStage}"`);
+      logger.debug(`🔧 Using validated fallback: "${validatedPipeline}" / "${validatedStage}"`);
     }
 
-    console.log(`🔍 Looking up CustomerHeaderDoc with ID: ${agreementId}`);
+    logger.debug(`🔍 Looking up CustomerHeaderDoc with ID: ${agreementId}`);
     const agreement = await CustomerHeaderDoc.findById(agreementId);
 
     if (!agreement) {
-      console.error(`❌ CustomerHeaderDoc not found with ID: ${agreementId}`);
+      logger.error(`❌ CustomerHeaderDoc not found with ID: ${agreementId}`);
       return res.status(404).json({
         success: false,
         error: "Agreement not found",
@@ -82,7 +83,7 @@ export async function firstTimeUpload(req, res) {
       });
     }
 
-    console.log(`✅ Found CustomerHeaderDoc: ${agreement._id} (${agreement.payload?.headerTitle || "No title"})`);
+    logger.debug(`✅ Found CustomerHeaderDoc: ${agreement._id} (${agreement.payload?.headerTitle || "No title"})`);
 
     // Get version document for PDF compilation
     let versionDoc = await VersionPdf.findOne({
@@ -100,35 +101,35 @@ export async function firstTimeUpload(req, res) {
       payloadForCompilation = versionDoc.payloadSnapshot;
       versionNumber = versionDoc.versionNumber;
       fileName = versionDoc.fileName;
-      console.log(`📄 [ZOHO-FIRST-TIME] Using VersionPdf v${versionNumber} payloadSnapshot`);
+      logger.debug(`📄 [ZOHO-FIRST-TIME] Using VersionPdf v${versionNumber} payloadSnapshot`);
     } else {
       payloadForCompilation = agreement.payload;
       versionNumber = agreement.currentVersionNumber || 1;
       fileName = agreement.fileName;
-      console.log(`📄 [ZOHO-FIRST-TIME] Using CustomerHeaderDoc payload (no version found)`);
+      logger.debug(`📄 [ZOHO-FIRST-TIME] Using CustomerHeaderDoc payload (no version found)`);
     }
 
     if (!payloadForCompilation) {
-      console.error(`❌ Agreement ${agreementId} has no payload for PDF compilation`);
+      logger.error(`❌ Agreement ${agreementId} has no payload for PDF compilation`);
       return res.status(400).json({
         success: false,
         error: "Agreement has no payload data for PDF compilation",
       });
     }
 
-    console.log(`🔄 [ZOHO-FIRST-TIME] Recompiling PDF on-demand for version ${versionNumber}...`);
+    logger.debug(`🔄 [ZOHO-FIRST-TIME] Recompiling PDF on-demand for version ${versionNumber}...`);
 
     const compiledPdf = await compileCustomerHeader(payloadForCompilation, { watermark: false });
 
     if (!compiledPdf || !compiledPdf.buffer) {
-      console.error(`❌ Failed to compile PDF for version ${versionNumber}`);
+      logger.error(`❌ Failed to compile PDF for version ${versionNumber}`);
       return res.status(500).json({
         success: false,
         error: "Failed to compile PDF for upload",
       });
     }
 
-    console.log(`✅ [ZOHO-FIRST-TIME] PDF compiled successfully: ${compiledPdf.buffer.length} bytes`);
+    logger.debug(`✅ [ZOHO-FIRST-TIME] PDF compiled successfully: ${compiledPdf.buffer.length} bytes`);
 
     const pdfData = {
       pdfBuffer: compiledPdf.buffer,
@@ -144,9 +145,9 @@ export async function firstTimeUpload(req, res) {
     const existingMapping = await ZohoMapping.findByAgreementId(agreementId);
 
     if (existingMapping && existingMapping.lastUploadStatus === "failed") {
-      console.log(`🔄 [V2-CLEAN-RETRY] Found failed mapping - deleting to allow fresh retry`);
+      logger.debug(`🔄 [V2-CLEAN-RETRY] Found failed mapping - deleting to allow fresh retry`);
       await ZohoMapping.findByIdAndDelete(existingMapping._id);
-      console.log(`✅ [V2-CLEAN-RETRY] Cleaned up failed mapping ${existingMapping._id}`);
+      logger.debug(`✅ [V2-CLEAN-RETRY] Cleaned up failed mapping ${existingMapping._id}`);
     } else if (existingMapping) {
       return res.status(400).json({
         success: false,
@@ -155,20 +156,20 @@ export async function firstTimeUpload(req, res) {
     }
 
     const dealAmount = calculateDealAmount(agreement);
-    console.log(`💼 Creating deal with amount: $${dealAmount}`);
+    logger.debug(`💼 Creating deal with amount: $${dealAmount}`);
 
     // Get or create contact
     let contactId = null;
     try {
-      console.log(`👤 [CONTACT-LOOKUP] Resolving contact for company: ${companyId}`);
+      logger.debug(`👤 [CONTACT-LOOKUP] Resolving contact for company: ${companyId}`);
       const contactResult = await getOrCreateContactForDeal(companyId, companyName || "Company");
 
       if (contactResult.success && contactResult.contact) {
         contactId = contactResult.contact.id;
-        console.log(`✅ [CONTACT-LOOKUP] Found/created contact: ${contactResult.contact.name} (${contactId})`);
+        logger.debug(`✅ [CONTACT-LOOKUP] Found/created contact: ${contactResult.contact.name} (${contactId})`);
       }
     } catch (contactError) {
-      console.error(`❌ [CONTACT-LOOKUP] Exception: ${contactError.message}`);
+      logger.error(`❌ [CONTACT-LOOKUP] Exception: ${contactError.message}`);
     }
 
     // Create deal
@@ -184,7 +185,7 @@ export async function firstTimeUpload(req, res) {
     });
 
     if (!dealResult.success) {
-      console.error(`❌ Deal creation failed:`, dealResult.error);
+      logger.error(`❌ Deal creation failed:`, dealResult.error);
       return res.status(500).json({
         success: false,
         error: `Failed to create deal: ${dealResult.error?.message || "Unknown error"}`,
@@ -195,7 +196,7 @@ export async function firstTimeUpload(req, res) {
     }
 
     const deal = dealResult.deal;
-    console.log(`✅ Deal created: ${deal.id}`);
+    logger.debug(`✅ Deal created: ${deal.id}`);
 
     // Create note
     const noteResult = await createBiginNote(deal.id, {
@@ -204,7 +205,7 @@ export async function firstTimeUpload(req, res) {
     });
 
     if (!noteResult.success) {
-      console.error(`❌ Failed to create note, but deal exists: ${deal.id}`);
+      logger.error(`❌ Failed to create note, but deal exists: ${deal.id}`);
       return res.status(500).json({
         success: false,
         error: `Deal created but failed to create note: ${noteResult.error?.message}`,
@@ -216,7 +217,7 @@ export async function firstTimeUpload(req, res) {
     }
 
     const note = noteResult.note;
-    console.log(`✅ Note created: ${note.id}`);
+    logger.debug(`✅ Note created: ${note.id}`);
 
     // Upload file
     let file = null;
@@ -231,7 +232,7 @@ export async function firstTimeUpload(req, res) {
       const fileResult = await uploadBiginFile(deal.id, pdfBuffer, finalVersionFileName);
 
       if (!fileResult.success) {
-        console.error(`❌ Failed to upload file, but deal and note exist: ${deal.id}, ${note.id}`);
+        logger.error(`❌ Failed to upload file, but deal and note exist: ${deal.id}, ${note.id}`);
         return res.status(500).json({
           success: false,
           error: `Deal and note created but failed to upload file: ${fileResult.error?.message}`,
@@ -244,7 +245,7 @@ export async function firstTimeUpload(req, res) {
       }
 
       file = fileResult.file;
-      console.log(`✅ File uploaded: ${file.id}`);
+      logger.debug(`✅ File uploaded: ${file.id}`);
     }
 
     // Create mapping
@@ -278,7 +279,7 @@ export async function firstTimeUpload(req, res) {
 
     await mapping.save();
 
-    console.log(`✅ First-time upload completed successfully!`);
+    logger.debug(`✅ First-time upload completed successfully!`);
 
     res.json({
       success: true,
@@ -308,13 +309,13 @@ export async function firstTimeUpload(req, res) {
     Promise.resolve()
       .then(() => recalcCommissionForAgreement(agreementId, companyId))
       .then((r) => {
-        console.log(`[COMMISSION-AUTO] connect recalc result for ${agreementId}:`, JSON.stringify(r));
+        logger.debug(`[COMMISSION-AUTO] connect recalc result for ${agreementId}:`, JSON.stringify(r));
       })
       .catch((err) => {
-        console.error(`[COMMISSION-AUTO] Recalc after Bigin connect failed for ${agreementId}:`, err?.message);
+        logger.error(`[COMMISSION-AUTO] Recalc after Bigin connect failed for ${agreementId}:`, err?.message);
       });
   } catch (error) {
-    console.error("❌ First-time upload failed:", error.message);
+    logger.error("❌ First-time upload failed:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -337,7 +338,7 @@ export async function updateUpload(req, res) {
       skipFileUpload = false,
     } = req.body;
 
-    console.log(`🔄 Starting update upload for agreement: ${agreementId}`);
+    logger.debug(`🔄 Starting update upload for agreement: ${agreementId}`);
 
     if (!noteText || !noteText.trim()) {
       return res.status(400).json({
@@ -358,7 +359,7 @@ export async function updateUpload(req, res) {
     let versionDoc = null;
 
     if (!skipFileUpload) {
-      console.log(`🔄 [ZOHO-UPLOAD] Getting version document for on-demand PDF compilation...`);
+      logger.debug(`🔄 [ZOHO-UPLOAD] Getting version document for on-demand PDF compilation...`);
 
       if (versionId) {
         versionDoc = await VersionPdf.findOne({
@@ -458,7 +459,7 @@ export async function updateUpload(req, res) {
       }
 
       note = noteResult.note;
-      console.log(`✅ Note created: ${note.id}`);
+      logger.debug(`✅ Note created: ${note.id}`);
     }
 
     // Upload file
@@ -484,7 +485,7 @@ export async function updateUpload(req, res) {
       }
 
       file = fileResult.file;
-      console.log(`✅ File uploaded: ${file.id}`);
+      logger.debug(`✅ File uploaded: ${file.id}`);
     }
 
     // Update mapping
@@ -499,7 +500,7 @@ export async function updateUpload(req, res) {
       await mapping.save();
     }
 
-    console.log(`✅ Update upload completed successfully!`);
+    logger.debug(`✅ Update upload completed successfully!`);
 
     res.json({
       success: true,
@@ -521,13 +522,13 @@ export async function updateUpload(req, res) {
     Promise.resolve()
       .then(() => recalcCommissionForAgreementById(agreementId))
       .then((r) => {
-        console.log(`[COMMISSION-AUTO] update-upload recalc result for ${agreementId}:`, JSON.stringify(r));
+        logger.debug(`[COMMISSION-AUTO] update-upload recalc result for ${agreementId}:`, JSON.stringify(r));
       })
       .catch((err) => {
-        console.error(`[COMMISSION-AUTO] Recalc after update-upload failed for ${agreementId}:`, err?.message);
+        logger.error(`[COMMISSION-AUTO] Recalc after update-upload failed for ${agreementId}:`, err?.message);
       });
   } catch (error) {
-    console.error("❌ Update upload failed:", error.message);
+    logger.error("❌ Update upload failed:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -543,7 +544,7 @@ export async function addAttachedFileToDeal(req, res) {
     const { fileId } = req.params;
     const { dealId, noteText, skipNoteCreation = false } = req.body;
 
-    console.log(`📎 Adding attached file ${fileId} to deal ${dealId}`);
+    logger.debug(`📎 Adding attached file ${fileId} to deal ${dealId}`);
 
     if (!fileId || !dealId) {
       return res.status(400).json({
@@ -584,7 +585,7 @@ export async function addAttachedFileToDeal(req, res) {
       });
     }
 
-    console.log(`✅ File uploaded to Zoho: ${fileResult.file.id}`);
+    logger.debug(`✅ File uploaded to Zoho: ${fileResult.file.id}`);
 
     // Create note if requested
     let note = null;
@@ -596,7 +597,7 @@ export async function addAttachedFileToDeal(req, res) {
 
       if (noteResult.success) {
         note = noteResult.note;
-        console.log(`✅ Note created: ${note.id}`);
+        logger.debug(`✅ Note created: ${note.id}`);
       }
     }
 
@@ -612,7 +613,7 @@ export async function addAttachedFileToDeal(req, res) {
       },
     });
   } catch (error) {
-    console.error("❌ Failed to add attached file to deal:", error.message);
+    logger.error("❌ Failed to add attached file to deal:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,

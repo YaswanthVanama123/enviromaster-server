@@ -1,4 +1,5 @@
 import { PriceFix } from "../../models/product/index.js";
+import logger from "../../utils/logger.js";
 
 export const createPriceFix = async (req, res) => {
   try {
@@ -29,7 +30,7 @@ export const createPriceFix = async (req, res) => {
 
     return res.status(201).json(doc);
   } catch (err) {
-    console.error("createPriceFix error:", err);
+    logger.error("createPriceFix error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -39,7 +40,7 @@ export const getAllPriceFixes = async (req, res) => {
     const docs = await PriceFix.find().lean();
     return res.status(200).json(docs);
   } catch (err) {
-    console.error("getAllPriceFixes error:", err);
+    logger.error("getAllPriceFixes error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -55,7 +56,7 @@ export const getPriceFixById = async (req, res) => {
 
     return res.status(200).json(doc);
   } catch (err) {
-    console.error("getPriceFixById error:", err);
+    logger.error("getPriceFixById error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -80,7 +81,7 @@ export const updatePriceFix = async (req, res) => {
 
     return res.status(200).json(doc);
   } catch (err) {
-    console.error("updatePriceFix error:", err);
+    logger.error("updatePriceFix error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };

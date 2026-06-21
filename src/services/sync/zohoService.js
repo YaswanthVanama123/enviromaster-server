@@ -1,5 +1,6 @@
 import FormData from "form-data";
 import axios from "axios";
+import logger from "../../utils/logger.js";
 
 const ZOHO_BIGIN_API_URL =
   process.env.ZOHO_BIGIN_API_URL || "https://www.zohoapis.in/bigin/v2";
@@ -33,7 +34,7 @@ const scopes = [
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("redirect_uri", redirectUri);
 
-  console.log("🔗 Generated OAuth URL:", authUrl.toString());
+  logger.debug("🔗 Generated OAuth URL:", authUrl.toString());
   return authUrl.toString();
 }
 
@@ -43,10 +44,10 @@ export async function handleZohoOAuthCallback(authorizationCode, location = "in"
     const clientSecret = process.env.ZOHO_CLIENT_SECRET;
     const redirectUri = process.env.ZOHO_REDIRECT_URI;
 
-    console.log("🔒 [TOKEN-CREATE] Step 1 - environment values");
-    console.log(`  ƒ\"o Client ID present: ${!!clientId}`);
-    console.log(`  ƒ\"o Client Secret present: ${!!clientSecret}`);
-    console.log(`  ƒ\"o Redirect URI: ${redirectUri}`);
+    logger.debug("🔒 [TOKEN-CREATE] Step 1 - environment values");
+    logger.debug(`  ƒ\"o Client ID present: ${!!clientId}`);
+    logger.debug(`  ƒ\"o Client Secret present: ${!!clientSecret}`);
+    logger.debug(`  ƒ\"o Redirect URI: ${redirectUri}`);
 
     if (!clientId || !clientSecret) {
       throw new Error("ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET environment variables are required");
@@ -59,14 +60,14 @@ export async function handleZohoOAuthCallback(authorizationCode, location = "in"
     };
     const accountsUrl = accountsUrlMap[location] || "https://accounts.zoho.com";
 
-    console.log("🔄 Step 2 - exchanging authorization code for tokens...");
-    console.log("  ├ Accounts URL:", accountsUrl);
-    console.log("  ├ Client ID:", clientId);
-    console.log("  ├ Redirect URI:", redirectUri);
-    console.log("  └ Auth code:", authorizationCode.substring(0, 20) + "...");
-    console.log("  └ Location hint:", location);
-    console.log('  └ Token endpoint:', `${accountsUrl}/oauth/v2/token`);
-    console.log('  └ Request params:', {
+    logger.debug("🔄 Step 2 - exchanging authorization code for tokens...");
+    logger.debug("  ├ Accounts URL:", accountsUrl);
+    logger.debug("  ├ Client ID:", clientId);
+    logger.debug("  ├ Redirect URI:", redirectUri);
+    logger.debug("  └ Auth code:", authorizationCode.substring(0, 20) + "...");
+    logger.debug("  └ Location hint:", location);
+    logger.debug('  └ Token endpoint:', `${accountsUrl}/oauth/v2/token`);
+    logger.debug('  └ Request params:', {
       grant_type: "authorization_code",
       code: authorizationCode ? "present" : "missing",
       redirect_uri: redirectUri
@@ -91,37 +92,37 @@ export async function handleZohoOAuthCallback(authorizationCode, location = "in"
 
     const { access_token, refresh_token, expires_in } = response.data;
 
-    console.log("🔁 Step 3 - token response received");
-    console.log("  ├ Response status:", response.status);
-    console.log("  ├ Access token length check:", access_token ? access_token.length : 'missing');
-    console.log("  ├ Refresh token length check:", refresh_token ? refresh_token.length : 'missing');
+    logger.debug("🔁 Step 3 - token response received");
+    logger.debug("  ├ Response status:", response.status);
+    logger.debug("  ├ Access token length check:", access_token ? access_token.length : 'missing');
+    logger.debug("  ├ Refresh token length check:", refresh_token ? refresh_token.length : 'missing');
 
     if (!access_token || !refresh_token) {
-      console.error("❌ Invalid token response:", response.data);
+      logger.error("❌ Invalid token response:", response.data);
       throw new Error("Failed to obtain valid tokens from Zoho");
     }
 
-    console.log("✅ Tokens obtained successfully!");
-    console.log("  ├ Access token length:", access_token.length);
-    console.log("  ├ Refresh token length:", refresh_token.length);
-    console.log("  └ Expires in:", expires_in, "seconds");
+    logger.debug("✅ Tokens obtained successfully!");
+    logger.debug("  ├ Access token length:", access_token.length);
+    logger.debug("  ├ Refresh token length:", refresh_token.length);
+    logger.debug("  └ Expires in:", expires_in, "seconds");
 
-    console.log("\n" + "=".repeat(80));
-    console.log("📋 COPY THESE TOKENS TO YOUR .ENV FILE:");
-    console.log("=".repeat(80));
-    console.log(`ZOHO_ACCESS_TOKEN=${access_token}`);
-    console.log(`ZOHO_REFRESH_TOKEN=${refresh_token}`);
-    console.log(`ZOHO_ACCOUNTS_BASE=${accountsUrl}`);
-    console.log("=".repeat(80));
-    console.log("💡 Add these to your .env file for automatic token refresh!");
-    console.log("=".repeat(80) + "\n");
+    logger.debug("\n" + "=".repeat(80));
+    logger.debug("📋 COPY THESE TOKENS TO YOUR .ENV FILE:");
+    logger.debug("=".repeat(80));
+    logger.debug(`ZOHO_ACCESS_TOKEN=${access_token}`);
+    logger.debug(`ZOHO_REFRESH_TOKEN=${refresh_token}`);
+    logger.debug(`ZOHO_ACCOUNTS_BASE=${accountsUrl}`);
+    logger.debug("=".repeat(80));
+    logger.debug("💡 Add these to your .env file for automatic token refresh!");
+    logger.debug("=".repeat(80) + "\n");
     process.env.ZOHO_ACCESS_TOKEN = access_token;
     process.env.ZOHO_REFRESH_TOKEN = refresh_token;
     process.env.ZOHO_ACCOUNTS_BASE = accountsUrl;
 
-    console.log("✅ OAuth tokens obtained successfully!");
-    console.log("⚠️  IMPORTANT: Copy the refresh token above to your .env file manually");
-    console.log("⚠️  Do NOT restart the server until you've updated .env with the new tokens");
+    logger.debug("✅ OAuth tokens obtained successfully!");
+    logger.debug("⚠️  IMPORTANT: Copy the refresh token above to your .env file manually");
+    logger.debug("⚠️  Do NOT restart the server until you've updated .env with the new tokens");
 
     return {
       success: true,
@@ -132,7 +133,7 @@ export async function handleZohoOAuthCallback(authorizationCode, location = "in"
     };
 
   } catch (error) {
-    console.error("❌ OAuth token exchange failed:", error.response?.data || error.message);
+    logger.error("❌ OAuth token exchange failed:", error.response?.data || error.message);
     return {
       success: false,
       error: error.response?.data?.error_description || error.message
@@ -145,7 +146,7 @@ export async function testZohoAccess() {
     const accessToken = await getZohoAccessToken();
     const baseUrl = process.env.ZOHO_BIGIN_API_URL || "https://www.zohoapis.in/bigin/v2";
 
-    console.log("🧪 Testing Zoho access with user info...");
+    logger.debug("🧪 Testing Zoho access with user info...");
 
     const testEndpoints = [
       `${baseUrl}/users/me`,
@@ -156,18 +157,18 @@ export async function testZohoAccess() {
 
     for (const endpoint of testEndpoints) {
       try {
-        console.log(`🧪 Testing: ${endpoint}`);
+        logger.debug(`🧪 Testing: ${endpoint}`);
         const response = await axios.get(endpoint, {
           headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
         });
-        console.log(`✅ Access granted to: ${endpoint}`, response.status);
+        logger.debug(`✅ Access granted to: ${endpoint}`, response.status);
       } catch (testError) {
-        console.log(`❌ Access denied to: ${endpoint}`, testError.response?.status, testError.response?.data?.code);
+        logger.debug(`❌ Access denied to: ${endpoint}`, testError.response?.status, testError.response?.data?.code);
       }
     }
 
   } catch (error) {
-    console.error("❌ Token test failed:", error.message);
+    logger.error("❌ Token test failed:", error.message);
   }
 }
 
@@ -175,7 +176,7 @@ async function detectZohoBiginBaseUrl() {
   try {
     const accessToken = await getZohoAccessToken();
 
-    console.log("🔍 [AUTO-DETECT] Testing Zoho endpoints to find the correct data center...");
+    logger.debug("🔍 [AUTO-DETECT] Testing Zoho endpoints to find the correct data center...");
 
     const accountsUrl = process.env.ZOHO_ACCOUNTS_BASE || ZOHO_ACCOUNTS_URL;
     let primaryDataCenter = 'com';
@@ -188,7 +189,7 @@ async function detectZohoBiginBaseUrl() {
       primaryDataCenter = 'com.au';
     }
 
-    console.log(`🔍 [AUTO-DETECT] Detected data center: ${primaryDataCenter} (from accounts URL: ${accountsUrl})`);
+    logger.debug(`🔍 [AUTO-DETECT] Detected data center: ${primaryDataCenter} (from accounts URL: ${accountsUrl})`);
 
     const dataCenters = [primaryDataCenter, 'com', 'in', 'eu', 'com.au'].filter((dc, index, arr) => arr.indexOf(dc) === index);
 
@@ -204,7 +205,7 @@ async function detectZohoBiginBaseUrl() {
       testEndpoints.push(`https://www.${domain}/bigin/v2/Deals`);
     }
 
-    console.log(`🔍 [AUTO-DETECT] Testing ${testEndpoints.length} endpoints, prioritizing ${primaryDataCenter} data center...`);
+    logger.debug(`🔍 [AUTO-DETECT] Testing ${testEndpoints.length} endpoints, prioritizing ${primaryDataCenter} data center...`);
 
     for (const endpoint of testEndpoints) {
       try {
@@ -218,21 +219,21 @@ async function detectZohoBiginBaseUrl() {
 
         if (response.status === 200 && response.data) {
           const baseUrl = endpoint.replace('/Deals', '');
-          console.log(`✅ [AUTO-DETECT] Found working endpoint: ${baseUrl}`);
-          console.log(`📊 [AUTO-DETECT] Deals info:`, response.data?.data?.length || 'Retrieved successfully');
+          logger.debug(`✅ [AUTO-DETECT] Found working endpoint: ${baseUrl}`);
+          logger.debug(`📊 [AUTO-DETECT] Deals info:`, response.data?.data?.length || 'Retrieved successfully');
 
           process.env.ZOHO_BIGIN_DETECTED_BASE = baseUrl;
           return baseUrl;
         }
       } catch (error) {
-        console.log(`⚠️ [AUTO-DETECT] ${endpoint}: ${error.response?.status || error.code}`);
+        logger.debug(`⚠️ [AUTO-DETECT] ${endpoint}: ${error.response?.status || error.code}`);
       }
     }
 
-    console.log("❌ [AUTO-DETECT] No working Zoho Bigin endpoint found");
+    logger.debug("❌ [AUTO-DETECT] No working Zoho Bigin endpoint found");
     return null;
   } catch (error) {
-    console.error("❌ [AUTO-DETECT] Failed to detect Zoho base URL:", error.message);
+    logger.error("❌ [AUTO-DETECT] Failed to detect Zoho base URL:", error.message);
     return null;
   }
 }
@@ -241,17 +242,17 @@ export async function getZohoDeals() {
   try {
     const accessToken = await getZohoAccessToken();
 
-    console.log("📋 Fetching deals from Zoho Bigin...");
+    logger.debug("📋 Fetching deals from Zoho Bigin...");
 
     let baseUrlToTry = process.env.ZOHO_BIGIN_DETECTED_BASE || process.env.ZOHO_BIGIN_WORKING_URL;
 
     if (!baseUrlToTry) {
-      console.log("🔍 No cached endpoint, running auto-detection...");
+      logger.debug("🔍 No cached endpoint, running auto-detection...");
       baseUrlToTry = await detectZohoBiginBaseUrl();
     }
 
     if (baseUrlToTry) {
-      console.log(`🎯 Testing detected endpoint: ${baseUrlToTry}`);
+      logger.debug(`🎯 Testing detected endpoint: ${baseUrlToTry}`);
 
       const dealEndpoints = ["deals", "Deals", "Potentials", "potentials"];
 
@@ -259,7 +260,7 @@ export async function getZohoDeals() {
         const fullUrl = `${baseUrlToTry}/${dealEndpoint}`;
 
         try {
-          console.log(`🔍 Testing deals endpoint: ${fullUrl}`);
+          logger.debug(`🔍 Testing deals endpoint: ${fullUrl}`);
           const response = await axios.get(fullUrl, {
             headers: {
               Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -271,8 +272,8 @@ export async function getZohoDeals() {
           const contentType = response.headers['content-type'] || '';
           if (contentType.includes('application/json')) {
             const deals = response.data?.data || [];
-            console.log(`✅ SUCCESS with detected endpoint: ${fullUrl}`);
-            console.log(`📋 Found ${deals.length} deals`);
+            logger.debug(`✅ SUCCESS with detected endpoint: ${fullUrl}`);
+            logger.debug(`📋 Found ${deals.length} deals`);
 
             process.env.ZOHO_BIGIN_WORKING_URL = baseUrlToTry;
             process.env.ZOHO_BIGIN_DEALS_ENDPOINT = dealEndpoint;
@@ -280,7 +281,7 @@ export async function getZohoDeals() {
             return deals;
           }
         } catch (error) {
-          console.log(`❌ Detected endpoint failed ${fullUrl}: ${error.response?.status || error.code}`);
+          logger.debug(`❌ Detected endpoint failed ${fullUrl}: ${error.response?.status || error.code}`);
         }
       }
     }
@@ -308,13 +309,13 @@ export async function getZohoDeals() {
     ];
 
     for (const baseUrl of possibleBaseUrls) {
-      console.log(`🌍 Trying base URL: ${baseUrl}`);
+      logger.debug(`🌍 Trying base URL: ${baseUrl}`);
 
       for (const dealEndpoint of dealEndpoints) {
         const fullUrl = `${baseUrl}/${dealEndpoint}`;
 
         try {
-          console.log(`🔍 Testing API endpoint: ${fullUrl}`);
+          logger.debug(`🔍 Testing API endpoint: ${fullUrl}`);
           const response = await axios.get(fullUrl, {
             headers: {
               Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -325,35 +326,35 @@ export async function getZohoDeals() {
 
           const contentType = response.headers['content-type'] || '';
           if (!contentType.includes('application/json')) {
-            console.log(`❌ Non-JSON response from ${fullUrl}: ${contentType}`);
+            logger.debug(`❌ Non-JSON response from ${fullUrl}: ${contentType}`);
             continue;
           }
 
           const deals = response.data?.data || [];
-          console.log(`✅ SUCCESS with JSON response: ${fullUrl}`);
-          console.log(`📋 Found ${deals.length} deals:`, deals.slice(0, 2));
+          logger.debug(`✅ SUCCESS with JSON response: ${fullUrl}`);
+          logger.debug(`📋 Found ${deals.length} deals:`, deals.slice(0, 2));
 
           process.env.ZOHO_BIGIN_WORKING_URL = baseUrl;
-          console.log(`🎯 Storing working base URL: ${baseUrl}`);
+          logger.debug(`🎯 Storing working base URL: ${baseUrl}`);
 
           return deals;
         } catch (error) {
           const status = error.response?.status || error.code;
           const contentType = error.response?.headers?.['content-type'] || '';
 
-          console.log(`❌ Failed ${fullUrl}: ${status}`);
+          logger.debug(`❌ Failed ${fullUrl}: ${status}`);
 
           if (contentType.includes('text/html')) {
-            console.log(`🚫 Skipping ${fullUrl} - returned HTML instead of JSON API`);
+            logger.debug(`🚫 Skipping ${fullUrl} - returned HTML instead of JSON API`);
           }
         }
       }
     }
 
-    console.log("❌ No working JSON API endpoint found for Zoho Bigin deals");
+    logger.debug("❌ No working JSON API endpoint found for Zoho Bigin deals");
     throw new Error("No working Zoho Bigin API endpoint found");
   } catch (error) {
-    console.error("❌ Failed to fetch Zoho deals:", error.message);
+    logger.error("❌ Failed to fetch Zoho deals:", error.message);
     return [];
   }
 }
@@ -363,46 +364,46 @@ export async function uploadToZohoBigin(
   fileName = "document.pdf",
   recordId = null
 ) {
-  console.log("🔥 Uploading to Zoho Bigin using deals/attachments...");
+  logger.debug("🔥 Uploading to Zoho Bigin using deals/attachments...");
   try {
     const accessToken = await getZohoAccessToken();
 
     let baseUrl = process.env.ZOHO_BIGIN_DETECTED_BASE || process.env.ZOHO_BIGIN_WORKING_URL;
 
     if (!baseUrl) {
-      console.log("🔍 No cached base URL, running auto-detection for upload...");
+      logger.debug("🔍 No cached base URL, running auto-detection for upload...");
       baseUrl = await detectZohoBiginBaseUrl();
     }
 
     if (!baseUrl) {
       baseUrl = "https://www.zohoapis.com/bigin/v1";
-      console.log("⚠️ Using fallback base URL:", baseUrl);
+      logger.debug("⚠️ Using fallback base URL:", baseUrl);
     }
 
     let dealId = recordId;
     if (!dealId) {
-      console.log("🔍 No deal ID provided, fetching available deals...");
+      logger.debug("🔍 No deal ID provided, fetching available deals...");
       const deals = await getZohoDeals();
 
       if (deals.length === 0) {
-        console.log("🆕 No deals found, creating a default deal for file attachments...");
+        logger.debug("🆕 No deals found, creating a default deal for file attachments...");
         const newDeal = await createDefaultDeal();
         if (newDeal && newDeal.id) {
           dealId = newDeal.id;
-          console.log("✅ Created new deal for attachments:", dealId, "-", newDeal.Deal_Name);
+          logger.debug("✅ Created new deal for attachments:", dealId, "-", newDeal.Deal_Name);
         } else {
           throw new Error("Failed to create default deal for file attachments");
         }
       } else {
         dealId = deals[0].id;
-        console.log("✅ Using first available deal:", dealId, "-", deals[0].Deal_Name);
+        logger.debug("✅ Using first available deal:", dealId, "-", deals[0].Deal_Name);
       }
     }
 
-    console.log("🚀 Uploading to Zoho Bigin deals/attachments...");
-    console.log("🌍 Bigin API URL being used:", baseUrl);
-    console.log("📌 Deal ID:", dealId);
-    console.log("📎 File Name:", fileName);
+    logger.debug("🚀 Uploading to Zoho Bigin deals/attachments...");
+    logger.debug("🌍 Bigin API URL being used:", baseUrl);
+    logger.debug("📌 Deal ID:", dealId);
+    logger.debug("📎 File Name:", fileName);
 
     const formData = new FormData();
     formData.append("file", pdfBuffer, {
@@ -421,12 +422,12 @@ export async function uploadToZohoBigin(
       }
     );
 
-    console.log("🔍 Zoho Bigin deals/attachments upload response:", JSON.stringify(uploadResponse.data, null, 2));
+    logger.debug("🔍 Zoho Bigin deals/attachments upload response:", JSON.stringify(uploadResponse.data, null, 2));
 
     const fileData = uploadResponse.data?.data?.[0] || uploadResponse.data;
     const fileId = fileData?.details?.id || fileData?.id;
 
-    console.log("📋 Parsed Zoho response:", { fileId, dealId, status: fileData?.status });
+    logger.debug("📋 Parsed Zoho response:", { fileId, dealId, status: fileData?.status });
 
     return {
       fileId: fileId || `ATTACH_${Date.now()}`,
@@ -434,13 +435,13 @@ export async function uploadToZohoBigin(
       dealId: dealId,
     };
   } catch (error) {
-    console.error("❌ Zoho Bigin deals/attachments upload error:", error.response?.data || error.message);
+    logger.error("❌ Zoho Bigin deals/attachments upload error:", error.response?.data || error.message);
 
     if (error.response) {
-      console.error("❌ Zoho Bigin API Error Details:");
-      console.error("Status:", error.response.status);
-      console.error("Headers:", JSON.stringify(error.response.headers, null, 2));
-      console.error("Data:", JSON.stringify(error.response.data, null, 2));
+      logger.error("❌ Zoho Bigin API Error Details:");
+      logger.error("Status:", error.response.status);
+      logger.error("Headers:", JSON.stringify(error.response.headers, null, 2));
+      logger.error("Data:", JSON.stringify(error.response.data, null, 2));
     }
 
     return {
@@ -456,18 +457,18 @@ async function createDefaultDeal() {
   try {
     const accessToken = await getZohoAccessToken();
 
-    console.log("🆕 Creating default deal for PDF attachments...");
+    logger.debug("🆕 Creating default deal for PDF attachments...");
 
     let baseUrlToTry = process.env.ZOHO_BIGIN_DETECTED_BASE || process.env.ZOHO_BIGIN_WORKING_URL;
 
     if (!baseUrlToTry) {
-      console.log("🔍 No cached endpoint for deal creation, running auto-detection...");
+      logger.debug("🔍 No cached endpoint for deal creation, running auto-detection...");
       baseUrlToTry = await detectZohoBiginBaseUrl();
     }
 
     if (baseUrlToTry) {
       const createUrl = `${baseUrlToTry}/Pipelines`;
-      console.log(`🔨 Testing deal creation with v2 Pipelines endpoint: ${createUrl}`);
+      logger.debug(`🔨 Testing deal creation with v2 Pipelines endpoint: ${createUrl}`);
 
       try {
         const dealData = {
@@ -497,14 +498,14 @@ async function createDefaultDeal() {
 
         const contentType = response.headers['content-type'] || '';
         if (contentType.includes('application/json')) {
-          console.log(`✅ SUCCESS with detected endpoint: ${createUrl}`);
-          console.log("🔍 Deal creation response:", JSON.stringify(response.data, null, 2));
+          logger.debug(`✅ SUCCESS with detected endpoint: ${createUrl}`);
+          logger.debug("🔍 Deal creation response:", JSON.stringify(response.data, null, 2));
 
           const newDeal = response.data?.data?.[0]?.details || response.data?.data?.[0] || response.data;
 
           if (response.data?.data?.[0]?.code === "SUCCESS" && response.data?.data?.[0]?.details?.id) {
             const dealId = response.data.data[0].details.id;
-            console.log("✅ Deal created successfully with ID:", dealId);
+            logger.debug("✅ Deal created successfully with ID:", dealId);
 
             return {
               id: dealId,
@@ -517,9 +518,9 @@ async function createDefaultDeal() {
           }
         }
       } catch (error) {
-        console.log(`❌ Detected endpoint failed for deal creation: ${error.response?.status || error.code}`);
+        logger.debug(`❌ Detected endpoint failed for deal creation: ${error.response?.status || error.code}`);
         if (error.response?.data) {
-          console.log(`🔍 API Error:`, error.response.data);
+          logger.debug(`🔍 API Error:`, error.response.data);
         }
       }
     }
@@ -553,7 +554,7 @@ async function createDefaultDeal() {
 
     for (const createUrl of possibleCreateUrls) {
       try {
-        console.log(`🔨 Testing deal creation at: ${createUrl}`);
+        logger.debug(`🔨 Testing deal creation at: ${createUrl}`);
 
         const response = await axios.post(
           createUrl,
@@ -570,12 +571,12 @@ async function createDefaultDeal() {
 
         const contentType = response.headers['content-type'] || '';
         if (!contentType.includes('application/json')) {
-          console.log(`❌ Non-JSON response from ${createUrl}: ${contentType}`);
+          logger.debug(`❌ Non-JSON response from ${createUrl}: ${contentType}`);
           continue;
         }
 
-        console.log(`✅ SUCCESS with JSON response: ${createUrl}`);
-        console.log("🔍 Full deal creation response:", JSON.stringify(response.data, null, 2));
+        logger.debug(`✅ SUCCESS with JSON response: ${createUrl}`);
+        logger.debug("🔍 Full deal creation response:", JSON.stringify(response.data, null, 2));
 
         const newDeal =
           response.data?.data?.[0]?.details ||
@@ -583,14 +584,14 @@ async function createDefaultDeal() {
           response.data ||
           null;
 
-        console.log("✅ Parsed new deal:", newDeal);
+        logger.debug("✅ Parsed new deal:", newDeal);
 
         if (response.data?.data?.[0]?.code === "SUCCESS" && response.data?.data?.[0]?.details?.id) {
           const dealId = response.data.data[0].details.id;
-          console.log("✅ Deal created successfully with ID:", dealId);
+          logger.debug("✅ Deal created successfully with ID:", dealId);
 
           process.env.ZOHO_BIGIN_WORKING_URL = createUrl.replace('/Deals', '');
-          console.log(`🎯 Storing working create URL base: ${process.env.ZOHO_BIGIN_WORKING_URL}`);
+          logger.debug(`🎯 Storing working create URL base: ${process.env.ZOHO_BIGIN_WORKING_URL}`);
 
           return {
             id: dealId,
@@ -600,32 +601,32 @@ async function createDefaultDeal() {
 
         if (newDeal && (newDeal.id || newDeal.Deal_Name)) {
           process.env.ZOHO_BIGIN_WORKING_URL = createUrl.replace('/Deals', '');
-          console.log(`🎯 Storing working create URL base: ${process.env.ZOHO_BIGIN_WORKING_URL}`);
+          logger.debug(`🎯 Storing working create URL base: ${process.env.ZOHO_BIGIN_WORKING_URL}`);
 
           return newDeal;
         }
 
-        console.log(`⚠️ Got JSON response but no valid deal data from ${createUrl}`);
+        logger.debug(`⚠️ Got JSON response but no valid deal data from ${createUrl}`);
 
       } catch (error) {
         const status = error.response?.status || error.code;
         const contentType = error.response?.headers?.['content-type'] || '';
 
-        console.log(`❌ Failed ${createUrl}: ${status}`);
+        logger.debug(`❌ Failed ${createUrl}: ${status}`);
 
         if (contentType.includes('text/html')) {
-          console.log(`🚫 Skipping ${createUrl} - returned HTML instead of JSON API`);
+          logger.debug(`🚫 Skipping ${createUrl} - returned HTML instead of JSON API`);
         } else if (error.response?.data) {
-          console.log(`🔍 API Error from ${createUrl}:`, error.response.data);
+          logger.debug(`🔍 API Error from ${createUrl}:`, error.response.data);
         }
       }
     }
 
-    console.log("❌ No working JSON API endpoint found for deal creation");
+    logger.debug("❌ No working JSON API endpoint found for deal creation");
     throw new Error("No working Zoho Bigin API endpoint found for deal creation");
 
   } catch (error) {
-    console.error("❌ Failed to create default deal:", error.message);
+    logger.error("❌ Failed to create default deal:", error.message);
     return null;
   }
 }
@@ -635,19 +636,19 @@ export async function uploadToZohoCRM(
   fileName = "document.pdf",
   recordId = null
 ) {
-  console.log("Uploading to Zoho CRM...");
+  logger.debug("Uploading to Zoho CRM...");
   try {
     const accessToken = await getZohoAccessToken();
 
-    console.log("🚀 Uploading to Zoho CRM...");
-    console.log("🌍 CRM API URL being used:", ZOHO_CRM_API_URL);
-    console.log(
+    logger.debug("🚀 Uploading to Zoho CRM...");
+    logger.debug("🌍 CRM API URL being used:", ZOHO_CRM_API_URL);
+    logger.debug(
       "🔐 CRM Access Token being sent:",
       accessToken.substring(0, 20),
       "..."
     );
-    console.log("📎 File Name:", fileName);
-    console.log("📌 CRM Record ID:", recordId || "none");
+    logger.debug("📎 File Name:", fileName);
+    logger.debug("📌 CRM Record ID:", recordId || "none");
 
     const formData = new FormData();
     formData.append("file", pdfBuffer, {
@@ -676,7 +677,7 @@ export async function uploadToZohoCRM(
       dealId: recordId || null,
     };
   } catch (error) {
-    console.error(
+    logger.error(
       "Zoho CRM upload error:",
       error.response?.data || error.message
     );
@@ -710,18 +711,18 @@ function isCachedTokenValid() {
 export async function getZohoAccessToken() {
   if (isCachedTokenValid()) {
     const remainingMinutes = Math.round((tokenExpiryTime - Date.now()) / 60000);
-    console.log(`🎯 [TOKEN-CACHE] Using cached token (${remainingMinutes} minutes remaining)`);
+    logger.debug(`🎯 [TOKEN-CACHE] Using cached token (${remainingMinutes} minutes remaining)`);
     return cachedAccessToken;
   }
 
   // If another refresh is already in progress, wait for it
   if (tokenRefreshInProgress && tokenRefreshPromise) {
-    console.log('🔄 [TOKEN-MUTEX] Another token refresh in progress, waiting...');
+    logger.debug('🔄 [TOKEN-MUTEX] Another token refresh in progress, waiting...');
     try {
       const token = await tokenRefreshPromise;
       return token; // Return the token from the other request
     } catch (error) {
-      console.log('🔄 [TOKEN-MUTEX] Previous refresh failed, will try again...');
+      logger.debug('🔄 [TOKEN-MUTEX] Previous refresh failed, will try again...');
       // Fall through to try our own refresh
     }
   }
@@ -739,7 +740,7 @@ export async function getZohoAccessToken() {
     tokenRefreshInProgress = true;
     tokenRefreshPromise = (async () => {
       try {
-        console.log("🔄 Auto-refreshing Zoho access token...");
+        logger.debug("🔄 Auto-refreshing Zoho access token...");
 
         const response = await axios.post(
           `${accountsUrl}/oauth/v2/token`,
@@ -763,22 +764,22 @@ export async function getZohoAccessToken() {
           throw new Error('No access_token in response from Zoho');
         }
 
-        console.log(`✅ Auto-refreshed Zoho token successfully!`);
-        console.log(`  ├ Token length: ${access_token.length} characters`);
-        console.log(`  ├ Expires in: ${expires_in} seconds (${Math.round(expires_in/3600)} hours)`);
+        logger.debug(`✅ Auto-refreshed Zoho token successfully!`);
+        logger.debug(`  ├ Token length: ${access_token.length} characters`);
+        logger.debug(`  ├ Expires in: ${expires_in} seconds (${Math.round(expires_in/3600)} hours)`);
 
         cachedAccessToken = access_token;
         tokenExpiryTime = Date.now() + (expires_in * 1000);
-        console.log(`🎯 [TOKEN-CACHE] Token cached until ${new Date(tokenExpiryTime).toLocaleString()}`);
+        logger.debug(`🎯 [TOKEN-CACHE] Token cached until ${new Date(tokenExpiryTime).toLocaleString()}`);
 
         return access_token;
       } catch (error) {
-        console.error("❌ Failed to auto-refresh Zoho token:");
-        console.error("  ├ Error type:", error.name || 'Unknown');
-        console.error("  ├ Error message:", error.message);
-        console.error("  ├ Response status:", error.response?.status);
+        logger.error("❌ Failed to auto-refresh Zoho token:");
+        logger.error("  ├ Error type:", error.name || 'Unknown');
+        logger.error("  ├ Error message:", error.message);
+        logger.error("  ├ Response status:", error.response?.status);
         if (error.response?.data) {
-          console.error("  └ Response data:", JSON.stringify(error.response.data, null, 2));
+          logger.error("  └ Response data:", JSON.stringify(error.response.data, null, 2));
         }
         throw error;
       }
@@ -788,29 +789,29 @@ export async function getZohoAccessToken() {
       const token = await tokenRefreshPromise;
       return token;
     } catch (error) {
-      console.log("🔄 [TOKEN-MUTEX] Refresh failed, falling back to static token");
+      logger.debug("🔄 [TOKEN-MUTEX] Refresh failed, falling back to static token");
     } finally {
       tokenRefreshInProgress = false;
       tokenRefreshPromise = null;
     }
   } else {
     if (clientId?.includes('your_') || clientSecret?.includes('your_') || refreshToken?.includes('your_')) {
-      console.log("⚠️  Zoho credentials contain placeholder values - please update .env with real credentials");
+      logger.debug("⚠️  Zoho credentials contain placeholder values - please update .env with real credentials");
     } else {
-      console.log("⚠️  Missing OAuth credentials for Zoho token refresh");
+      logger.debug("⚠️  Missing OAuth credentials for Zoho token refresh");
     }
   }
 
   if (process.env.ZOHO_ACCESS_TOKEN) {
     const token = process.env.ZOHO_ACCESS_TOKEN.trim();
-    console.log("⚠️  Using static Zoho access token (may expire soon):", token.substring(0, 25), "...");
-    console.log("💡 Recommendation: Set up permanent refresh token via OAuth for automatic renewal");
+    logger.debug("⚠️  Using static Zoho access token (may expire soon):", token.substring(0, 25), "...");
+    logger.debug("💡 Recommendation: Set up permanent refresh token via OAuth for automatic renewal");
     return token;
   }
 
-  console.error("❌ No Zoho credentials configured");
+  logger.error("❌ No Zoho credentials configured");
   const serverUrl = process.env.SERVER_URL || "http://localhost:5000";
-  console.error(`💡 Admin setup required: Visit ${serverUrl}/oauth/zoho/auth to configure Zoho integration`);
+  logger.error(`💡 Admin setup required: Visit ${serverUrl}/oauth/zoho/auth to configure Zoho integration`);
 
   throw new Error("Zoho integration not configured. Administrator needs to set up OAuth credentials.");
 }
@@ -829,7 +830,7 @@ async function attachFileToRecord(recordId, fileId, accessToken, apiUrl) {
       }
     );
   } catch (error) {
-    console.error(
+    logger.error(
       "Failed to attach file to record:",
       error.response?.data || error.message
     );
@@ -837,7 +838,7 @@ async function attachFileToRecord(recordId, fileId, accessToken, apiUrl) {
 }
 
 export async function getBiginContactsByAccount(accountId) {
-  console.log(`👤 Fetching contacts for account: ${accountId}`);
+  logger.debug(`👤 Fetching contacts for account: ${accountId}`);
 
   try {
     const coqlQuery = `SELECT id, Contact_Name, Email, Phone
@@ -845,14 +846,14 @@ export async function getBiginContactsByAccount(accountId) {
                        WHERE Account_Name = '${accountId}'
                        LIMIT 10`;
 
-    console.log(`🔍 [V8-CONTACTS] Using COQL to fetch contacts for account ${accountId}`);
+    logger.debug(`🔍 [V8-CONTACTS] Using COQL to fetch contacts for account ${accountId}`);
     const coqlResult = await makeBiginRequest('POST', '/coql', {
       select_query: coqlQuery
     });
 
     if (coqlResult.success && coqlResult.data?.data) {
       const contacts = coqlResult.data.data;
-      console.log(`✅ [V8-CONTACTS] Found ${contacts.length} contacts via COQL`);
+      logger.debug(`✅ [V8-CONTACTS] Found ${contacts.length} contacts via COQL`);
       return {
         success: true,
         contacts: contacts.map(contact => ({
@@ -864,14 +865,14 @@ export async function getBiginContactsByAccount(accountId) {
       };
     }
 
-    console.log(`🔄 [V8-CONTACTS] COQL failed, trying direct Contacts endpoint`);
+    logger.debug(`🔄 [V8-CONTACTS] COQL failed, trying direct Contacts endpoint`);
 
     const contactFields = ['id', 'Contact_Name', 'Email', 'Phone'].join(',');
     const directResult = await makeBiginRequest('GET', `/Contacts?Account_Name=${accountId}&fields=${contactFields}`);
 
     if (directResult.success && directResult.data?.data) {
       const contacts = directResult.data.data;
-      console.log(`✅ [V8-CONTACTS] Found ${contacts.length} contacts via direct endpoint`);
+      logger.debug(`✅ [V8-CONTACTS] Found ${contacts.length} contacts via direct endpoint`);
       return {
         success: true,
         contacts: contacts.map(contact => ({
@@ -883,14 +884,14 @@ export async function getBiginContactsByAccount(accountId) {
       };
     }
 
-    console.log(`⚠️ [V8-CONTACTS] No contacts found for account ${accountId}`);
+    logger.debug(`⚠️ [V8-CONTACTS] No contacts found for account ${accountId}`);
     return {
       success: true,
       contacts: []
     };
 
   } catch (error) {
-    console.error(`❌ [V8-CONTACTS] Failed to fetch contacts for account ${accountId}:`, error.message);
+    logger.error(`❌ [V8-CONTACTS] Failed to fetch contacts for account ${accountId}:`, error.message);
     return {
       success: false,
       error: error.message,
@@ -900,7 +901,7 @@ export async function getBiginContactsByAccount(accountId) {
 }
 
 export async function createDefaultBiginContact(accountId, accountName) {
-  console.log(`👤 Creating default contact for account: ${accountId} (${accountName})`);
+  logger.debug(`👤 Creating default contact for account: ${accountId} (${accountName})`);
 
   try {
     const contactData = {
@@ -914,16 +915,16 @@ export async function createDefaultBiginContact(accountId, accountName) {
       }]
     };
 
-    console.log(`🔍 [V8-CONTACTS] Creating contact payload:`, JSON.stringify(contactData, null, 2));
+    logger.debug(`🔍 [V8-CONTACTS] Creating contact payload:`, JSON.stringify(contactData, null, 2));
 
     const result = await makeBiginRequest('POST', '/Contacts', contactData);
 
     if (result.success) {
       const createdContact = result.data?.data?.[0];
-      console.log(`🔍 [V8-CONTACTS] Contact creation response:`, JSON.stringify(result.data, null, 2));
+      logger.debug(`🔍 [V8-CONTACTS] Contact creation response:`, JSON.stringify(result.data, null, 2));
 
       if (createdContact?.code === 'SUCCESS') {
-        console.log(`✅ [V8-CONTACTS] Contact created successfully: ${createdContact.details.id}`);
+        logger.debug(`✅ [V8-CONTACTS] Contact created successfully: ${createdContact.details.id}`);
         return {
           success: true,
           contact: {
@@ -934,7 +935,7 @@ export async function createDefaultBiginContact(accountId, accountName) {
           }
         };
       } else {
-        console.error(`❌ [V8-CONTACTS] Contact creation failed:`, result.data);
+        logger.error(`❌ [V8-CONTACTS] Contact creation failed:`, result.data);
         return {
           success: false,
           error: result.data
@@ -942,14 +943,14 @@ export async function createDefaultBiginContact(accountId, accountName) {
       }
     }
 
-    console.error(`❌ [V8-CONTACTS] Contact creation API call failed:`, result.error);
+    logger.error(`❌ [V8-CONTACTS] Contact creation API call failed:`, result.error);
     return {
       success: false,
       error: result.error
     };
 
   } catch (error) {
-    console.error(`❌ [V8-CONTACTS] Failed to create default contact:`, error.message);
+    logger.error(`❌ [V8-CONTACTS] Failed to create default contact:`, error.message);
     return {
       success: false,
       error: error.message
@@ -958,14 +959,14 @@ export async function createDefaultBiginContact(accountId, accountName) {
 }
 
 export async function getOrCreateContactForDeal(accountId, accountName) {
-  console.log(`🔗 [V8-CONTACTS] Getting or creating contact for deal creation...`);
+  logger.debug(`🔗 [V8-CONTACTS] Getting or creating contact for deal creation...`);
 
   try {
     const contactsResult = await getBiginContactsByAccount(accountId);
 
     if (contactsResult.success && contactsResult.contacts.length > 0) {
       const contact = contactsResult.contacts[0]; 
-      console.log(`✅ [V8-CONTACTS] Using existing contact: ${contact.name} (${contact.id})`);
+      logger.debug(`✅ [V8-CONTACTS] Using existing contact: ${contact.name} (${contact.id})`);
       return {
         success: true,
         contact: contact,
@@ -973,11 +974,11 @@ export async function getOrCreateContactForDeal(accountId, accountName) {
       };
     }
 
-    console.log(`🆕 [V8-CONTACTS] No existing contacts found, creating default contact...`);
+    logger.debug(`🆕 [V8-CONTACTS] No existing contacts found, creating default contact...`);
     const createResult = await createDefaultBiginContact(accountId, accountName);
 
     if (createResult.success) {
-      console.log(`✅ [V8-CONTACTS] Created new default contact: ${createResult.contact.name} (${createResult.contact.id})`);
+      logger.debug(`✅ [V8-CONTACTS] Created new default contact: ${createResult.contact.name} (${createResult.contact.id})`);
       return {
         success: true,
         contact: createResult.contact,
@@ -985,14 +986,14 @@ export async function getOrCreateContactForDeal(accountId, accountName) {
       };
     }
 
-    console.error(`❌ [V8-CONTACTS] Failed to get or create contact:`, createResult.error);
+    logger.error(`❌ [V8-CONTACTS] Failed to get or create contact:`, createResult.error);
     return {
       success: false,
       error: createResult.error
     };
 
   } catch (error) {
-    console.error(`❌ [V8-CONTACTS] Exception in getOrCreateContactForDeal:`, error.message);
+    logger.error(`❌ [V8-CONTACTS] Exception in getOrCreateContactForDeal:`, error.message);
     return {
       success: false,
       error: error.message
@@ -1004,7 +1005,7 @@ export async function recordZohoPdf({ fileName, size, mimeType, url }) {
 }
 
 export async function testV10LayoutPipelineCompatibility() {
-  console.log(`🔍 [V10-COMPAT-TEST] Testing Layout+Pipeline compatibility matching...`);
+  logger.debug(`🔍 [V10-COMPAT-TEST] Testing Layout+Pipeline compatibility matching...`);
 
   try {
     const compatiblePairs = [];
@@ -1013,10 +1014,10 @@ export async function testV10LayoutPipelineCompatibility() {
 
     if (layoutResult.success && layoutResult.data?.layouts) {
       const layouts = layoutResult.data.layouts;
-      console.log(`✅ [V10-COMPAT-TEST] Found ${layouts.length} layouts to analyze`);
+      logger.debug(`✅ [V10-COMPAT-TEST] Found ${layouts.length} layouts to analyze`);
 
       for (const layout of layouts) {
-        console.log(`🔍 [V10-COMPAT-TEST] Analyzing layout: "${layout.name}" (ID: ${layout.id}, visible: ${layout.visible})`);
+        logger.debug(`🔍 [V10-COMPAT-TEST] Analyzing layout: "${layout.name}" (ID: ${layout.id}, visible: ${layout.visible})`);
 
         const layoutInfo = {
           id: layout.id,
@@ -1029,10 +1030,10 @@ export async function testV10LayoutPipelineCompatibility() {
           for (const section of layout.sections) {
             const pipelineField = section.fields?.find(f => f.api_name === 'Pipeline');
             if (pipelineField && pipelineField.pick_list_values) {
-              console.log(`  📋 Found ${pipelineField.pick_list_values.length} Pipeline options in this layout:`);
+              logger.debug(`  📋 Found ${pipelineField.pick_list_values.length} Pipeline options in this layout:`);
               pipelineField.pick_list_values.forEach((pipeline, index) => {
                 const pipelineValue = pipeline.actual_value || pipeline.display_value;
-                console.log(`    ${index + 1}. "${pipeline.display_value}" (actual: "${pipelineValue}")`);
+                logger.debug(`    ${index + 1}. "${pipeline.display_value}" (actual: "${pipelineValue}")`);
 
                 layoutInfo.pipelines.push({
                   display: pipeline.display_value,
@@ -1053,25 +1054,25 @@ export async function testV10LayoutPipelineCompatibility() {
         }
 
         if (layoutInfo.pipelines.length === 0) {
-          console.log(`  ⚠️ No Pipeline field found in this layout`);
+          logger.debug(`  ⚠️ No Pipeline field found in this layout`);
         }
       }
 
-      console.log(`\n✅ [V10-COMPAT-TEST] COMPATIBILITY ANALYSIS COMPLETE:`);
-      console.log(`📊 Found ${compatiblePairs.length} compatible Layout+Pipeline combinations`);
+      logger.debug(`\n✅ [V10-COMPAT-TEST] COMPATIBILITY ANALYSIS COMPLETE:`);
+      logger.debug(`📊 Found ${compatiblePairs.length} compatible Layout+Pipeline combinations`);
 
       const visiblePairs = compatiblePairs.filter(pair => pair.visible);
-      console.log(`🔍 Visible Layout+Pipeline combinations (${visiblePairs.length}):`);
+      logger.debug(`🔍 Visible Layout+Pipeline combinations (${visiblePairs.length}):`);
       visiblePairs.slice(0, 5).forEach((pair, index) => {
-        console.log(`  ${index + 1}. Layout: "${pair.layoutName}" + Pipeline: "${pair.pipelineActual}"`);
+        logger.debug(`  ${index + 1}. Layout: "${pair.layoutName}" + Pipeline: "${pair.pipelineActual}"`);
       });
 
       if (visiblePairs.length > 0) {
         const recommended = visiblePairs[0];
-        console.log(`\n🎯 [V10-COMPAT-TEST] RECOMMENDED for V10:`);
-        console.log(`  📐 Layout: "${recommended.layoutName}" (ID: ${recommended.layoutId})`);
-        console.log(`  🔗 Pipeline: "${recommended.pipelineActual}"`);
-        console.log(`  ✅ This combination is guaranteed to be compatible!`);
+        logger.debug(`\n🎯 [V10-COMPAT-TEST] RECOMMENDED for V10:`);
+        logger.debug(`  📐 Layout: "${recommended.layoutName}" (ID: ${recommended.layoutId})`);
+        logger.debug(`  🔗 Pipeline: "${recommended.pipelineActual}"`);
+        logger.debug(`  ✅ This combination is guaranteed to be compatible!`);
 
         return {
           success: true,
@@ -1082,7 +1083,7 @@ export async function testV10LayoutPipelineCompatibility() {
           totalCompatiblePairs: compatiblePairs.length
         };
       } else {
-        console.log(`❌ [V10-COMPAT-TEST] No visible Layout+Pipeline pairs found!`);
+        logger.debug(`❌ [V10-COMPAT-TEST] No visible Layout+Pipeline pairs found!`);
         return {
           success: false,
           error: 'No visible Layout+Pipeline pairs found',
@@ -1092,7 +1093,7 @@ export async function testV10LayoutPipelineCompatibility() {
       }
 
     } else {
-      console.log(`❌ [V10-COMPAT-TEST] Failed to fetch layouts`);
+      logger.debug(`❌ [V10-COMPAT-TEST] Failed to fetch layouts`);
       return {
         success: false,
         error: 'Failed to fetch layouts',
@@ -1101,7 +1102,7 @@ export async function testV10LayoutPipelineCompatibility() {
     }
 
   } catch (error) {
-    console.error(`❌ [V10-COMPAT-TEST] Compatibility test failed:`, error.message);
+    logger.error(`❌ [V10-COMPAT-TEST] Compatibility test failed:`, error.message);
     return {
       success: false,
       error: error.message
@@ -1109,7 +1110,7 @@ export async function testV10LayoutPipelineCompatibility() {
   }
 }
 export async function testV9SimplePipelineDetection() {
-  console.log(`🔍 [V9-SIMPLE-TEST] Testing simple Pipeline detection from field metadata...`);
+  logger.debug(`🔍 [V9-SIMPLE-TEST] Testing simple Pipeline detection from field metadata...`);
 
   try {
     const fieldsResult = await makeBiginRequest('GET', '/settings/fields?module=Deals');
@@ -1118,20 +1119,20 @@ export async function testV9SimplePipelineDetection() {
       const pipelineField = fieldsResult.data.fields.find(f => f.api_name === 'Pipeline');
 
       if (pipelineField) {
-        console.log(`✅ [V9-SIMPLE-TEST] Found Pipeline field:`);
-        console.log(`  - Data type: ${pipelineField.data_type}`);
-        console.log(`  - Required: ${pipelineField.required}`);
-        console.log(`  - Read only: ${pipelineField.read_only}`);
+        logger.debug(`✅ [V9-SIMPLE-TEST] Found Pipeline field:`);
+        logger.debug(`  - Data type: ${pipelineField.data_type}`);
+        logger.debug(`  - Required: ${pipelineField.required}`);
+        logger.debug(`  - Read only: ${pipelineField.read_only}`);
 
         if (pipelineField.pick_list_values && pipelineField.pick_list_values.length > 0) {
-          console.log(`  - Available values (${pipelineField.pick_list_values.length}):`);
+          logger.debug(`  - Available values (${pipelineField.pick_list_values.length}):`);
           pipelineField.pick_list_values.forEach((pipeline, index) => {
-            console.log(`    ${index + 1}. "${pipeline.display_value}" (actual: "${pipeline.actual_value || pipeline.display_value}")`);
+            logger.debug(`    ${index + 1}. "${pipeline.display_value}" (actual: "${pipeline.actual_value || pipeline.display_value}")`);
           });
 
           const firstPipeline = pipelineField.pick_list_values[0];
           const selectedValue = firstPipeline.actual_value || firstPipeline.display_value;
-          console.log(`🎯 [V9-SIMPLE-TEST] V9 will use: "${selectedValue}"`);
+          logger.debug(`🎯 [V9-SIMPLE-TEST] V9 will use: "${selectedValue}"`);
 
           return {
             success: true,
@@ -1147,21 +1148,21 @@ export async function testV9SimplePipelineDetection() {
             }
           };
         } else {
-          console.log(`⚠️ [V9-SIMPLE-TEST] Pipeline field has no picklist values`);
+          logger.debug(`⚠️ [V9-SIMPLE-TEST] Pipeline field has no picklist values`);
           return {
             success: false,
             error: 'Pipeline field has no picklist values'
           };
         }
       } else {
-        console.log(`❌ [V9-SIMPLE-TEST] Pipeline field not found in Deals module`);
+        logger.debug(`❌ [V9-SIMPLE-TEST] Pipeline field not found in Deals module`);
         return {
           success: false,
           error: 'Pipeline field not found in Deals module'
         };
       }
     } else {
-      console.log(`❌ [V9-SIMPLE-TEST] Could not fetch Deals field metadata`);
+      logger.debug(`❌ [V9-SIMPLE-TEST] Could not fetch Deals field metadata`);
       return {
         success: false,
         error: 'Could not fetch Deals field metadata',
@@ -1170,7 +1171,7 @@ export async function testV9SimplePipelineDetection() {
     }
 
   } catch (error) {
-    console.error(`❌ [V9-SIMPLE-TEST] Pipeline detection failed:`, error.message);
+    logger.error(`❌ [V9-SIMPLE-TEST] Pipeline detection failed:`, error.message);
     return {
       success: false,
       error: error.message
@@ -1178,27 +1179,27 @@ export async function testV9SimplePipelineDetection() {
   }
 }
 export async function testLayoutPipelineDetection() {
-  console.log(`🔍 [V7-DIAGNOSTIC] Testing Layout and Pipeline detection...`);
+  logger.debug(`🔍 [V7-DIAGNOSTIC] Testing Layout and Pipeline detection...`);
 
   try {
     const layoutResult = await makeBiginRequest('GET', '/settings/layouts?module=Deals');
 
     if (layoutResult.success && layoutResult.data?.layouts) {
       const layouts = layoutResult.data.layouts;
-      console.log(`✅ [V7-DIAGNOSTIC] Found ${layouts.length} layouts:`);
+      logger.debug(`✅ [V7-DIAGNOSTIC] Found ${layouts.length} layouts:`);
 
       layouts.forEach((layout, index) => {
-        console.log(`  Layout ${index + 1}: ${layout.name} (ID: ${layout.id}, visible: ${layout.visible})`);
+        logger.debug(`  Layout ${index + 1}: ${layout.name} (ID: ${layout.id}, visible: ${layout.visible})`);
 
         if (layout.sections) {
           layout.sections.forEach((section, sectionIndex) => {
             const pipelineField = section.fields?.find(f => f.api_name === 'Pipeline');
             if (pipelineField) {
-              console.log(`    📋 Pipeline field found in section ${sectionIndex + 1}:`);
-              console.log(`      - Field type: ${pipelineField.data_type}`);
-              console.log(`      - Required: ${pipelineField.required}`);
+              logger.debug(`    📋 Pipeline field found in section ${sectionIndex + 1}:`);
+              logger.debug(`      - Field type: ${pipelineField.data_type}`);
+              logger.debug(`      - Required: ${pipelineField.required}`);
               if (pipelineField.pick_list_values) {
-                console.log(`      - Available pipelines: ${pipelineField.pick_list_values.map(p => p.display_value).join(', ')}`);
+                logger.debug(`      - Available pipelines: ${pipelineField.pick_list_values.map(p => p.display_value).join(', ')}`);
               }
             }
           });
@@ -1207,7 +1208,7 @@ export async function testLayoutPipelineDetection() {
 
       const defaultLayout = layouts.find(l => l.visible && !l.convert_mapping) || layouts[0];
       if (defaultLayout) {
-        console.log(`🎯 [V7-DIAGNOSTIC] Selected layout: ${defaultLayout.name} (ID: ${defaultLayout.id})`);
+        logger.debug(`🎯 [V7-DIAGNOSTIC] Selected layout: ${defaultLayout.name} (ID: ${defaultLayout.id})`);
         return {
           success: true,
           layoutId: defaultLayout.id,
@@ -1216,20 +1217,20 @@ export async function testLayoutPipelineDetection() {
         };
       }
     } else {
-      console.log(`❌ [V7-DIAGNOSTIC] Failed to fetch layouts:`, layoutResult.error);
+      logger.debug(`❌ [V7-DIAGNOSTIC] Failed to fetch layouts:`, layoutResult.error);
     }
 
     const fieldsResult = await makeBiginRequest('GET', '/settings/fields?module=Deals');
     if (fieldsResult.success && fieldsResult.data?.fields) {
       const pipelineField = fieldsResult.data.fields.find(f => f.api_name === 'Pipeline');
       if (pipelineField) {
-        console.log(`🔍 [V7-DIAGNOSTIC] Pipeline field metadata:`);
-        console.log(`  - Data type: ${pipelineField.data_type}`);
-        console.log(`  - Required: ${pipelineField.required}`);
-        console.log(`  - Read only: ${pipelineField.read_only}`);
+        logger.debug(`🔍 [V7-DIAGNOSTIC] Pipeline field metadata:`);
+        logger.debug(`  - Data type: ${pipelineField.data_type}`);
+        logger.debug(`  - Required: ${pipelineField.required}`);
+        logger.debug(`  - Read only: ${pipelineField.read_only}`);
         if (pipelineField.pick_list_values) {
           const availableValues = pipelineField.pick_list_values.map(p => `"${p.display_value}"`).join(', ');
-          console.log(`  - Available values: ${availableValues}`);
+          logger.debug(`  - Available values: ${availableValues}`);
         }
       }
     }
@@ -1240,7 +1241,7 @@ export async function testLayoutPipelineDetection() {
     };
 
   } catch (error) {
-    console.error(`❌ [V7-DIAGNOSTIC] Layout detection failed:`, error.message);
+    logger.error(`❌ [V7-DIAGNOSTIC] Layout detection failed:`, error.message);
     return {
       success: false,
       error: error.message
@@ -1248,94 +1249,94 @@ export async function testLayoutPipelineDetection() {
   }
 }
 export async function runZohoDiagnostics() {
-  console.log("🔧 [DIAGNOSTICS] Starting comprehensive Zoho integration test...");
+  logger.debug("🔧 [DIAGNOSTICS] Starting comprehensive Zoho integration test...");
   const results = {};
 
   try {
-    console.log("\n📋 [TEST 1] Testing Zoho token refresh...");
+    logger.debug("\n📋 [TEST 1] Testing Zoho token refresh...");
     try {
       const token = await getZohoAccessToken();
       results.tokenRefresh = { success: true, tokenLength: token.length };
-      console.log(`✅ Token refresh successful, length: ${token.length}`);
+      logger.debug(`✅ Token refresh successful, length: ${token.length}`);
     } catch (error) {
       results.tokenRefresh = { success: false, error: error.message };
-      console.log(`❌ Token refresh failed: ${error.message}`);
+      logger.debug(`❌ Token refresh failed: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 2] Testing V10 Layout+Pipeline compatibility matching...");
+    logger.debug("\n📋 [TEST 2] Testing V10 Layout+Pipeline compatibility matching...");
     try {
       const compatTest = await testV10LayoutPipelineCompatibility();
       results.layoutPipelineCompatibilityV10 = compatTest;
       if (compatTest.success) {
-        console.log(`✅ V10 Compatibility analysis successful: Found ${compatTest.totalCompatiblePairs} compatible pairs`);
+        logger.debug(`✅ V10 Compatibility analysis successful: Found ${compatTest.totalCompatiblePairs} compatible pairs`);
         if (compatTest.recommended) {
-          console.log(`🎯 V10 Recommended: "${compatTest.recommended.layoutName}" + "${compatTest.recommended.pipelineActual}"`);
+          logger.debug(`🎯 V10 Recommended: "${compatTest.recommended.layoutName}" + "${compatTest.recommended.pipelineActual}"`);
         }
       } else {
-        console.log(`❌ V10 Compatibility analysis failed: ${compatTest.error}`);
+        logger.debug(`❌ V10 Compatibility analysis failed: ${compatTest.error}`);
       }
     } catch (error) {
       results.layoutPipelineCompatibilityV10 = { success: false, error: error.message };
-      console.log(`❌ V10 Compatibility analysis error: ${error.message}`);
+      logger.debug(`❌ V10 Compatibility analysis error: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 3] Testing V9 Simple Pipeline detection (no Layout complexity)...");
+    logger.debug("\n📋 [TEST 3] Testing V9 Simple Pipeline detection (no Layout complexity)...");
     try {
       const pipelineTest = await testV9SimplePipelineDetection();
       results.simplePipelineDetectionV9 = pipelineTest;
       if (pipelineTest.success) {
-        console.log(`✅ V9 Simple Pipeline detection successful: "${pipelineTest.pipelineField.selectedValue}"`);
-        console.log(`📋 Available Pipeline options: ${pipelineTest.pipelineField.availableValues.length}`);
+        logger.debug(`✅ V9 Simple Pipeline detection successful: "${pipelineTest.pipelineField.selectedValue}"`);
+        logger.debug(`📋 Available Pipeline options: ${pipelineTest.pipelineField.availableValues.length}`);
       } else {
-        console.log(`❌ V9 Simple Pipeline detection failed: ${pipelineTest.error}`);
+        logger.debug(`❌ V9 Simple Pipeline detection failed: ${pipelineTest.error}`);
       }
     } catch (error) {
       results.simplePipelineDetectionV9 = { success: false, error: error.message };
-      console.log(`❌ V9 Simple Pipeline detection error: ${error.message}`);
+      logger.debug(`❌ V9 Simple Pipeline detection error: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 3] Testing V7 Layout+Pipeline detection (complex approach)...");
+    logger.debug("\n📋 [TEST 3] Testing V7 Layout+Pipeline detection (complex approach)...");
     try {
       const layoutTest = await testLayoutPipelineDetection();
       results.layoutPipelineDetection = layoutTest;
       if (layoutTest.success) {
-        console.log(`✅ V7 Layout detection successful: ${layoutTest.layoutName} (${layoutTest.layoutId})`);
+        logger.debug(`✅ V7 Layout detection successful: ${layoutTest.layoutName} (${layoutTest.layoutId})`);
       } else {
-        console.log(`❌ V7 Layout detection failed: ${layoutTest.error}`);
+        logger.debug(`❌ V7 Layout detection failed: ${layoutTest.error}`);
       }
     } catch (error) {
       results.layoutPipelineDetection = { success: false, error: error.message };
-      console.log(`❌ V7 Layout detection error: ${error.message}`);
+      logger.debug(`❌ V7 Layout detection error: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 4] Testing endpoint auto-detection...");
+    logger.debug("\n📋 [TEST 4] Testing endpoint auto-detection...");
     try {
       const baseUrl = await detectZohoBiginBaseUrl();
       results.autoDetection = { success: !!baseUrl, baseUrl };
       if (baseUrl) {
-        console.log(`✅ Auto-detection successful: ${baseUrl}`);
+        logger.debug(`✅ Auto-detection successful: ${baseUrl}`);
       } else {
-        console.log(`❌ Auto-detection failed - no working endpoint found`);
+        logger.debug(`❌ Auto-detection failed - no working endpoint found`);
       }
     } catch (error) {
       results.autoDetection = { success: false, error: error.message };
-      console.log(`❌ Auto-detection error: ${error.message}`);
+      logger.debug(`❌ Auto-detection error: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 5] Testing deals fetching...");
+    logger.debug("\n📋 [TEST 5] Testing deals fetching...");
     try {
       const deals = await getZohoDeals();
       results.dealsFetch = { success: true, dealCount: deals.length };
-      console.log(`✅ Deals fetch successful, found ${deals.length} deals`);
+      logger.debug(`✅ Deals fetch successful, found ${deals.length} deals`);
       if (deals.length > 0) {
-        console.log(`📄 First deal: ${deals[0].Deal_Name || deals[0].name || 'Unnamed'}`);
+        logger.debug(`📄 First deal: ${deals[0].Deal_Name || deals[0].name || 'Unnamed'}`);
       }
     } catch (error) {
       results.dealsFetch = { success: false, error: error.message };
-      console.log(`❌ Deals fetch failed: ${error.message}`);
+      logger.debug(`❌ Deals fetch failed: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 7] Testing deal creation with V10 Layout+Pipeline compatibility fix...");
+    logger.debug("\n📋 [TEST 7] Testing deal creation with V10 Layout+Pipeline compatibility fix...");
     try {
       const newDeal = await createBiginDeal({
         dealName: 'V10-COMPATIBILITY-TEST-DEAL-' + Date.now(),
@@ -1345,21 +1346,21 @@ export async function runZohoDiagnostics() {
       });
       results.dealCreationV10 = { success: !!newDeal, dealId: newDeal?.id };
       if (newDeal) {
-        console.log(`✅ V10 Deal creation successful, ID: ${newDeal.id}`);
+        logger.debug(`✅ V10 Deal creation successful, ID: ${newDeal.id}`);
       } else {
-        console.log(`❌ V10 Deal creation failed - no deal returned`);
+        logger.debug(`❌ V10 Deal creation failed - no deal returned`);
       }
     } catch (error) {
       results.dealCreationV10 = { success: false, error: error.message };
-      console.log(`❌ V10 Deal creation error: ${error.message}`);
+      logger.debug(`❌ V10 Deal creation error: ${error.message}`);
     }
 
-    console.log("\n📋 [TEST 8] Testing V8 Contact creation for deal linking...");
+    logger.debug("\n📋 [TEST 8] Testing V8 Contact creation for deal linking...");
     try {
       const companies = await getBiginCompanies(1, 5);
       if (companies.success && companies.companies.length > 0) {
         const testCompany = companies.companies[0];
-        console.log(`🏢 [V8-TEST] Testing contact creation with company: ${testCompany.name} (${testCompany.id})`);
+        logger.debug(`🏢 [V8-TEST] Testing contact creation with company: ${testCompany.name} (${testCompany.id})`);
 
         const contactResult = await getOrCreateContactForDeal(testCompany.id, testCompany.name);
         results.contactCreationV8 = {
@@ -1369,74 +1370,74 @@ export async function runZohoDiagnostics() {
         };
 
         if (contactResult.success) {
-          console.log(`✅ V8 Contact creation successful: ${contactResult.contact.name} (${contactResult.contact.id})`);
+          logger.debug(`✅ V8 Contact creation successful: ${contactResult.contact.name} (${contactResult.contact.id})`);
           if (contactResult.wasCreated) {
-            console.log(`🆕 V8 Contact was created automatically`);
+            logger.debug(`🆕 V8 Contact was created automatically`);
           } else {
-            console.log(`🔍 V8 Used existing contact`);
+            logger.debug(`🔍 V8 Used existing contact`);
           }
         } else {
-          console.log(`❌ V8 Contact creation failed: ${contactResult.error}`);
+          logger.debug(`❌ V8 Contact creation failed: ${contactResult.error}`);
         }
       } else {
         results.contactCreationV8 = { success: false, error: 'No companies available for contact test' };
-        console.log(`❌ V8 Contact test skipped - no companies available`);
+        logger.debug(`❌ V8 Contact test skipped - no companies available`);
       }
     } catch (error) {
       results.contactCreationV8 = { success: false, error: error.message };
-      console.log(`❌ V8 Contact creation error: ${error.message}`);
+      logger.debug(`❌ V8 Contact creation error: ${error.message}`);
     }
-    console.log("\n🏁 [SUMMARY] V10 Zoho Integration Diagnostic Results:");
-    console.log("=" .repeat(60));
-    console.log(`Token Refresh: ${results.tokenRefresh?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`V10 Layout+Pipeline Compatibility: ${results.layoutPipelineCompatibilityV10?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`V9 Simple Pipeline: ${results.simplePipelineDetectionV9?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`V7 Layout Detection: ${results.layoutPipelineDetection?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`Auto-Detection: ${results.autoDetection?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`Deals Fetching: ${results.dealsFetch?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`V10 Deal Creation: ${results.dealCreationV10?.success ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`V8 Contact Creation: ${results.contactCreationV8?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug("\n🏁 [SUMMARY] V10 Zoho Integration Diagnostic Results:");
+    logger.debug("=" .repeat(60));
+    logger.debug(`Token Refresh: ${results.tokenRefresh?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`V10 Layout+Pipeline Compatibility: ${results.layoutPipelineCompatibilityV10?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`V9 Simple Pipeline: ${results.simplePipelineDetectionV9?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`V7 Layout Detection: ${results.layoutPipelineDetection?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`Auto-Detection: ${results.autoDetection?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`Deals Fetching: ${results.dealsFetch?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`V10 Deal Creation: ${results.dealCreationV10?.success ? '✅ PASS' : '❌ FAIL'}`);
+    logger.debug(`V8 Contact Creation: ${results.contactCreationV8?.success ? '✅ PASS' : '❌ FAIL'}`);
 
     if (results.autoDetection?.baseUrl) {
-      console.log(`\n🎯 Detected working endpoint: ${results.autoDetection.baseUrl}`);
+      logger.debug(`\n🎯 Detected working endpoint: ${results.autoDetection.baseUrl}`);
     }
 
     if (results.layoutPipelineCompatibilityV10?.success && results.layoutPipelineCompatibilityV10.recommended) {
       const rec = results.layoutPipelineCompatibilityV10.recommended;
-      console.log(`🎯 V10 Recommended Compatible Pair: "${rec.layoutName}" + "${rec.pipelineActual}"`);
+      logger.debug(`🎯 V10 Recommended Compatible Pair: "${rec.layoutName}" + "${rec.pipelineActual}"`);
     }
 
     if (results.simplePipelineDetectionV9?.success) {
-      console.log(`🎯 V9 Selected Pipeline: "${results.simplePipelineDetectionV9.pipelineField.selectedValue}"`);
+      logger.debug(`🎯 V9 Selected Pipeline: "${results.simplePipelineDetectionV9.pipelineField.selectedValue}"`);
     }
 
     if (results.layoutPipelineDetection?.layoutId) {
-      console.log(`🎯 V7 Layout ID: ${results.layoutPipelineDetection.layoutId} (${results.layoutPipelineDetection.layoutName})`);
+      logger.debug(`🎯 V7 Layout ID: ${results.layoutPipelineDetection.layoutId} (${results.layoutPipelineDetection.layoutName})`);
     }
 
     if (results.contactCreationV8?.contactId) {
-      console.log(`🎯 V8 Contact ID: ${results.contactCreationV8.contactId} (${results.contactCreationV8.wasCreated ? 'Created' : 'Existing'})`);
+      logger.debug(`🎯 V8 Contact ID: ${results.contactCreationV8.contactId} (${results.contactCreationV8.wasCreated ? 'Created' : 'Existing'})`);
     }
 
     const passCount = Object.values(results).filter(r => r.success).length;
-    console.log(`\n📊 Overall Score: ${passCount}/8 tests passed`);
+    logger.debug(`\n📊 Overall Score: ${passCount}/8 tests passed`);
 
     const v10Success = results.dealCreationV10?.success;
     const v9Success = results.dealCreationV9?.success;
     const v7Success = results.dealCreationV7?.success;
 
     if (v10Success && !v9Success && !v7Success) {
-      console.log(`\n🏆 V10 COMPATIBILITY approach succeeded where V9 and V7 failed!`);
+      logger.debug(`\n🏆 V10 COMPATIBILITY approach succeeded where V9 and V7 failed!`);
     } else if (v10Success) {
-      console.log(`\n✅ V10 COMPATIBILITY approach works! This should resolve the MAPPING_MISMATCH error.`);
+      logger.debug(`\n✅ V10 COMPATIBILITY approach works! This should resolve the MAPPING_MISMATCH error.`);
     } else {
-      console.log(`\n❌ Even V10 COMPATIBILITY approach failed. More investigation needed.`);
+      logger.debug(`\n❌ Even V10 COMPATIBILITY approach failed. More investigation needed.`);
     }
 
     return results;
 
   } catch (error) {
-    console.error("❌ [DIAGNOSTICS] Failed to run diagnostics:", error.message);
+    logger.error("❌ [DIAGNOSTICS] Failed to run diagnostics:", error.message);
     return { error: error.message };
   }
 }
@@ -1478,8 +1479,8 @@ async function makeBiginRequest(method, endpoint, data = null) {
       config.data = data;
     }
 
-    console.log(`📡 [BIGIN API] ${method} ${endpoint}`);
-    console.log(`🌍 [BIGIN API] Using base URL: ${baseUrl}`);
+    logger.debug(`📡 [BIGIN API] ${method} ${endpoint}`);
+    logger.debug(`🌍 [BIGIN API] Using base URL: ${baseUrl}`);
     const response = await axios(config);
 
     return {
@@ -1489,7 +1490,7 @@ async function makeBiginRequest(method, endpoint, data = null) {
     };
 
   } catch (error) {
-    console.error(`❌ [BIGIN API] ${method} ${endpoint} failed:`, error.response?.data || error.message);
+    logger.error(`❌ [BIGIN API] ${method} ${endpoint} failed:`, error.response?.data || error.message);
     return {
       success: false,
       error: error.response?.data || { message: error.message },
@@ -1499,7 +1500,7 @@ async function makeBiginRequest(method, endpoint, data = null) {
 }
 
 export async function getBiginDealsByCompany(companyId, page = 1, perPage = 20) {
-  console.log(`💼 Fetching Bigin deals for company: ${companyId} (page ${page}, ${perPage} per page)`);
+  logger.debug(`💼 Fetching Bigin deals for company: ${companyId} (page ${page}, ${perPage} per page)`);
 
   try {
     const dealFields = [
@@ -1519,12 +1520,12 @@ export async function getBiginDealsByCompany(companyId, page = 1, perPage = 20) 
     const criteria = encodeURIComponent(`(Account_Name:equals:${companyId})`);
     const endpoint = `/Pipelines/search?criteria=${criteria}&fields=${dealFields}&page=${page}&per_page=${Math.min(perPage, 200)}`;
 
-    console.log(`🔍 [COMPANY-DEALS] Searching pipelines for company ${companyId}`);
+    logger.debug(`🔍 [COMPANY-DEALS] Searching pipelines for company ${companyId}`);
     const result = await makeBiginRequest('GET', endpoint);
 
     if (result.success && result.data?.data) {
       const deals = result.data.data;
-      console.log(`✅ [COMPANY-DEALS] Found ${deals.length} pipelines`);
+      logger.debug(`✅ [COMPANY-DEALS] Found ${deals.length} pipelines`);
 
       return {
         success: true,
@@ -1549,7 +1550,7 @@ export async function getBiginDealsByCompany(companyId, page = 1, perPage = 20) 
       };
     }
 
-    console.log(`⚠️ [COMPANY-DEALS] No pipelines found for company ${companyId}`);
+    logger.debug(`⚠️ [COMPANY-DEALS] No pipelines found for company ${companyId}`);
     return {
       success: true,
       deals: [],
@@ -1562,7 +1563,7 @@ export async function getBiginDealsByCompany(companyId, page = 1, perPage = 20) 
     };
 
   } catch (error) {
-    console.error(`❌ [COMPANY-DEALS] Failed to fetch deals for company ${companyId}:`, error.message);
+    logger.error(`❌ [COMPANY-DEALS] Failed to fetch deals for company ${companyId}:`, error.message);
     return {
       success: false,
       error: error.message,
@@ -1572,16 +1573,16 @@ export async function getBiginDealsByCompany(companyId, page = 1, perPage = 20) 
 }
 
 export async function getBiginUsers() {
-  console.log(`👥 Fetching Bigin users...`);
+  logger.debug(`👥 Fetching Bigin users...`);
   const result = await makeBiginRequest('GET', '/users?type=AllUsers&per_page=200');
-  console.log(`👥 [USERS] success:`, result.success, 'status:', result.status);
-  console.log(`👥 [USERS] data keys:`, result.data ? Object.keys(result.data) : 'null');
-  console.log(`👥 [USERS] error:`, result.error);
+  logger.debug(`👥 [USERS] success:`, result.success, 'status:', result.status);
+  logger.debug(`👥 [USERS] data keys:`, result.data ? Object.keys(result.data) : 'null');
+  logger.debug(`👥 [USERS] error:`, result.error);
   if (result.success) {
     // Zoho Bigin returns `users` array
     const rawUsers = result.data?.users || result.data?.Users || [];
-    console.log(`👥 [USERS] found ${rawUsers.length} users`);
-    if (rawUsers.length > 0) console.log(`👥 [USERS] first user raw:`, JSON.stringify(rawUsers[0], null, 2));
+    logger.debug(`👥 [USERS] found ${rawUsers.length} users`);
+    if (rawUsers.length > 0) logger.debug(`👥 [USERS] first user raw:`, JSON.stringify(rawUsers[0], null, 2));
     const users = rawUsers.map((u) => ({
       id: u.id,
       name: u.full_name || u.name || u.display_name || '',
@@ -1593,7 +1594,7 @@ export async function getBiginUsers() {
 }
 
 export async function getBiginCompanies(page = 1, perPage = 50) {
-  console.log(`📋 Fetching Bigin companies (page ${page}, ${perPage} per page)...`);
+  logger.debug(`📋 Fetching Bigin companies (page ${page}, ${perPage} per page)...`);
 
   const fields = [
     'id',
@@ -1610,8 +1611,8 @@ export async function getBiginCompanies(page = 1, perPage = 50) {
 
   if (result.success) {
     const companies = result.data?.data || [];
-    console.log(`✅ Found ${companies.length} companies`);
-    console.log(`✅ Found ${companies} companies`);
+    logger.debug(`✅ Found ${companies.length} companies`);
+    logger.debug(`✅ Found ${companies} companies`);
     return {
       success: true,
       companies: companies.map(company => ({
@@ -1630,7 +1631,7 @@ export async function getBiginCompanies(page = 1, perPage = 50) {
 }
 
 export async function getAllBiginCompanies() {
-  console.log(`📋 Fetching ALL Bigin companies (all pages)...`);
+  logger.debug(`📋 Fetching ALL Bigin companies (all pages)...`);
 
   const fields = [
     'id',
@@ -1666,7 +1667,7 @@ export async function getAllBiginCompanies() {
 
     // Debug: log first company to see Owner structure
     if (batch.length > 0 && page === 1) {
-      console.log('📋 Sample company data:', JSON.stringify(batch[0], null, 2));
+      logger.debug('📋 Sample company data:', JSON.stringify(batch[0], null, 2));
     }
 
     allCompanies.push(...batch.map(company => ({
@@ -1688,18 +1689,18 @@ export async function getAllBiginCompanies() {
 
     const info = result.data?.info || {};
     const moreRecords = info.more_records ?? (batch.length === perPage);
-    console.log(`📄 Page ${page}: fetched ${batch.length} companies (total so far: ${allCompanies.length}, more: ${moreRecords})`);
+    logger.debug(`📄 Page ${page}: fetched ${batch.length} companies (total so far: ${allCompanies.length}, more: ${moreRecords})`);
 
     if (!moreRecords || batch.length < perPage) break;
     page++;
   }
 
-  console.log(`✅ Fetched all ${allCompanies.length} companies`);
+  logger.debug(`✅ Fetched all ${allCompanies.length} companies`);
   return { success: true, companies: allCompanies };
 }
 
 export async function searchBiginCompanies(searchTerm) {
-  console.log(`🔍 Searching Bigin companies for: "${searchTerm}"`);
+  logger.debug(`🔍 Searching Bigin companies for: "${searchTerm}"`);
 
   const coqlQuery = `SELECT id, Account_Name, Phone, Email, Website
                      FROM Accounts
@@ -1713,7 +1714,7 @@ export async function searchBiginCompanies(searchTerm) {
 
   if (result.success) {
     const companies = result.data?.data || [];
-    console.log(`✅ Found ${companies.length} companies matching "${searchTerm}"`);
+    logger.debug(`✅ Found ${companies.length} companies matching "${searchTerm}"`);
 
     return {
       success: true,
@@ -1731,7 +1732,7 @@ export async function searchBiginCompanies(searchTerm) {
 }
 
 export async function createBiginCompany(companyData) {
-  console.log(`🏢 Creating new Bigin company: ${companyData.name}`);
+  logger.debug(`🏢 Creating new Bigin company: ${companyData.name}`);
 
   const record = {
     Account_Name: companyData.name,
@@ -1747,15 +1748,15 @@ export async function createBiginCompany(companyData) {
 
   const payload = { data: [record] };
 
-  console.log(`📤 [CREATE COMPANY] Sending payload:`, JSON.stringify(payload, null, 2));
+  logger.debug(`📤 [CREATE COMPANY] Sending payload:`, JSON.stringify(payload, null, 2));
   const result = await makeBiginRequest('POST', '/Accounts', payload);
-  console.log(`📥 [CREATE COMPANY] Full result:`, JSON.stringify(result, null, 2));
+  logger.debug(`📥 [CREATE COMPANY] Full result:`, JSON.stringify(result, null, 2));
 
   if (result.success) {
     const createdCompany = result.data?.data?.[0];
     if (createdCompany?.code === 'SUCCESS') {
-      console.log(`✅ Company created successfully: ${createdCompany.details.id}`);
-      console.log(`🔍 Full Zoho response:`, JSON.stringify(result.data, null, 2));
+      logger.debug(`✅ Company created successfully: ${createdCompany.details.id}`);
+      logger.debug(`🔍 Full Zoho response:`, JSON.stringify(result.data, null, 2));
 
       return {
         success: true,
@@ -1769,7 +1770,7 @@ export async function createBiginCompany(companyData) {
         }
       };
     } else {
-      console.error(`❌ Company creation failed:`, result.data);
+      logger.error(`❌ Company creation failed:`, result.data);
       return {
         success: false,
         error: result.data
@@ -1781,7 +1782,7 @@ export async function createBiginCompany(companyData) {
 }
 
 export async function createBiginDeal(dealData) {
-  console.log(`💼 Creating new Bigin deal: ${dealData.dealName}`);
+  logger.debug(`💼 Creating new Bigin deal: ${dealData.dealName}`);
 
   const record = {
     Deal_Name: dealData.dealName,
@@ -1807,7 +1808,7 @@ export async function createBiginDeal(dealData) {
 
   const payload = { data: [record] };
 
-  console.log(
+  logger.debug(
     "🔍 [V2-Pipelines] Final payload:",
     JSON.stringify(payload, null, 2)
   );
@@ -1820,10 +1821,10 @@ export async function createBiginDeal(dealData) {
 
   if (result.success) {
     const createdDeal = result.data?.data?.[0];
-    console.log(`🔍 [DEAL CREATION] Full Zoho response:`, JSON.stringify(result.data, null, 2));
+    logger.debug(`🔍 [DEAL CREATION] Full Zoho response:`, JSON.stringify(result.data, null, 2));
 
     if (createdDeal?.code === 'SUCCESS') {
-      console.log(`✅ Deal created successfully: ${createdDeal.details.id}`);
+      logger.debug(`✅ Deal created successfully: ${createdDeal.details.id}`);
 
       return {
         success: true,
@@ -1836,7 +1837,7 @@ export async function createBiginDeal(dealData) {
         }
       };
     } else {
-      console.error(`❌ Deal creation failed:`, result.data);
+      logger.error(`❌ Deal creation failed:`, result.data);
       return {
         success: false,
         error: result.data
@@ -1844,19 +1845,19 @@ export async function createBiginDeal(dealData) {
     }
   }
 
-  console.error(`❌ Deal creation API call failed:`, result.error);
+  logger.error(`❌ Deal creation API call failed:`, result.error);
   return result;
 }
 
 export async function createBiginNote(dealId, noteData) {
-  console.log(`📝 Creating note for deal ${dealId}: ${noteData.title}`);
+  logger.debug(`📝 Creating note for deal ${dealId}: ${noteData.title}`);
 
   try {
-    console.log(`🔍 [NOTE CREATION] Checking Notes module field requirements...`);
+    logger.debug(`🔍 [NOTE CREATION] Checking Notes module field requirements...`);
     const notesFields = await getBiginModuleFields('Notes');
     if (notesFields.success) {
       const requiredFields = notesFields.fields.filter(f => f.required);
-    console.log(`🔍 [NOTE CREATION] Required fields for Notes:`, requiredFields.map(f => ({
+    logger.debug(`🔍 [NOTE CREATION] Required fields for Notes:`, requiredFields.map(f => ({
       apiName: f.apiName,
       required: f.required,
       dataType: f.data_type,
@@ -1864,7 +1865,7 @@ export async function createBiginNote(dealId, noteData) {
     })));
   }
 } catch (e) {
-  console.log(`⚠️ [NOTE CREATION] Could not fetch Notes fields:`, e.message);
+  logger.debug(`⚠️ [NOTE CREATION] Could not fetch Notes fields:`, e.message);
 }
 
   const payload = {
@@ -1876,26 +1877,26 @@ export async function createBiginNote(dealId, noteData) {
     }]
   };
 
-  console.log(`🔍 [NOTE CREATION] Payload:`, JSON.stringify(payload, null, 2));
+  logger.debug(`🔍 [NOTE CREATION] Payload:`, JSON.stringify(payload, null, 2));
 
   const endpoint = `/Notes`;
-  console.log(`🔍 [NOTE CREATION] Using v2 Notes endpoint: ${endpoint}`);
+  logger.debug(`🔍 [NOTE CREATION] Using v2 Notes endpoint: ${endpoint}`);
 
   const result = await makeBiginRequest('POST', endpoint, payload);
   const errorPayload = result.error ? JSON.stringify(result.error, null, 2) : 'None';
-  console.log(`🔍 [NOTE CREATION] Zoho response status:`, result.status, 'error:', errorPayload);
-  console.log(`🔍 [NOTE CREATION] Zoho response payload:`, JSON.stringify(result.data, null, 2));
+  logger.debug(`🔍 [NOTE CREATION] Zoho response status:`, result.status, 'error:', errorPayload);
+  logger.debug(`🔍 [NOTE CREATION] Zoho response payload:`, JSON.stringify(result.data, null, 2));
   const detailedError = result.error?.data?.[0]?.details || result.error?.details;
   if (detailedError) {
-    console.log(`🔍 [NOTE CREATION] Zoho error detail payload:`, JSON.stringify(detailedError, null, 2));
+    logger.debug(`🔍 [NOTE CREATION] Zoho error detail payload:`, JSON.stringify(detailedError, null, 2));
   }
 
   if (result.success) {
     const createdNote = result.data?.data?.[0];
-    console.log(`🔍 [NOTE CREATION] Full Zoho response:`, JSON.stringify(result.data, null, 2));
+    logger.debug(`🔍 [NOTE CREATION] Full Zoho response:`, JSON.stringify(result.data, null, 2));
 
     if (createdNote?.code === 'SUCCESS') {
-      console.log(`✅ Note created successfully: ${createdNote.details.id}`);
+      logger.debug(`✅ Note created successfully: ${createdNote.details.id}`);
 
       return {
         success: true,
@@ -1907,12 +1908,12 @@ export async function createBiginNote(dealId, noteData) {
         }
       };
     } else {
-      console.error(`❌ Note creation failed:`, result.data);
+      logger.error(`❌ Note creation failed:`, result.data);
 
       const zohoError = result.data?.data?.[0];
       const errorMessage = zohoError?.message || zohoError?.details || 'Unknown Zoho error';
 
-      console.error(`❌ Extracted error message:`, errorMessage);
+      logger.error(`❌ Extracted error message:`, errorMessage);
 
       return {
         success: false,
@@ -1921,7 +1922,7 @@ export async function createBiginNote(dealId, noteData) {
     }
   }
 
-  console.error(`❌ Note creation API call failed:`, result.error);
+  logger.error(`❌ Note creation API call failed:`, result.error);
 
   const errorMessage = result.error?.message || result.error || 'Unknown API error';
 
@@ -1932,7 +1933,7 @@ export async function createBiginNote(dealId, noteData) {
 }
 
 export async function createBiginTask(companyId, taskData) {
-  console.log(`✅ Creating task for company ${companyId}: ${taskData.subject}`);
+  logger.debug(`✅ Creating task for company ${companyId}: ${taskData.subject}`);
 
   const record = {
     Subject: taskData.subject,
@@ -1967,26 +1968,26 @@ export async function createBiginTask(companyId, taskData) {
 
   const payload = { data: [record] };
 
-  console.log(`🔍 [TASK CREATION] Payload:`, JSON.stringify(payload, null, 2));
+  logger.debug(`🔍 [TASK CREATION] Payload:`, JSON.stringify(payload, null, 2));
 
   let result = await makeBiginRequest('POST', '/Tasks', payload);
-  console.log(`🔍 [TASK CREATION] Response status:`, result.status, 'error:', result.error ? JSON.stringify(result.error) : 'None');
+  logger.debug(`🔍 [TASK CREATION] Response status:`, result.status, 'error:', result.error ? JSON.stringify(result.error) : 'None');
 
   // If owner caused the error, retry without it
   if (!result.success && result.status === 400 && taskData.ownerId) {
     const ownerError = JSON.stringify(result.error || '');
     if (ownerError.includes('Owner')) {
-      console.log(`⚠️ [TASK CREATION] Owner ID rejected, retrying without Owner field...`);
+      logger.debug(`⚠️ [TASK CREATION] Owner ID rejected, retrying without Owner field...`);
       delete record.Owner;
       result = await makeBiginRequest('POST', '/Tasks', { data: [record] });
-      console.log(`🔍 [TASK CREATION] Retry status:`, result.status, 'error:', result.error ? JSON.stringify(result.error) : 'None');
+      logger.debug(`🔍 [TASK CREATION] Retry status:`, result.status, 'error:', result.error ? JSON.stringify(result.error) : 'None');
     }
   }
 
   if (result.success) {
     const createdTask = result.data?.data?.[0];
     if (createdTask?.code === 'SUCCESS') {
-      console.log(`✅ Task created successfully: ${createdTask.details.id}`);
+      logger.debug(`✅ Task created successfully: ${createdTask.details.id}`);
       return {
         success: true,
         task: {
@@ -2000,18 +2001,18 @@ export async function createBiginTask(companyId, taskData) {
     }
     const zohoError = result.data?.data?.[0];
     const errorMessage = zohoError?.message || zohoError?.details || 'Unknown Zoho error';
-    console.error(`❌ Task creation failed:`, errorMessage);
+    logger.error(`❌ Task creation failed:`, errorMessage);
     return { success: false, error: errorMessage };
   }
 
   const errorMessage = result.error?.message || result.error || 'Unknown API error';
-  console.error(`❌ Task creation API call failed:`, errorMessage);
+  logger.error(`❌ Task creation API call failed:`, errorMessage);
   return { success: false, error: errorMessage };
 }
 
 export async function uploadBiginFile(dealId, pdfBuffer, fileName, options = {}) {
   const contentType = options.contentType || "application/pdf";
-  console.log(`📎 Uploading file to deal ${dealId}: ${fileName} (${pdfBuffer.length} bytes, contentType=${contentType})`);
+  logger.debug(`📎 Uploading file to deal ${dealId}: ${fileName} (${pdfBuffer.length} bytes, contentType=${contentType})`);
 
   try {
     const accessToken = await getZohoAccessToken();
@@ -2027,8 +2028,8 @@ export async function uploadBiginFile(dealId, pdfBuffer, fileName, options = {})
     });
 
     const uploadUrl = `${baseUrl}/Pipelines/${dealId}/Attachments`;
-    console.log(`🔍 [FILE UPLOAD] URL: ${uploadUrl}`);
-    console.log(`🔍 [FILE UPLOAD] File metadata:`, {
+    logger.debug(`🔍 [FILE UPLOAD] URL: ${uploadUrl}`);
+    logger.debug(`🔍 [FILE UPLOAD] File metadata:`, {
       originalFileName: fileName,
       sanitizedFileName,
       bufferLength: pdfBuffer.length,
@@ -2046,11 +2047,11 @@ export async function uploadBiginFile(dealId, pdfBuffer, fileName, options = {})
       maxBodyLength: Infinity
     });
 
-    console.log(`🔍 [FILE UPLOAD] Full Zoho response:`, JSON.stringify(response.data, null, 2));
+    logger.debug(`🔍 [FILE UPLOAD] Full Zoho response:`, JSON.stringify(response.data, null, 2));
 
     if (response.data?.data?.[0]?.code === 'SUCCESS') {
       const fileData = response.data.data[0].details;
-      console.log(`✅ File uploaded successfully to deal: ${fileData.id}`);
+      logger.debug(`✅ File uploaded successfully to deal: ${fileData.id}`);
 
       return {
         success: true,
@@ -2062,7 +2063,7 @@ export async function uploadBiginFile(dealId, pdfBuffer, fileName, options = {})
         }
       };
     } else {
-      console.error(`❌ File upload failed - unexpected response format:`, response.data);
+      logger.error(`❌ File upload failed - unexpected response format:`, response.data);
       return {
         success: false,
         error: {
@@ -2073,8 +2074,8 @@ export async function uploadBiginFile(dealId, pdfBuffer, fileName, options = {})
     }
 
   } catch (error) {
-    console.error(`❌ File upload error:`, error.response?.data || error.message);
-    console.error(`❌ Full error object:`, {
+    logger.error(`❌ File upload error:`, error.response?.data || error.message);
+    logger.error(`❌ Full error object:`, {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -2094,13 +2095,13 @@ export async function uploadBiginFile(dealId, pdfBuffer, fileName, options = {})
 }
 
 export async function getBiginModules() {
-  console.log(`📋 Fetching available Bigin modules...`);
+  logger.debug(`📋 Fetching available Bigin modules...`);
 
   const result = await makeBiginRequest('GET', '/settings/modules');
 
   if (result.success) {
     const modules = result.data?.modules || [];
-    console.log(`✅ Found ${modules.length} modules`);
+    logger.debug(`✅ Found ${modules.length} modules`);
     return {
       success: true,
       modules: modules.map(module => ({
@@ -2116,21 +2117,21 @@ export async function getBiginModules() {
 }
 
 export async function getBiginModuleFields(moduleName) {
-  console.log(`📋 Fetching field metadata for ${moduleName} module...`);
+  logger.debug(`📋 Fetching field metadata for ${moduleName} module...`);
 
   const result = await makeBiginRequest('GET', `/settings/fields?module=${moduleName}`);
 
-  console.log(`🔍 [DEBUG] Module fields request for ${moduleName}:`);
-  console.log(`  ├ Success: ${result.success}`);
-  console.log(`  ├ Status: ${result.status}`);
-  console.log(`  ├ Data keys: ${result.data ? Object.keys(result.data) : 'No data'}`);
-  console.log(`  └ Error: ${result.error || 'None'}`);
+  logger.debug(`🔍 [DEBUG] Module fields request for ${moduleName}:`);
+  logger.debug(`  ├ Success: ${result.success}`);
+  logger.debug(`  ├ Status: ${result.status}`);
+  logger.debug(`  ├ Data keys: ${result.data ? Object.keys(result.data) : 'No data'}`);
+  logger.debug(`  └ Error: ${result.error || 'None'}`);
 
   if (result.success) {
     const fields = result.data?.fields || [];
-    console.log(`✅ Found ${fields.length} fields for ${moduleName}`);
+    logger.debug(`✅ Found ${fields.length} fields for ${moduleName}`);
     if (fields.length > 0) {
-      console.log(`🔍 Sample fields: ${fields.slice(0, 5).map(f => f.api_name).join(', ')}`);
+      logger.debug(`🔍 Sample fields: ${fields.slice(0, 5).map(f => f.api_name).join(', ')}`);
     }
     return {
       success: true,
@@ -2146,12 +2147,12 @@ export async function getBiginModuleFields(moduleName) {
     };
   }
 
-  console.error(`❌ Failed to get ${moduleName} fields:`, result);
+  logger.error(`❌ Failed to get ${moduleName} fields:`, result);
   return result;
 }
 
 export async function getBiginPipelines() {
-  console.log(`📋 Fetching available Bigin pipelines with IDs...`);
+  logger.debug(`📋 Fetching available Bigin pipelines with IDs...`);
 
   const endpoints = [
     '/settings/pipelines',
@@ -2163,37 +2164,37 @@ export async function getBiginPipelines() {
     try {
       const result = await makeBiginRequest('GET', endpoint);
       if (result.success && result.data) {
-        console.log(`✅ Found pipelines data from ${endpoint}:`, JSON.stringify(result.data, null, 2));
+        logger.debug(`✅ Found pipelines data from ${endpoint}:`, JSON.stringify(result.data, null, 2));
         return {
           success: true,
           pipelines: result.data.pipelines || result.data.data || result.data.layouts || []
         };
       }
     } catch (error) {
-      console.log(`⚠️ Pipeline endpoint ${endpoint} failed: ${error.message}`);
+      logger.debug(`⚠️ Pipeline endpoint ${endpoint} failed: ${error.message}`);
     }
   }
 
-  console.log(`⚠️ Could not fetch pipeline IDs - using fallback`);
+  logger.debug(`⚠️ Could not fetch pipeline IDs - using fallback`);
   return {
     success: false,
     pipelines: []
   };
 }
 export async function getBiginPipelineStages() {
-  console.log(`🔍 Fetching pipeline and stage options from Bigin...`);
+  logger.debug(`🔍 Fetching pipeline and stage options from Bigin...`);
 
   try {
-    console.log(`🔍 Trying to fetch fields from 'Deals' module first...`);
+    logger.debug(`🔍 Trying to fetch fields from 'Deals' module first...`);
     let fieldsResult = await getBiginModuleFields('Deals');
 
     if (!fieldsResult.success) {
-      console.log(`🔄 'Deals' failed, trying 'Pipelines' module...`);
+      logger.debug(`🔄 'Deals' failed, trying 'Pipelines' module...`);
       fieldsResult = await getBiginModuleFields('Pipelines');
     }
 
     if (!fieldsResult.success) {
-      console.log(`🔄 Both modules failed, trying 'Potentials' module...`);
+      logger.debug(`🔄 Both modules failed, trying 'Potentials' module...`);
       fieldsResult = await getBiginModuleFields('Potentials');
     }
 
@@ -2206,10 +2207,10 @@ export async function getBiginPipelineStages() {
 
     const fields = fieldsResult.fields;
 
-    console.log(`🔍 [DEBUG] Available fields in module (${fieldsResult.moduleName || 'unknown'}):`, fields.map(f => f.apiName).slice(0, 15));
+    logger.debug(`🔍 [DEBUG] Available fields in module (${fieldsResult.moduleName || 'unknown'}):`, fields.map(f => f.apiName).slice(0, 15));
 
-    console.log(`🔍 [DEBUG] Looking for pipeline fields: Sub_Pipeline, Pipeline, Pipeline_Name`);
-    console.log(`🔍 [DEBUG] Looking for stage fields: Stage, Stage_Name`);
+    logger.debug(`🔍 [DEBUG] Looking for pipeline fields: Sub_Pipeline, Pipeline, Pipeline_Name`);
+    logger.debug(`🔍 [DEBUG] Looking for stage fields: Stage, Stage_Name`);
 
     const pipelineField = fields.find(f =>
       f.apiName === 'Sub_Pipeline' ||
@@ -2221,15 +2222,15 @@ export async function getBiginPipelineStages() {
       f.apiName === 'Stage_Name'
     );
 
-    console.log(`🔍 [DEBUG] Pipeline field found:`, pipelineField?.apiName, 'with', pipelineField?.pickListValues?.length || 0, 'values');
-    console.log(`🔍 [DEBUG] Stage field found:`, stageField?.apiName, 'with', stageField?.pickListValues?.length || 0, 'values');
+    logger.debug(`🔍 [DEBUG] Pipeline field found:`, pipelineField?.apiName, 'with', pipelineField?.pickListValues?.length || 0, 'values');
+    logger.debug(`🔍 [DEBUG] Stage field found:`, stageField?.apiName, 'with', stageField?.pickListValues?.length || 0, 'values');
 
     const pipelineValues = pipelineField?.pickListValues;
     const pipelines = (pipelineValues && pipelineValues.length > 0) ? pipelineValues : [
       { display_value: 'Sales Pipeline Standard', actual_value: 'Sales Pipeline Standard' }
     ];
 
-    console.log(`🔍 [DEBUG] Using pipelines:`, pipelines.map(p => p.display_value || p.actual_value));
+    logger.debug(`🔍 [DEBUG] Using pipelines:`, pipelines.map(p => p.display_value || p.actual_value));
 
     const stages = stageField?.pickListValues || [
       { display_value: 'Qualification', actual_value: 'Qualification' },
@@ -2240,9 +2241,9 @@ export async function getBiginPipelineStages() {
       { display_value: 'Closed Lost', actual_value: 'Closed Lost' }
     ];
 
-    console.log(`✅ Found ${pipelines.length} pipelines and ${stages.length} stages`);
-    console.log(`🔍 Pipelines:`, pipelines.map(p => p.display_value));
-    console.log(`🔍 Stages:`, stages.map(s => s.display_value));
+    logger.debug(`✅ Found ${pipelines.length} pipelines and ${stages.length} stages`);
+    logger.debug(`🔍 Pipelines:`, pipelines.map(p => p.display_value));
+    logger.debug(`🔍 Stages:`, stages.map(s => s.display_value));
 
     return {
       success: true,
@@ -2257,7 +2258,7 @@ export async function getBiginPipelineStages() {
     };
 
   } catch (error) {
-    console.error(`❌ Failed to fetch pipeline/stage options:`, error.message);
+    logger.error(`❌ Failed to fetch pipeline/stage options:`, error.message);
     return {
       success: false,
       error: error.message,
@@ -2277,13 +2278,13 @@ export async function getBiginPipelineStages() {
 }
 
 export async function validatePipelineStage(pipelineName, stageName) {
-  console.log(`🔍 Validating pipeline: "${pipelineName}", stage: "${stageName}"`);
+  logger.debug(`🔍 Validating pipeline: "${pipelineName}", stage: "${stageName}"`);
 
   try {
     const pipelineStages = await getBiginPipelineStages();
 
     if (!pipelineStages.success) {
-      console.log(`⚠️ Could not validate against Zoho, allowing values`);
+      logger.debug(`⚠️ Could not validate against Zoho, allowing values`);
       return {
         success: true,
         valid: true,
@@ -2305,7 +2306,7 @@ export async function validatePipelineStage(pipelineName, stageName) {
     );
 
     if (!matchingPipeline) {
-      console.log(`❌ Invalid pipeline: "${pipelineName}". Valid options:`, validPipelines.map(p => p.label));
+      logger.debug(`❌ Invalid pipeline: "${pipelineName}". Valid options:`, validPipelines.map(p => p.label));
       return {
         success: false,
         valid: false,
@@ -2316,7 +2317,7 @@ export async function validatePipelineStage(pipelineName, stageName) {
     }
 
     if (!matchingStage) {
-      console.log(`❌ Invalid stage: "${stageName}". Valid options:`, validStages.map(s => s.label));
+      logger.debug(`❌ Invalid stage: "${stageName}". Valid options:`, validStages.map(s => s.label));
       return {
         success: false,
         valid: false,
@@ -2328,7 +2329,7 @@ export async function validatePipelineStage(pipelineName, stageName) {
       };
     }
 
-    console.log(`✅ Pipeline and stage are valid`);
+    logger.debug(`✅ Pipeline and stage are valid`);
     return {
       success: true,
       valid: true,
@@ -2337,7 +2338,7 @@ export async function validatePipelineStage(pipelineName, stageName) {
     };
 
   } catch (error) {
-    console.error(`❌ Pipeline/stage validation error:`, error.message);
+    logger.error(`❌ Pipeline/stage validation error:`, error.message);
     return {
       success: true,
       valid: true,

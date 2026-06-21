@@ -2,6 +2,7 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from "../../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,11 +15,11 @@ const ensureLogsDirectory = async () => {
     await fs.access(LOGS_DIR);
   } catch (error) {
     await fs.mkdir(LOGS_DIR, { recursive: true });
-    console.log('Created logs directory:', LOGS_DIR);
+    logger.debug('Created logs directory:', LOGS_DIR);
   }
 };
 
-ensureLogsDirectory().catch(console.error);
+ensureLogsDirectory().catch(logger.error);
 
 router.post('/create', async (req, res) => {
   try {
@@ -33,7 +34,7 @@ router.post('/create', async (req, res) => {
       changes
     } = req.body;
 
-    console.log('[VERSION-LOGS] Creating log file:', {
+    logger.debug('[VERSION-LOGS] Creating log file:', {
       agreementId,
       versionNumber,
       changesCount: changes?.length || 0,
@@ -58,7 +59,7 @@ router.post('/create', async (req, res) => {
 
     await fs.writeFile(filePath, logContent, 'utf8');
 
-    console.log('[VERSION-LOGS] Log file created successfully:', fileName);
+    logger.debug('[VERSION-LOGS] Log file created successfully:', fileName);
 
     const totalChanges = changes?.length || 0;
     const totalPriceImpact = changes?.reduce((sum, change) => sum + (change.changeAmount || 0), 0) || 0;
@@ -84,7 +85,7 @@ router.post('/create', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[VERSION-LOGS] Error creating log file:', error);
+    logger.error('[VERSION-LOGS] Error creating log file:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create version log file',
@@ -119,7 +120,7 @@ router.get('/:agreementId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[VERSION-LOGS] Error getting log files:', error);
+    logger.error('[VERSION-LOGS] Error getting log files:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get log files',
@@ -142,7 +143,7 @@ router.get('/download/:fileName', async (req, res) => {
     res.status(200).send(content);
 
   } catch (error) {
-    console.error('[VERSION-LOGS] Error downloading log file:', error);
+    logger.error('[VERSION-LOGS] Error downloading log file:', error);
     res.status(404).json({
       success: false,
       message: 'Log file not found',

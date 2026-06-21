@@ -4,6 +4,7 @@
  */
 
 import { chromium } from 'playwright-core';
+import logger from "../../utils/logger.js";
 
 const BASE_URL = process.env.ROUTESTAR_BASE_URL || 'https://emnrv.routestar.online';
 const USERNAME = process.env.ROUTESTAR_USERNAME || '';
@@ -13,9 +14,9 @@ const PASSWORD = process.env.ROUTESTAR_PASSWORD || '';
  * Login to RouteSTAR
  */
 async function login(page) {
-  console.log('🔐 Logging into RouteStar...');
-  console.log(`   URL: ${BASE_URL}/web/login/`);
-  console.log(`   Username: ${USERNAME ? USERNAME.substring(0, 3) + '***' : 'NOT SET'}`);
+  logger.debug('🔐 Logging into RouteStar...');
+  logger.debug(`   URL: ${BASE_URL}/web/login/`);
+  logger.debug(`   Username: ${USERNAME ? USERNAME.substring(0, 3) + '***' : 'NOT SET'}`);
 
   if (!USERNAME || !PASSWORD) {
     throw new Error('ROUTESTAR_USERNAME or ROUTESTAR_PASSWORD not set in environment');
@@ -51,7 +52,7 @@ async function login(page) {
   } catch (e) {
     // Check if we're already logged in by looking at the URL
     const currentUrl = page.url();
-    console.log('   Current URL after login attempt:', currentUrl);
+    logger.debug('   Current URL after login attempt:', currentUrl);
   }
 
   // Verify login success
@@ -62,7 +63,7 @@ async function login(page) {
     throw new Error(`Login failed: ${errorMsg || 'Still on login page'}`);
   }
 
-  console.log('✅ Login successful');
+  logger.debug('✅ Login successful');
   return true;
 }
 
@@ -70,7 +71,7 @@ async function login(page) {
  * Navigate to customers page and set up for scraping
  */
 async function navigateToCustomers(page) {
-  console.log('📍 Navigating to customers page...');
+  logger.debug('📍 Navigating to customers page...');
   await page.goto(`${BASE_URL}/web/customers/`, {
     waitUntil: 'networkidle',
     timeout: 30000
@@ -78,10 +79,10 @@ async function navigateToCustomers(page) {
 
   // Wait for table to load
   await page.waitForSelector('#customer-list-table, .handsontable, table', { timeout: 30000 });
-  console.log('✅ Customers page loaded');
+  logger.debug('✅ Customers page loaded');
 
   // Set items per page to 20 (no scrolling needed at this size)
-  console.log('📋 Setting items per page to 20...');
+  logger.debug('📋 Setting items per page to 20...');
   try {
     const selectExists = await page.$('#items_per_page');
     if (selectExists) {
@@ -89,12 +90,12 @@ async function navigateToCustomers(page) {
       await page.selectOption('#items_per_page', '20');
       await new Promise(resolve => setTimeout(resolve, 2000));
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      console.log('✅ Set to 20 items per page');
+      logger.debug('✅ Set to 20 items per page');
     } else {
-      console.log('⚠️ Items per page dropdown not found, using default');
+      logger.debug('⚠️ Items per page dropdown not found, using default');
     }
   } catch (e) {
-    console.log('⚠️ Could not set items per page:', e.message);
+    logger.debug('⚠️ Could not set items per page:', e.message);
   }
 }
 
@@ -144,10 +145,10 @@ async function getTotalPages(page) {
       return 1; // Default to 1 page if we can't determine
     });
 
-    console.log(`📄 Found ${totalPages} total pages`);
+    logger.debug(`📄 Found ${totalPages} total pages`);
     return totalPages;
   } catch (e) {
-    console.log('⚠️ Could not determine total pages:', e.message);
+    logger.debug('⚠️ Could not determine total pages:', e.message);
     return 1;
   }
 }
@@ -157,7 +158,7 @@ async function getTotalPages(page) {
  */
 async function goToPage(page, pageNum) {
   try {
-    console.log(`   Navigating to page ${pageNum}...`);
+    logger.debug(`   Navigating to page ${pageNum}...`);
 
     // Try clicking the page number in pagination
     const clicked = await page.evaluate((targetPage) => {
@@ -192,7 +193,7 @@ async function goToPage(page, pageNum) {
 
     return false;
   } catch (e) {
-    console.log(`   ⚠️ Error navigating to page ${pageNum}:`, e.message);
+    logger.debug(`   ⚠️ Error navigating to page ${pageNum}:`, e.message);
     return false;
   }
 }
@@ -282,19 +283,19 @@ async function scrapeCurrentPage(page) {
  * Scrape all customers with pagination support
  */
 async function scrapeAllCustomers(page, onProgress) {
-  console.log('🔍 Starting to scrape all customers (20 per page)...');
+  logger.debug('🔍 Starting to scrape all customers (20 per page)...');
 
   let allCustomers = [];
   let currentPage = 1;
   let consecutiveEmptyPages = 0;
 
   // Scrape first page
-  console.log(`📄 Scraping page 1...`);
+  logger.debug(`📄 Scraping page 1...`);
   onProgress?.(50, `Scraping page 1...`);
 
   const firstPageCustomers = await scrapeCurrentPage(page);
   allCustomers = [...firstPageCustomers];
-  console.log(`   Found ${firstPageCustomers.length} customers on page 1`);
+  logger.debug(`   Found ${firstPageCustomers.length} customers on page 1`);
 
   // Keep navigating to next pages
   while (consecutiveEmptyPages < 2) {
@@ -317,7 +318,7 @@ async function scrapeAllCustomers(page, onProgress) {
 
     // If page number not visible, click "»" to load more pages first
     if (!navigated.success) {
-      console.log(`   Page ${currentPage} not visible, clicking » to load more pages...`);
+      logger.debug(`   Page ${currentPage} not visible, clicking » to load more pages...`);
 
       const clickedNext = await page.evaluate(() => {
         const nextLi = document.querySelector('.pagination li.next:not(.disabled)');
@@ -332,7 +333,7 @@ async function scrapeAllCustomers(page, onProgress) {
       });
 
       if (!clickedNext) {
-        console.log(`   ✅ No more next button, reached last page`);
+        logger.debug(`   ✅ No more next button, reached last page`);
         break;
       }
 
@@ -362,30 +363,30 @@ async function scrapeAllCustomers(page, onProgress) {
       if (!navigated.success) {
         // Check if we're already past the target (means we're at the end)
         if (navigated.activePage && navigated.activePage >= currentPage) {
-          console.log(`   Already at page ${navigated.activePage}, continuing...`);
+          logger.debug(`   Already at page ${navigated.activePage}, continuing...`);
           currentPage = navigated.activePage;
         } else {
-          console.log(`   ⚠️ Could not navigate to page ${currentPage}, stopping`);
+          logger.debug(`   ⚠️ Could not navigate to page ${currentPage}, stopping`);
           break;
         }
       }
     }
 
-    console.log(`   Navigating to page ${currentPage}...`);
+    logger.debug(`   Navigating to page ${currentPage}...`);
 
     // Wait for page to load
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const progressPercent = Math.min(50 + currentPage * 2, 90);
     onProgress?.(progressPercent, `Scraping page ${currentPage}...`);
-    console.log(`📄 Scraping page ${currentPage}...`);
+    logger.debug(`📄 Scraping page ${currentPage}...`);
 
     const pageCustomers = await scrapeCurrentPage(page);
-    console.log(`   Found ${pageCustomers.length} customers on page ${currentPage}`);
+    logger.debug(`   Found ${pageCustomers.length} customers on page ${currentPage}`);
 
     if (pageCustomers.length === 0) {
       consecutiveEmptyPages++;
-      console.log(`   ⚠️ No customers found on page ${currentPage}`);
+      logger.debug(`   ⚠️ No customers found on page ${currentPage}`);
     } else {
       consecutiveEmptyPages = 0;
       allCustomers = [...allCustomers, ...pageCustomers];
@@ -393,7 +394,7 @@ async function scrapeAllCustomers(page, onProgress) {
 
     // Safety check - if we've scraped more than 50 pages, something is wrong
     if (currentPage > 50) {
-      console.log(`   ⚠️ Safety limit reached (50 pages), stopping`);
+      logger.debug(`   ⚠️ Safety limit reached (50 pages), stopping`);
       break;
     }
   }
@@ -406,7 +407,7 @@ async function scrapeAllCustomers(page, onProgress) {
     return acc;
   }, []);
 
-  console.log(`✅ Total unique customers scraped: ${uniqueCustomers.length}`);
+  logger.debug(`✅ Total unique customers scraped: ${uniqueCustomers.length}`);
   return uniqueCustomers;
 }
 
@@ -417,7 +418,7 @@ export async function scrapeRouteStarCustomers(onProgress) {
   let browser = null;
 
   try {
-    console.log('🚀 Starting RouteSTAR customer scrape...');
+    logger.debug('🚀 Starting RouteSTAR customer scrape...');
     onProgress?.(5, 'Launching browser...');
 
     browser = await chromium.launch({
@@ -453,10 +454,10 @@ export async function scrapeRouteStarCustomers(onProgress) {
     await browser.close();
 
     if (customers.length === 0) {
-      console.log('⚠️ No customers found - table may be empty or structure changed');
+      logger.debug('⚠️ No customers found - table may be empty or structure changed');
     }
 
-    console.log('🎉 Scrape completed successfully!');
+    logger.debug('🎉 Scrape completed successfully!');
     return {
       success: true,
       customers,
@@ -464,7 +465,7 @@ export async function scrapeRouteStarCustomers(onProgress) {
       scrapedAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('❌ Scrape failed:', error);
+    logger.error('❌ Scrape failed:', error);
 
     if (browser) {
       await browser.close();

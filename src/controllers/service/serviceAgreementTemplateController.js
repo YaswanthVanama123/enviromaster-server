@@ -1,4 +1,5 @@
 import { ServiceAgreementTemplate } from "../../models/service/index.js";
+import logger from "../../utils/logger.js";
 
 export async function getActiveTemplate(req, res) {
   try {
@@ -12,7 +13,7 @@ export async function getActiveTemplate(req, res) {
         name: 'default',
         isActive: true
       });
-      console.log('📝 [SERVICE-AGREEMENT-TEMPLATE] Created default template');
+      logger.debug('📝 [SERVICE-AGREEMENT-TEMPLATE] Created default template');
 
       template = newTemplate.toObject();
     }
@@ -53,7 +54,7 @@ export async function getActiveTemplate(req, res) {
       }
     });
   } catch (error) {
-    console.error('❌ [SERVICE-AGREEMENT-TEMPLATE] Error fetching active template:', error);
+    logger.error('❌ [SERVICE-AGREEMENT-TEMPLATE] Error fetching active template:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch service agreement template',
@@ -76,7 +77,7 @@ export async function updateTemplate(req, res) {
       pageNumberText
     } = req.body;
 
-    console.log('📝 [SERVICE-AGREEMENT-TEMPLATE] Updating service agreement template');
+    logger.debug('📝 [SERVICE-AGREEMENT-TEMPLATE] Updating service agreement template');
 
     const updateData = {
       updatedAt: new Date(),
@@ -123,7 +124,7 @@ export async function updateTemplate(req, res) {
       }
     ).lean();
 
-    console.log('✅ [SERVICE-AGREEMENT-TEMPLATE] Template updated successfully');
+    logger.debug('✅ [SERVICE-AGREEMENT-TEMPLATE] Template updated successfully');
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -162,7 +163,7 @@ export async function updateTemplate(req, res) {
       }
     });
   } catch (error) {
-    console.error('❌ [SERVICE-AGREEMENT-TEMPLATE] Error updating template:', error);
+    logger.error('❌ [SERVICE-AGREEMENT-TEMPLATE] Error updating template:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to update service agreement template',

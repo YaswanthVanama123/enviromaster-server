@@ -9,6 +9,7 @@ import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { scrapeBiginAuditLogs } from "../../services/biginAuditScraper.js";
 import { v4 as uuidv4 } from "uuid";
 import { parse } from "csv-parse/sync";
+import logger from "../../utils/logger.js";
 
 // Track scrape status in memory
 let scrapeStatus = {
@@ -92,7 +93,7 @@ export const getAllAuditLogs = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching audit logs:", error);
+    logger.error("Error fetching audit logs:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch audit logs",
@@ -121,7 +122,7 @@ export const getAuditLogById = async (req, res) => {
       data: log,
     });
   } catch (error) {
-    console.error("Error fetching audit log:", error);
+    logger.error("Error fetching audit log:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch audit log",
@@ -153,7 +154,7 @@ export const getScrapeStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting scrape status:", error);
+    logger.error("Error getting scrape status:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get scrape status",
@@ -202,7 +203,7 @@ export const startScrape = async (req, res) => {
 
     runScrapeInBackground(sessionId);
   } catch (error) {
-    console.error("Error starting scrape:", error);
+    logger.error("Error starting scrape:", error);
     scrapeStatus.isRunning = false;
     res.status(500).json({
       success: false,
@@ -216,7 +217,7 @@ export const startScrape = async (req, res) => {
  */
 async function runScrapeInBackground(sessionId) {
   try {
-    console.log("🚀 Starting Bigin audit log scrape...");
+    logger.debug("🚀 Starting Bigin audit log scrape...");
 
     const onProgress = (progress, message) => {
       scrapeStatus.progress = progress;
@@ -258,9 +259,9 @@ async function runScrapeInBackground(sessionId) {
       }
     );
 
-    console.log(`✅ Scrape completed: ${result.auditLogs.length} logs`);
+    logger.debug(`✅ Scrape completed: ${result.auditLogs.length} logs`);
   } catch (error) {
-    console.error("❌ Scrape failed:", error);
+    logger.error("❌ Scrape failed:", error);
     scrapeStatus.isRunning = false;
     scrapeStatus.lastScrapeAt = new Date();
     scrapeStatus.lastScrapeResult = "failed";
@@ -284,7 +285,7 @@ async function runScrapeInBackground(sessionId) {
  * Only stores Lisa Rothwell's records
  */
 async function saveAuditLogsToDatabase(auditLogs, sessionId) {
-  console.log(`💾 Processing ${auditLogs.length} audit logs (storing only Lisa Rothwell's records)...`);
+  logger.debug(`💾 Processing ${auditLogs.length} audit logs (storing only Lisa Rothwell's records)...`);
 
   let saved = 0;
   let skipped = 0;
@@ -347,11 +348,11 @@ async function saveAuditLogsToDatabase(auditLogs, sessionId) {
         skipped++;
       }
     } catch (err) {
-      console.error(`Error saving audit log:`, err.message);
+      logger.error(`Error saving audit log:`, err.message);
     }
   }
 
-  console.log(`✅ Save complete: ${saved} new Lisa Rothwell records, ${skipped} duplicates skipped, ${skippedNonLisa} non-Lisa skipped`);
+  logger.debug(`✅ Save complete: ${saved} new Lisa Rothwell records, ${skipped} duplicates skipped, ${skippedNonLisa} non-Lisa skipped`);
   return saved;
 }
 
@@ -374,7 +375,7 @@ export const getAuditStats = async (req, res) => {
       ]);
       storageSize = result[0]?.totalSize || 0;
     } catch (statsError) {
-      console.error("Error getting collection stats:", statsError.message);
+      logger.error("Error getting collection stats:", statsError.message);
     }
 
     const users = await BiginAuditLog.distinct("user");
@@ -455,7 +456,7 @@ export const getAuditStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting audit stats:", error);
+    logger.error("Error getting audit stats:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get audit stats",
@@ -487,7 +488,7 @@ export const getScrapeHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting scrape history:", error);
+    logger.error("Error getting scrape history:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get scrape history",
@@ -507,7 +508,7 @@ export const uploadCsv = async (req, res) => {
       });
     }
 
-    console.log("📤 Processing CSV upload...");
+    logger.debug("📤 Processing CSV upload...");
 
     const csvContent = req.file.buffer.toString("utf-8");
 
@@ -533,7 +534,7 @@ export const uploadCsv = async (req, res) => {
       });
     }
 
-    console.log(`📊 Found ${records.length} rows in CSV`);
+    logger.debug(`📊 Found ${records.length} rows in CSV`);
 
     const sessionId = uuidv4();
     await BiginScrapeSession.create({
@@ -640,7 +641,7 @@ export const uploadCsv = async (req, res) => {
           skipped++;
         }
       } catch (err) {
-        console.error("Error processing CSV row:", err.message);
+        logger.error("Error processing CSV row:", err.message);
         errors++;
       }
     }
@@ -653,7 +654,7 @@ export const uploadCsv = async (req, res) => {
       }
     );
 
-    console.log(`✅ CSV upload complete: ${saved} saved, ${skipped} duplicates skipped, ${skippedNonLisa} non-Lisa skipped, ${errors} errors`);
+    logger.debug(`✅ CSV upload complete: ${saved} saved, ${skipped} duplicates skipped, ${skippedNonLisa} non-Lisa skipped, ${errors} errors`);
 
     res.json({
       success: true,
@@ -669,7 +670,7 @@ export const uploadCsv = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error uploading CSV:", error);
+    logger.error("Error uploading CSV:", error);
     res.status(500).json({
       success: false,
       error: "Failed to process CSV file: " + error.message,
@@ -731,7 +732,7 @@ function parseAuditedTime(timeStr) {
  */
 export const deleteAllAuditLogs = async (req, res) => {
   try {
-    console.log("🗑️ Deleting all audit logs...");
+    logger.debug("🗑️ Deleting all audit logs...");
 
     const count = await BiginAuditLog.countDocuments();
     const result = await BiginAuditLog.deleteMany({});
@@ -746,7 +747,7 @@ export const deleteAllAuditLogs = async (req, res) => {
       currentSessionId: null,
     };
 
-    console.log(`✅ Deleted ${result.deletedCount} audit logs`);
+    logger.debug(`✅ Deleted ${result.deletedCount} audit logs`);
 
     res.json({
       success: true,
@@ -757,7 +758,7 @@ export const deleteAllAuditLogs = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error deleting audit logs:", error);
+    logger.error("Error deleting audit logs:", error);
     res.status(500).json({
       success: false,
       error: "Failed to delete audit logs",
@@ -770,14 +771,14 @@ export const deleteAllAuditLogs = async (req, res) => {
  */
 export const deleteUnnecessaryData = async (req, res) => {
   try {
-    console.log("🗑️ Deleting unnecessary audit logs (keeping Lisa Rothwell's records)...");
+    logger.debug("🗑️ Deleting unnecessary audit logs (keeping Lisa Rothwell's records)...");
 
     const totalCount = await BiginAuditLog.countDocuments();
     const lisaCount = await BiginAuditLog.countDocuments({ user: "Lisa Rothwell" });
 
     const result = await BiginAuditLog.deleteMany({ user: { $ne: "Lisa Rothwell" } });
 
-    console.log(`✅ Deleted ${result.deletedCount} unnecessary audit logs, kept ${lisaCount} Lisa Rothwell records`);
+    logger.debug(`✅ Deleted ${result.deletedCount} unnecessary audit logs, kept ${lisaCount} Lisa Rothwell records`);
 
     res.json({
       success: true,
@@ -789,7 +790,7 @@ export const deleteUnnecessaryData = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error deleting unnecessary audit logs:", error);
+    logger.error("Error deleting unnecessary audit logs:", error);
     res.status(500).json({
       success: false,
       error: "Failed to delete unnecessary audit logs",
@@ -811,14 +812,14 @@ export const checkInsideSalesEligibility = async (req, res) => {
       });
     }
 
-    console.log(`🔍 Checking inside sales eligibility for salesperson: ${salespersonName}`);
+    logger.debug(`🔍 Checking inside sales eligibility for salesperson: ${salespersonName}`);
 
     const allAgreementsByUser = await CustomerHeaderDoc.find({
       createdBy: { $regex: new RegExp(`^${salespersonName}$`, 'i') },
       isDeleted: { $ne: true },
     }).select("_id payload.headerTitle createdAt createdBy zoho.bigin.dealId").lean();
 
-    console.log(`📋 Total agreements by ${salespersonName}: ${allAgreementsByUser.length}`);
+    logger.debug(`📋 Total agreements by ${salespersonName}: ${allAgreementsByUser.length}`);
 
     if (allAgreementsByUser.length === 0) {
       return res.json({
@@ -844,7 +845,7 @@ export const checkInsideSalesEligibility = async (req, res) => {
       agreementId: { $in: agreementIds },
     }).select("agreementId zohoDeal.id zohoDeal.name").lean();
 
-    console.log(`📊 Found ${zohoMappings.length} ZohoMappings for ${allAgreementsByUser.length} agreements`);
+    logger.debug(`📊 Found ${zohoMappings.length} ZohoMappings for ${allAgreementsByUser.length} agreements`);
 
     const mappingByAgreementId = {};
     zohoMappings.forEach(m => {
@@ -870,7 +871,7 @@ export const checkInsideSalesEligibility = async (req, res) => {
     const agreementsWithBiginIds = agreementDetails.filter(a => a.biginId && a.biginId.trim() !== "");
     const biginIds = agreementsWithBiginIds.map(a => a.biginId);
 
-    console.log(`📊 Extracted ${biginIds.length} Bigin IDs from ${allAgreementsByUser.length} agreements:`, biginIds.slice(0, 5));
+    logger.debug(`📊 Extracted ${biginIds.length} Bigin IDs from ${allAgreementsByUser.length} agreements:`, biginIds.slice(0, 5));
 
     if (biginIds.length === 0) {
       return res.json({
@@ -913,7 +914,7 @@ export const checkInsideSalesEligibility = async (req, res) => {
       if (biginIds.includes(r.biginId)) matchedBiginIds.add(r.biginId);
     });
 
-    console.log(`✅ Inside sales eligibility for ${salespersonName}: ${isInsideSales} (${matchingRecords.length} audit records found)`);
+    logger.debug(`✅ Inside sales eligibility for ${salespersonName}: ${isInsideSales} (${matchingRecords.length} audit records found)`);
 
     res.json({
       success: true,
@@ -937,7 +938,7 @@ export const checkInsideSalesEligibility = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error checking inside sales eligibility:", error);
+    logger.error("Error checking inside sales eligibility:", error);
     res.status(500).json({
       success: false,
       error: "Failed to check inside sales eligibility",

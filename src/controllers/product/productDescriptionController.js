@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { COMPREHENSIVE_PRODUCT_DATA, SERVICE_PRICING } from "../../data/comprehensiveProductData.js";
+import logger from "../../utils/logger.js";
 
 const LEGACY_PRODUCT_DESCRIPTIONS = {
   floor_daily: "Water-based for daily floor cleaning. Excellent for regular maintenance cleaning.",
@@ -98,7 +99,7 @@ export async function getProductCatalog(req, res) {
       data: catalog
     });
   } catch (error) {
-    console.error('Error fetching product catalog:', error);
+    logger.error('Error fetching product catalog:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product catalog',
@@ -112,7 +113,7 @@ export async function addProductDescriptions(req, res) {
     const db = mongoose.connection.db;
     const collection = db.collection('productcatalogs');
 
-    console.log('🔄 Adding descriptions to product catalog...');
+    logger.debug('🔄 Adding descriptions to product catalog...');
 
     const catalog = await collection.findOne({ isActive: true });
     if (!catalog) {
@@ -131,10 +132,10 @@ export async function addProductDescriptions(req, res) {
         if (description) {
           product.description = description;
           updatedCount++;
-          console.log(`✅ Added description for ${product.key}: ${product.name}`);
+          logger.debug(`✅ Added description for ${product.key}: ${product.name}`);
         } else {
           skippedCount++;
-          console.log(`⚠️  No description found for ${product.key}: ${product.name}`);
+          logger.debug(`⚠️  No description found for ${product.key}: ${product.name}`);
         }
       });
     });
@@ -149,8 +150,8 @@ export async function addProductDescriptions(req, res) {
       }
     );
 
-    console.log(`✅ Product descriptions update completed`);
-    console.log(`📊 Updated: ${updatedCount}, Skipped: ${skippedCount}`);
+    logger.debug(`✅ Product descriptions update completed`);
+    logger.debug(`📊 Updated: ${updatedCount}, Skipped: ${skippedCount}`);
 
     res.json({
       success: true,
@@ -164,7 +165,7 @@ export async function addProductDescriptions(req, res) {
     });
 
   } catch (error) {
-    console.error('Error adding product descriptions:', error);
+    logger.error('Error adding product descriptions:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to add product descriptions',
@@ -188,7 +189,7 @@ export async function updateProductDescription(req, res) {
     const db = mongoose.connection.db;
     const collection = db.collection('productcatalogs');
 
-    console.log(`🔄 Updating description for product: ${productKey}`);
+    logger.debug(`🔄 Updating description for product: ${productKey}`);
 
     const result = await collection.updateOne(
       {
@@ -216,7 +217,7 @@ export async function updateProductDescription(req, res) {
       });
     }
 
-    console.log(`✅ Updated description for ${productKey}`);
+    logger.debug(`✅ Updated description for ${productKey}`);
 
     res.json({
       success: true,
@@ -226,7 +227,7 @@ export async function updateProductDescription(req, res) {
     });
 
   } catch (error) {
-    console.error('Error updating product description:', error);
+    logger.error('Error updating product description:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update product description',
@@ -286,7 +287,7 @@ export async function getMissingDescriptions(req, res) {
     });
 
   } catch (error) {
-    console.error('Error getting missing descriptions:', error);
+    logger.error('Error getting missing descriptions:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get missing descriptions',
@@ -300,7 +301,7 @@ export async function addComprehensiveProductData(req, res) {
     const db = mongoose.connection.db;
     const collection = db.collection('productcatalogs');
 
-    console.log('🔄 Adding comprehensive product data to catalog...');
+    logger.debug('🔄 Adding comprehensive product data to catalog...');
 
     const catalog = await collection.findOne({ isActive: true });
     if (!catalog) {
@@ -346,16 +347,16 @@ export async function addComprehensiveProductData(req, res) {
             note: comprehensiveData.note
           });
           updatedCount++;
-          console.log(`✅ Added comprehensive data for ${product.key}: ${product.name}`);
+          logger.debug(`✅ Added comprehensive data for ${product.key}: ${product.name}`);
         } else {
           const legacyDescription = LEGACY_PRODUCT_DESCRIPTIONS[product.key];
           if (legacyDescription && !product.description) {
             product.description = legacyDescription;
             updatedCount++;
-            console.log(`⚠️ Added legacy description for ${product.key}: ${product.name}`);
+            logger.debug(`⚠️ Added legacy description for ${product.key}: ${product.name}`);
           } else {
             skippedCount++;
-            console.log(`⚠️ No comprehensive or legacy data found for ${product.key}: ${product.name}`);
+            logger.debug(`⚠️ No comprehensive or legacy data found for ${product.key}: ${product.name}`);
           }
         }
       });
@@ -372,8 +373,8 @@ export async function addComprehensiveProductData(req, res) {
       }
     );
 
-    console.log(`✅ Comprehensive product data update completed`);
-    console.log(`📊 Updated: ${updatedCount}, Skipped: ${skippedCount}`);
+    logger.debug(`✅ Comprehensive product data update completed`);
+    logger.debug(`📊 Updated: ${updatedCount}, Skipped: ${skippedCount}`);
 
     res.json({
       success: true,
@@ -388,7 +389,7 @@ export async function addComprehensiveProductData(req, res) {
     });
 
   } catch (error) {
-    console.error('Error adding comprehensive product data:', error);
+    logger.error('Error adding comprehensive product data:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to add comprehensive product data',
@@ -440,7 +441,7 @@ export async function getComprehensiveProductData(req, res) {
     res.json(responseData);
 
   } catch (error) {
-    console.error('Error getting comprehensive product data:', error);
+    logger.error('Error getting comprehensive product data:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get comprehensive product data',
@@ -476,7 +477,7 @@ export async function getServicePricing(req, res) {
     }
 
   } catch (error) {
-    console.error('Error getting service pricing:', error);
+    logger.error('Error getting service pricing:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get service pricing',
@@ -544,7 +545,7 @@ export async function getProductsByCategory(req, res) {
     });
 
   } catch (error) {
-    console.error('Error getting products by category:', error);
+    logger.error('Error getting products by category:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get products by category',
@@ -640,7 +641,7 @@ export async function getPricingSummary(req, res) {
     });
 
   } catch (error) {
-    console.error('Error getting pricing summary:', error);
+    logger.error('Error getting pricing summary:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get pricing summary',
@@ -665,7 +666,7 @@ export async function getAvailableCategories(req, res) {
     });
 
   } catch (error) {
-    console.error('Error getting available categories:', error);
+    logger.error('Error getting available categories:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get available categories',

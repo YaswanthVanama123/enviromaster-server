@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { signAdminToken } from "../../middleware/adminAuth.js";
 import { AdminUser } from "../../models/user/index.js";
 import { CustomerHeaderDoc, ManualUploadDocument } from "../../models/agreement/index.js";
+import logger from "../../utils/logger.js";
 
 export async function adminLogin(req, res) {
   try {
@@ -41,7 +42,7 @@ export async function adminLogin(req, res) {
       },
     });
   } catch (err) {
-    console.error("adminLogin error:", err);
+    logger.error("adminLogin error:", err);
     res.status(500).json({ error: "Login failed", detail: String(err) });
   }
 }
@@ -89,7 +90,7 @@ export async function changeAdminPassword(req, res) {
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (err) {
-    console.error("changeAdminPassword error:", err);
+    logger.error("changeAdminPassword error:", err);
     res
       .status(500)
       .json({ error: "Password change failed", detail: String(err) });
@@ -117,7 +118,7 @@ export async function getAdminProfile(req, res) {
 
     res.json({ admin });
   } catch (err) {
-    console.error("getAdminProfile error:", err);
+    logger.error("getAdminProfile error:", err);
     res
       .status(500)
       .json({ error: "Failed to fetch admin profile", detail: String(err) });
@@ -165,7 +166,7 @@ export async function createAdminAccount(req, res) {
       },
     });
   } catch (err) {
-    console.error("createAdminAccount error:", err);
+    logger.error("createAdminAccount error:", err);
     res
       .status(500)
       .json({ error: "Create admin failed", detail: String(err) });
@@ -175,10 +176,10 @@ export async function createAdminAccount(req, res) {
 export async function getAdminDashboard(req, res) {
   try {
     const startTime = Date.now();
-    console.log('📊 [ADMIN-DASHBOARD] Starting optimized dashboard data fetch...');
+    logger.debug('📊 [ADMIN-DASHBOARD] Starting optimized dashboard data fetch...');
 
     if (mongoose.connection.readyState !== 1) {
-      console.log('⚠️ [ADMIN-DASHBOARD] Database not connected, connection state:', mongoose.connection.readyState);
+      logger.debug('⚠️ [ADMIN-DASHBOARD] Database not connected, connection state:', mongoose.connection.readyState);
       return res.json({
         stats: {
           manualUploads: 0,
@@ -265,11 +266,11 @@ export async function getAdminDashboard(req, res) {
     const approvedCount = stats.approvedCount[0]?.count || 0;
 
     const totalTime = Date.now() - startTime;
-    console.log(`⚡ [OPTIMIZED SUMMARY] Total: ${totalTime}ms | Aggregation: ${aggregationTime}ms`);
-    console.log('📊 [COUNTS] Manual uploads:', manualUploadsCount);
-    console.log('📊 [COUNTS] Total documents:', totalDocumentsCount);
-    console.log('📊 [COUNTS] Saved documents:', savedDocumentsCount);
-    console.log('📊 [COUNTS] By status - Draft:', draftCount, 'Saved:', savedCount, 'Pending:', pendingCount, 'Approved:', approvedCount);
+    logger.debug(`⚡ [OPTIMIZED SUMMARY] Total: ${totalTime}ms | Aggregation: ${aggregationTime}ms`);
+    logger.debug('📊 [COUNTS] Manual uploads:', manualUploadsCount);
+    logger.debug('📊 [COUNTS] Total documents:', totalDocumentsCount);
+    logger.debug('📊 [COUNTS] Saved documents:', savedDocumentsCount);
+    logger.debug('📊 [COUNTS] By status - Draft:', draftCount, 'Saved:', savedCount, 'Pending:', pendingCount, 'Approved:', approvedCount);
 
     const dashboardData = {
       stats: {
@@ -307,7 +308,7 @@ export async function getAdminDashboard(req, res) {
       }
     };
 
-    console.log('✅ [ADMIN-DASHBOARD] Successfully fetched dashboard data:', {
+    logger.debug('✅ [ADMIN-DASHBOARD] Successfully fetched dashboard data:', {
       manualUploads: manualUploadsCount,
       savedDocuments: savedDocumentsCount,
       totalDocuments: totalDocumentsCount,
@@ -317,8 +318,8 @@ export async function getAdminDashboard(req, res) {
     res.json(dashboardData);
 
   } catch (err) {
-    console.error('❌ [ADMIN-DASHBOARD] Error fetching dashboard data:', err);
-    console.error('❌ [ADMIN-DASHBOARD] Error stack:', err.stack);
+    logger.error('❌ [ADMIN-DASHBOARD] Error fetching dashboard data:', err);
+    logger.error('❌ [ADMIN-DASHBOARD] Error stack:', err.stack);
 
     res.status(500).json({
       error: "Failed to fetch dashboard data",
@@ -351,11 +352,11 @@ export async function getAdminRecentDocuments(req, res) {
       100
     );
 
-    console.log('📄 [ADMIN-RECENT] Fetching recent documents - page:', page, 'limit:', limit);
-    console.log('📄 [DB-STATE] Connection state:', mongoose.connection.readyState);
+    logger.debug('📄 [ADMIN-RECENT] Fetching recent documents - page:', page, 'limit:', limit);
+    logger.debug('📄 [DB-STATE] Connection state:', mongoose.connection.readyState);
 
     if (mongoose.connection.readyState !== 1) {
-      console.log('⚠️ [ADMIN-RECENT] Database not connected, connection state:', mongoose.connection.readyState);
+      logger.debug('⚠️ [ADMIN-RECENT] Database not connected, connection state:', mongoose.connection.readyState);
       return res.json({
         total: 0,
         page,
@@ -378,14 +379,14 @@ export async function getAdminRecentDocuments(req, res) {
 
     if (req.query.status) {
       filter.status = req.query.status;
-      console.log('📄 [ADMIN-RECENT] Filtering by status:', req.query.status);
+      logger.debug('📄 [ADMIN-RECENT] Filtering by status:', req.query.status);
     }
 
-    console.log('📄 [QUERY] Counting total documents...');
+    logger.debug('📄 [QUERY] Counting total documents...');
     const total = await CustomerHeaderDoc.countDocuments(filter);
-    console.log('📄 [COUNT] Total matching documents:', total);
+    logger.debug('📄 [COUNT] Total matching documents:', total);
 
-    console.log('📄 [QUERY] Fetching recent documents...');
+    logger.debug('📄 [QUERY] Fetching recent documents...');
     const documents = await CustomerHeaderDoc.find(filter)
       .select({
         _id: 1,
@@ -406,7 +407,7 @@ export async function getAdminRecentDocuments(req, res) {
       .limit(limit)
       .lean();
 
-    console.log('📄 [RESULT] Found documents for this page:', documents.length);
+    logger.debug('📄 [RESULT] Found documents for this page:', documents.length);
 
     const transformedDocuments = documents.map(doc => {
       try {
@@ -433,7 +434,7 @@ export async function getAdminRecentDocuments(req, res) {
           })
         };
       } catch (transformError) {
-        console.warn('⚠️ [ADMIN-RECENT] Error transforming document:', doc._id, transformError);
+        logger.warn('⚠️ [ADMIN-RECENT] Error transforming document:', doc._id, transformError);
         return {
           id: doc._id,
           title: 'Error loading document',
@@ -448,7 +449,7 @@ export async function getAdminRecentDocuments(req, res) {
       }
     });
 
-    console.log('✅ [ADMIN-RECENT] Successfully fetched recent documents:', {
+    logger.debug('✅ [ADMIN-RECENT] Successfully fetched recent documents:', {
       total,
       page,
       limit,
@@ -472,8 +473,8 @@ export async function getAdminRecentDocuments(req, res) {
     });
 
   } catch (err) {
-    console.error('❌ [ADMIN-RECENT] Error fetching recent documents:', err);
-    console.error('❌ [ADMIN-RECENT] Error stack:', err.stack);
+    logger.error('❌ [ADMIN-RECENT] Error fetching recent documents:', err);
+    logger.error('❌ [ADMIN-RECENT] Error stack:', err.stack);
 
     res.status(500).json({
       error: "Failed to fetch recent documents",
@@ -611,7 +612,7 @@ export async function getAdminDashboardStatusCounts(req, res) {
       endDate: endDate?.toISOString() || null
     });
   } catch (err) {
-    console.error("getAdminDashboardStatusCounts error:", err);
+    logger.error("getAdminDashboardStatusCounts error:", err);
     res.status(500).json({
       success: false,
       error: "Failed to fetch status counts",
@@ -668,7 +669,7 @@ export async function resetAdminPassword(req, res) {
     admin.passwordChangedAt = new Date();
     await admin.save();
 
-    console.log(`[ADMIN-AUTH] Password reset by developer: ${developerName}`);
+    logger.debug(`[ADMIN-AUTH] Password reset by developer: ${developerName}`);
 
     res.json({
       success: true,
@@ -676,7 +677,7 @@ export async function resetAdminPassword(req, res) {
     });
 
   } catch (err) {
-    console.error("resetAdminPassword error:", err);
+    logger.error("resetAdminPassword error:", err);
     res
       .status(500)
       .json({

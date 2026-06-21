@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
+import logger from "../../utils/logger.js";
 
 export async function getApprovalDocumentsGrouped(req, res) {
   try {
@@ -63,7 +64,7 @@ export async function getApprovalDocumentsGrouped(req, res) {
     const totalFiles = groups.reduce((sum, g) => sum + g.fileCount, 0);
     res.json({ success: true, totalGroups: groups.length, totalFiles, groups });
   } catch (error) {
-    console.error('getApprovalDocumentsGrouped error:', error);
+    logger.error('getApprovalDocumentsGrouped error:', error);
     res.status(500).json({ success: false, error: 'server_error', detail: error.message });
   }
 }

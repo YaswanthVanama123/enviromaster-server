@@ -7,6 +7,7 @@ import { CompanyMapping, BiginCompany, RouteStarCustomer } from "../../models/cu
 import { ZohoMapping } from "../../models/sync/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { recalcCommissionForCompany, getPriorLocationFarAnnual } from "../../services/commissionAutomation.js";
+import logger from "../../utils/logger.js";
 
 function triggerCommissionRecalc(biginId) {
   if (!biginId) return;
@@ -14,12 +15,12 @@ function triggerCommissionRecalc(biginId) {
     .then(() => recalcCommissionForCompany(biginId))
     .then((summary) => {
       const updated = summary.results.filter((r) => !r.skipped).length;
-      console.log(
+      logger.debug(
         `[COMMISSION-AUTO] Recalculated ${updated}/${summary.agreementCount} agreement(s) for Bigin company ${biginId}`,
       );
     })
     .catch((err) => {
-      console.error(`[COMMISSION-AUTO] Recalc failed for Bigin company ${biginId}:`, err?.message);
+      logger.error(`[COMMISSION-AUTO] Recalc failed for Bigin company ${biginId}:`, err?.message);
     });
 }
 
@@ -104,7 +105,7 @@ export const getAllMappings = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching company mappings:", error);
+    logger.error("Error fetching company mappings:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch company mappings",
@@ -133,7 +134,7 @@ export const getMappingStats = async (req, res) => {
       data: { total, mapped, unmapped },
     });
   } catch (error) {
-    console.error("Error fetching mapping stats:", error);
+    logger.error("Error fetching mapping stats:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch mapping stats",
@@ -161,7 +162,7 @@ export const getMappingById = async (req, res) => {
       data: mapping,
     });
   } catch (error) {
-    console.error("Error fetching mapping:", error);
+    logger.error("Error fetching mapping:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch mapping",
@@ -194,7 +195,7 @@ export const getMappingStatusByBigin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching mapping status:", error);
+    logger.error("Error fetching mapping status:", error);
     res.status(500).json({ success: false, error: "Failed to fetch mapping status" });
   }
 };
@@ -210,7 +211,7 @@ export const getPriorFarByBigin = async (req, res) => {
     const prior = await getPriorLocationFarAnnual(biginId, excludeAgreementId || null);
     res.json({ success: true, data: prior });
   } catch (error) {
-    console.error("Error fetching prior far revenue:", error);
+    logger.error("Error fetching prior far revenue:", error);
     res.status(500).json({ success: false, error: "Failed to fetch prior far revenue" });
   }
 };
@@ -226,7 +227,7 @@ export const recalcCompanyFar = async (req, res) => {
     const prior = await getPriorLocationFarAnnual(biginId, null);
     res.json({ success: true, prior, agreementCount: result.agreementCount });
   } catch (error) {
-    console.error("Error recalculating company far:", error);
+    logger.error("Error recalculating company far:", error);
     res.status(500).json({ success: false, error: "Failed to recalculate" });
   }
 };
@@ -256,7 +257,7 @@ export const getConnectedCompanies = async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error("Error fetching connected companies:", error);
+    logger.error("Error fetching connected companies:", error);
     res.status(500).json({ success: false, error: "Failed to fetch connected companies" });
   }
 };
@@ -297,7 +298,7 @@ export const getFarBreakdown = async (req, res) => {
     });
     res.json({ success: true, agreements });
   } catch (error) {
-    console.error("Error fetching far breakdown:", error);
+    logger.error("Error fetching far breakdown:", error);
     res.status(500).json({ success: false, error: "Failed to fetch far breakdown" });
   }
 };
@@ -382,7 +383,7 @@ export const saveMapping = async (req, res) => {
 
     if (routeStarId) triggerCommissionRecalc(biginId);
   } catch (error) {
-    console.error("Error saving mapping:", error);
+    logger.error("Error saving mapping:", error);
     res.status(500).json({
       success: false,
       error: "Failed to save mapping",
@@ -442,7 +443,7 @@ export const updateMapping = async (req, res) => {
 
     if (routeStarId) triggerCommissionRecalc(mapping.biginId);
   } catch (error) {
-    console.error("Error updating mapping:", error);
+    logger.error("Error updating mapping:", error);
     res.status(500).json({
       success: false,
       error: "Failed to update mapping",
@@ -474,7 +475,7 @@ export const deleteMapping = async (req, res) => {
       message: "Mapping cleared successfully",
     });
   } catch (error) {
-    console.error("Error deleting mapping:", error);
+    logger.error("Error deleting mapping:", error);
     res.status(500).json({
       success: false,
       error: "Failed to delete mapping",
@@ -572,7 +573,7 @@ export const bulkSaveMapping = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error bulk saving mappings:", error);
+    logger.error("Error bulk saving mappings:", error);
     res.status(500).json({
       success: false,
       error: "Failed to bulk save mappings",
@@ -625,7 +626,7 @@ export const initializeMappings = async (req, res) => {
       message: `Initialized ${created} new mapping records, skipped ${skipped} existing`,
     });
   } catch (error) {
-    console.error("Error initializing mappings:", error);
+    logger.error("Error initializing mappings:", error);
     res.status(500).json({
       success: false,
       error: "Failed to initialize mappings",
@@ -672,7 +673,7 @@ export const getAvailableRouteStarCustomers = async (req, res) => {
       data: customers,
     });
   } catch (error) {
-    console.error("Error fetching available RouteStar customers:", error);
+    logger.error("Error fetching available RouteStar customers:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch available RouteStar customers",
@@ -707,7 +708,7 @@ export const syncMappings = async (req, res) => {
       message: `Synced ${updated} mapping records`,
     });
   } catch (error) {
-    console.error("Error syncing mappings:", error);
+    logger.error("Error syncing mappings:", error);
     res.status(500).json({
       success: false,
       error: "Failed to sync mappings",

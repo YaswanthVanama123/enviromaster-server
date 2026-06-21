@@ -1,4 +1,5 @@
 import { EmailTemplate } from "../../models/service/index.js";
+import logger from "../../utils/logger.js";
 
 export async function getActiveTemplate(req, res) {
   try {
@@ -19,7 +20,7 @@ Best regards,
 EnviroMaster NVA Team`,
         isActive: true
       });
-      console.log('📧 [EMAIL-TEMPLATE] Created default email template');
+      logger.debug('📧 [EMAIL-TEMPLATE] Created default email template');
 
       template = {
         _id: newTemplate._id,
@@ -47,7 +48,7 @@ EnviroMaster NVA Team`,
       }
     });
   } catch (error) {
-    console.error('❌ [EMAIL-TEMPLATE] Error fetching active template:', error);
+    logger.error('❌ [EMAIL-TEMPLATE] Error fetching active template:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch email template',
@@ -68,7 +69,7 @@ export async function updateTemplate(req, res) {
       });
     }
 
-    console.log('📧 [EMAIL-TEMPLATE] Updating email template');
+    logger.debug('📧 [EMAIL-TEMPLATE] Updating email template');
 
     const template = await EmailTemplate.findOneAndUpdate(
       { isActive: true },
@@ -92,7 +93,7 @@ export async function updateTemplate(req, res) {
       }
     ).lean();
 
-    console.log('✅ [EMAIL-TEMPLATE] Template updated successfully');
+    logger.debug('✅ [EMAIL-TEMPLATE] Template updated successfully');
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -111,7 +112,7 @@ export async function updateTemplate(req, res) {
       }
     });
   } catch (error) {
-    console.error('❌ [EMAIL-TEMPLATE] Error updating template:', error);
+    logger.error('❌ [EMAIL-TEMPLATE] Error updating template:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to update email template',

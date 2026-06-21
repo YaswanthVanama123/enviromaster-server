@@ -1,3 +1,4 @@
+import logger from "../../utils/logger.js";
 /**
  * Account Type Detection Controller
  * Auto-detects account type based on revenue and distance to nearest anchor
@@ -122,7 +123,7 @@ export async function detect(req, res) {
       thresholds: THRESHOLDS,
     });
   } catch (error) {
-    console.error('Error detecting account type:', error);
+    logger.error('Error detecting account type:', error);
     res.status(500).json({ error: 'Failed to detect account type' });
   }
 }
@@ -177,7 +178,7 @@ export async function detectBatch(req, res) {
       thresholds: THRESHOLDS,
     });
   } catch (error) {
-    console.error('Error batch detecting account types:', error);
+    logger.error('Error batch detecting account types:', error);
     res.status(500).json({ error: 'Failed to batch detect account types' });
   }
 }
@@ -219,7 +220,7 @@ export async function getThresholds(req, res) {
       ],
     });
   } catch (error) {
-    console.error('Error getting thresholds:', error);
+    logger.error('Error getting thresholds:', error);
     res.status(500).json({ error: 'Failed to get thresholds' });
   }
 }

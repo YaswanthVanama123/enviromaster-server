@@ -1,3 +1,4 @@
+import logger from "../../utils/logger.js";
 import {
   CommissionRules,
   CommissionRecord,
@@ -77,7 +78,7 @@ export async function getActiveRules(req, res) {
 
     res.json(rules);
   } catch (error) {
-    console.error("Error fetching commission rules:", error);
+    logger.error("Error fetching commission rules:", error);
     res.status(500).json({ error: "Failed to fetch commission rules" });
   }
 }
@@ -90,7 +91,7 @@ export async function getAllRules(req, res) {
     const rules = await CommissionRules.find().sort({ createdAt: -1 }).lean();
     res.json(rules);
   } catch (error) {
-    console.error("Error fetching all commission rules:", error);
+    logger.error("Error fetching all commission rules:", error);
     res.status(500).json({ error: "Failed to fetch commission rules" });
   }
 }
@@ -138,7 +139,7 @@ export async function updateRules(req, res) {
 
     res.json(rules);
   } catch (error) {
-    console.error("Error updating commission rules:", error);
+    logger.error("Error updating commission rules:", error);
     res.status(500).json({ error: "Failed to update commission rules" });
   }
 }
@@ -158,7 +159,7 @@ export async function createRules(req, res) {
     const rules = await CommissionRules.create(rulesData);
     res.status(201).json(rules);
   } catch (error) {
-    console.error("Error creating commission rules:", error);
+    logger.error("Error creating commission rules:", error);
     res.status(500).json({ error: "Failed to create commission rules" });
   }
 }
@@ -208,7 +209,7 @@ export async function calculate(req, res) {
 
     res.json(result);
   } catch (error) {
-    console.error("Error calculating commission:", error);
+    logger.error("Error calculating commission:", error);
     res.status(500).json({ error: "Failed to calculate commission" });
   }
 }
@@ -239,7 +240,7 @@ export async function saveRecord(req, res) {
 
     res.status(201).json(record);
   } catch (error) {
-    console.error("Error saving commission record:", error);
+    logger.error("Error saving commission record:", error);
     res.status(500).json({ error: "Failed to save commission record" });
   }
 }
@@ -280,7 +281,7 @@ export async function getRecords(req, res) {
       totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (error) {
-    console.error("Error fetching commission records:", error);
+    logger.error("Error fetching commission records:", error);
     res.status(500).json({ error: "Failed to fetch commission records" });
   }
 }
@@ -300,7 +301,7 @@ export async function getRecordById(req, res) {
 
     res.json(record);
   } catch (error) {
-    console.error("Error fetching commission record:", error);
+    logger.error("Error fetching commission record:", error);
     res.status(500).json({ error: "Failed to fetch commission record" });
   }
 }
@@ -329,7 +330,7 @@ export async function updateRecordStatus(req, res) {
 
     res.json(record);
   } catch (error) {
-    console.error("Error updating commission record status:", error);
+    logger.error("Error updating commission record status:", error);
     res.status(500).json({ error: "Failed to update commission record status" });
   }
 }
@@ -349,7 +350,7 @@ export async function deleteRecord(req, res) {
 
     res.json({ message: "Commission record deleted successfully" });
   } catch (error) {
-    console.error("Error deleting commission record:", error);
+    logger.error("Error deleting commission record:", error);
     res.status(500).json({ error: "Failed to delete commission record" });
   }
 }

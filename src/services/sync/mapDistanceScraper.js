@@ -8,6 +8,7 @@ import { chromium } from 'playwright-core';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import logger from "../../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,9 +54,9 @@ class MapDistanceSession {
         path: path.join(SCREENSHOT_DIR, filename),
         fullPage: true
       });
-      console.log(`   📸 Screenshot: ${filename}`);
+      logger.debug(`   📸 Screenshot: ${filename}`);
     } catch (e) {
-      console.log(`   ⚠️ Screenshot failed: ${e.message}`);
+      logger.debug(`   ⚠️ Screenshot failed: ${e.message}`);
     }
   }
 
@@ -64,11 +65,11 @@ class MapDistanceSession {
    */
   async initialize(onProgress) {
     if (this.isInitialized) {
-      console.log('[Session] Already initialized, reusing session');
+      logger.debug('[Session] Already initialized, reusing session');
       return;
     }
 
-    console.log('[Session] Initializing new session...');
+    logger.debug('[Session] Initializing new session...');
     onProgress?.(5, 'Launching browser...');
 
     this.browser = await chromium.launch({
@@ -98,7 +99,7 @@ class MapDistanceSession {
 
     this.isInitialized = true;
     this.isOnMapDistancePage = true;
-    console.log('[Session] Session initialized successfully');
+    logger.debug('[Session] Session initialized successfully');
   }
 
   /**
@@ -109,7 +110,7 @@ class MapDistanceSession {
       throw new Error('Session not initialized. Call initialize() first.');
     }
 
-    console.log(`[Session] Fetching distance for: ${customerName}`);
+    logger.debug(`[Session] Fetching distance for: ${customerName}`);
     onProgress?.(50, `Searching for ${customerName}...`);
 
     try {
@@ -131,12 +132,12 @@ class MapDistanceSession {
       };
 
     } catch (error) {
-      console.error(`[Session] Error fetching for ${customerName}:`, error.message);
+      logger.error(`[Session] Error fetching for ${customerName}:`, error.message);
 
       // Try to recover - check if we need to re-login
       const currentUrl = this.page.url();
       if (currentUrl.includes('/login')) {
-        console.log('[Session] Session expired, re-initializing...');
+        logger.debug('[Session] Session expired, re-initializing...');
         this.isInitialized = false;
         this.isOnMapDistancePage = false;
         await this.initialize(onProgress);
@@ -159,7 +160,7 @@ class MapDistanceSession {
    */
   async close() {
     if (this.browser) {
-      console.log('[Session] Closing browser session');
+      logger.debug('[Session] Closing browser session');
       await this.browser.close();
       this.browser = null;
       this.context = null;
@@ -179,7 +180,7 @@ class MapDistanceSession {
   // Private methods below
 
   async _login() {
-    console.log('🔐 Logging into RouteStar...');
+    logger.debug('🔐 Logging into RouteStar...');
 
     if (!USERNAME || !PASSWORD) {
       throw new Error('ROUTESTAR_USERNAME or ROUTESTAR_PASSWORD not set');
@@ -216,11 +217,11 @@ class MapDistanceSession {
       throw new Error('Login failed - still on login page');
     }
 
-    console.log('✅ Login successful');
+    logger.debug('✅ Login successful');
   }
 
   async _navigateToMapDistance() {
-    console.log('📍 Navigating to Map Distance page...');
+    logger.debug('📍 Navigating to Map Distance page...');
 
     // Inject script to block bootbox modals
     await this.page.addInitScript(() => {
@@ -244,7 +245,7 @@ class MapDistanceSession {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     await this.page.waitForSelector('.select2-selection, #customerSelect', { timeout: 15000 });
-    console.log('✅ Map Distance page loaded');
+    logger.debug('✅ Map Distance page loaded');
   }
 
   async _dismissModals() {
@@ -300,7 +301,7 @@ class MapDistanceSession {
   async _searchAndGetDistance(customerName) {
     this.customerCount++;
     const safeCustomerName = customerName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-    console.log(`🔍 Searching for: ${customerName}`);
+    logger.debug(`🔍 Searching for: ${customerName}`);
 
     // Take screenshot at start of each search (every 5th customer or first 3)
     if (this.customerCount <= 3 || this.customerCount % 5 === 0) {
@@ -346,7 +347,7 @@ class MapDistanceSession {
 
     // If search field not found, take screenshot and try again
     if (!searchField) {
-      console.log('   Search field not found, retrying...');
+      logger.debug('   Search field not found, retrying...');
       await this._screenshot(`${this.customerCount}_${safeCustomerName}_no_searchfield`);
       await this._dismissModals();
       await this.page.evaluate(() => {
@@ -370,28 +371,28 @@ class MapDistanceSession {
       }
 
       // Select first result - MUST click the highlighted option
-      console.log('   Selecting dropdown option...');
+      logger.debug('   Selecting dropdown option...');
 
       // Method 1: Click the highlighted option using Playwright (more reliable than evaluate)
       try {
         const highlightedOption = await this.page.$('.select2-results__option--highlighted');
         if (highlightedOption) {
           await highlightedOption.click();
-          console.log('   ✓ Clicked highlighted option via Playwright');
+          logger.debug('   ✓ Clicked highlighted option via Playwright');
         } else {
           // Try clicking first valid option
           const firstOption = await this.page.$('.select2-results__option[role="option"]');
           if (firstOption) {
             await firstOption.click();
-            console.log('   ✓ Clicked first option via Playwright');
+            logger.debug('   ✓ Clicked first option via Playwright');
           } else {
             // Fallback: use keyboard to select
-            console.log('   Using keyboard fallback...');
+            logger.debug('   Using keyboard fallback...');
             await this.page.keyboard.press('Enter');
           }
         }
       } catch (clickErr) {
-        console.log(`   Click error: ${clickErr.message}, trying keyboard...`);
+        logger.debug(`   Click error: ${clickErr.message}, trying keyboard...`);
         await this.page.keyboard.press('Enter');
       }
 
@@ -407,9 +408,9 @@ class MapDistanceSession {
       });
 
       if (selectedText && !selectedText.includes('Search Customers')) {
-        console.log(`   ✓ Selected: "${selectedText}"`);
+        logger.debug(`   ✓ Selected: "${selectedText}"`);
       } else {
-        console.log('   ⚠️ Selection may have failed, retrying with keyboard...');
+        logger.debug('   ⚠️ Selection may have failed, retrying with keyboard...');
         // Re-open dropdown and try keyboard
         await this.page.click('.select2-selection');
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -420,7 +421,7 @@ class MapDistanceSession {
       }
 
     } else {
-      console.log('   WARNING: Could not find search field');
+      logger.debug('   WARNING: Could not find search field');
       await this._screenshot(`${this.customerCount}_${safeCustomerName}_ERROR_no_field`);
     }
 
@@ -428,7 +429,7 @@ class MapDistanceSession {
     await this._dismissModals();
 
     // Click Get Distance button - this submits the form and causes page navigation
-    console.log('   Clicking Get Distance...');
+    logger.debug('   Clicking Get Distance...');
 
     try {
       // Start waiting for navigation BEFORE clicking (form submission)
@@ -442,9 +443,9 @@ class MapDistanceSession {
 
       // Wait for navigation to complete
       await navigationPromise;
-      console.log('   ✓ Page loaded after form submit');
+      logger.debug('   ✓ Page loaded after form submit');
     } catch (navError) {
-      console.log(`   ⚠️ Navigation: ${navError.message}`);
+      logger.debug(`   ⚠️ Navigation: ${navError.message}`);
     }
 
     // Wait for page to fully stabilize after navigation
@@ -458,7 +459,7 @@ class MapDistanceSession {
     }
 
     // Wait for table to have data (not "No data found")
-    console.log('   Waiting for table data...');
+    logger.debug('   Waiting for table data...');
     try {
       await this.page.waitForFunction(() => {
         const rows = document.querySelectorAll('table.table tbody tr, table.footable tbody tr');
@@ -468,9 +469,9 @@ class MapDistanceSession {
         const cells = firstRow.querySelectorAll('td');
         return cells.length >= 6;
       }, null, { timeout: 10000 });
-      console.log('   ✓ Table data loaded');
+      logger.debug('   ✓ Table data loaded');
     } catch (tableErr) {
-      console.log('   ⚠️ Table wait timeout - checking results anyway');
+      logger.debug('   ⚠️ Table wait timeout - checking results anyway');
     }
 
     // Additional stabilization wait
@@ -515,7 +516,7 @@ class MapDistanceSession {
       }).filter(r => r !== null && (r.customer || r.assignedTo));
     });
 
-    console.log(`✅ Found ${results.length} results`);
+    logger.debug(`✅ Found ${results.length} results`);
 
     // Take screenshot if no results found (might indicate issue)
     if (results.length === 0) {

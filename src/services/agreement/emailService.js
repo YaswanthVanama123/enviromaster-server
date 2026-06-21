@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import logger from "../../utils/logger.js";
 
 dotenv.config();
 
@@ -38,7 +39,7 @@ const getTransporter = () => {
     config.service = process.env.EMAIL_SERVICE;
   }
 
-  console.log('⚡ [EMAIL-SERVICE] Creating pooled transporter with config:', {
+  logger.debug('⚡ [EMAIL-SERVICE] Creating pooled transporter with config:', {
     host: config.host,
     port: config.port,
     secure: config.secure,
@@ -58,7 +59,7 @@ const createTransporter = getTransporter;
 
 export async function sendEmail({ to, from, subject, body, attachment, fireAndForget = false }) {
   try {
-    console.log('⚡ [EMAIL-SERVICE] Preparing to send email:', {
+    logger.debug('⚡ [EMAIL-SERVICE] Preparing to send email:', {
       to,
       from: from || process.env.EMAIL_FROM_ADDRESS,
       subject,
@@ -92,22 +93,22 @@ export async function sendEmail({ to, from, subject, body, attachment, fireAndFo
           contentType: attachment.contentType || 'application/pdf',
         },
       ];
-      console.log('📎 [EMAIL-SERVICE] Attachment added:', {
+      logger.debug('📎 [EMAIL-SERVICE] Attachment added:', {
         filename: attachment.filename,
         size: `${(attachment.buffer.length / 1024 / 1024).toFixed(2)} MB`
       });
     }
 
     if (fireAndForget) {
-      console.log('🚀 [EMAIL-SERVICE] ULTRA-FAST: Sending email in background (fire-and-forget)...');
+      logger.debug('🚀 [EMAIL-SERVICE] ULTRA-FAST: Sending email in background (fire-and-forget)...');
 
       transporter.sendMail(mailOptions).then(info => {
-        console.log('✅ [EMAIL-SERVICE] Background email sent successfully:', {
+        logger.debug('✅ [EMAIL-SERVICE] Background email sent successfully:', {
           messageId: info.messageId,
           response: info.response
         });
       }).catch(error => {
-        console.error('❌ [EMAIL-SERVICE] Background email failed:', {
+        logger.error('❌ [EMAIL-SERVICE] Background email failed:', {
           error: error.message,
           to,
           subject
@@ -122,10 +123,10 @@ export async function sendEmail({ to, from, subject, body, attachment, fireAndFo
       };
     }
 
-    console.log('📤 [EMAIL-SERVICE] Sending email (waiting for completion)...');
+    logger.debug('📤 [EMAIL-SERVICE] Sending email (waiting for completion)...');
     const info = await transporter.sendMail(mailOptions);
 
-    console.log('✅ [EMAIL-SERVICE] Email sent successfully:', {
+    logger.debug('✅ [EMAIL-SERVICE] Email sent successfully:', {
       messageId: info.messageId,
       response: info.response,
       accepted: info.accepted,
@@ -140,7 +141,7 @@ export async function sendEmail({ to, from, subject, body, attachment, fireAndFo
     };
 
   } catch (error) {
-    console.error('❌ [EMAIL-SERVICE] Error sending email:', {
+    logger.error('❌ [EMAIL-SERVICE] Error sending email:', {
       error: error.message,
       code: error.code,
       command: error.command
@@ -165,7 +166,7 @@ export async function sendEmail({ to, from, subject, body, attachment, fireAndFo
 
 export async function verifyEmailConfig() {
   try {
-    console.log('🔍 [EMAIL-SERVICE] Verifying email configuration...');
+    logger.debug('🔍 [EMAIL-SERVICE] Verifying email configuration...');
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
       return {
@@ -177,7 +178,7 @@ export async function verifyEmailConfig() {
     const transporter = createTransporter();
     await transporter.verify();
 
-    console.log('✅ [EMAIL-SERVICE] Email configuration verified successfully');
+    logger.debug('✅ [EMAIL-SERVICE] Email configuration verified successfully');
     return {
       success: true,
       message: 'Email configuration is valid and ready to send emails',
@@ -190,7 +191,7 @@ export async function verifyEmailConfig() {
     };
 
   } catch (error) {
-    console.error('❌ [EMAIL-SERVICE] Email configuration verification failed:', error.message);
+    logger.error('❌ [EMAIL-SERVICE] Email configuration verification failed:', error.message);
     return {
       success: false,
       error: error.message,

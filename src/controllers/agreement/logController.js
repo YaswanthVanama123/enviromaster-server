@@ -1,6 +1,7 @@
 import { Log } from "../../models/logging/index.js";
 import { CustomerHeaderDoc, VersionPdf } from "../../models/agreement/index.js";
 import mongoose from 'mongoose';
+import logger from "../../utils/logger.js";
 
 export const createVersionLog = async (req, res) => {
   try {
@@ -19,7 +20,7 @@ export const createVersionLog = async (req, res) => {
       overwriteReason
     } = req.body;
 
-    console.log('📝 [LOG-CONTROLLER] Creating log:', {
+    logger.debug('📝 [LOG-CONTROLLER] Creating log:', {
       agreementId,
       versionId,
       versionNumber,
@@ -36,19 +37,19 @@ export const createVersionLog = async (req, res) => {
     let resolvedVersionNumber = versionNumber;
 
     if (!resolvedVersionNumber && versionId) {
-      console.log(`🔍 [LOG-CONTROLLER] Version number not provided, looking up from versionId: ${versionId}`);
+      logger.debug(`🔍 [LOG-CONTROLLER] Version number not provided, looking up from versionId: ${versionId}`);
 
       try {
         const versionPdf = await VersionPdf.findById(versionId).select('versionNumber').lean();
         if (versionPdf && versionPdf.versionNumber) {
           resolvedVersionNumber = versionPdf.versionNumber;
-          console.log(`✅ [LOG-CONTROLLER] Found version number: ${resolvedVersionNumber}`);
+          logger.debug(`✅ [LOG-CONTROLLER] Found version number: ${resolvedVersionNumber}`);
         } else {
-          console.log(`⚠️ [LOG-CONTROLLER] Version PDF not found, defaulting to version 1`);
+          logger.debug(`⚠️ [LOG-CONTROLLER] Version PDF not found, defaulting to version 1`);
           resolvedVersionNumber = 1;
         }
       } catch (err) {
-        console.error(`❌ [LOG-CONTROLLER] Error looking up version number:`, err);
+        logger.error(`❌ [LOG-CONTROLLER] Error looking up version number:`, err);
         resolvedVersionNumber = 1;
       }
     }
@@ -66,23 +67,23 @@ export const createVersionLog = async (req, res) => {
       const agreement = await CustomerHeaderDoc.findById(agreementId).select('payload.headerTitle').lean();
       if (agreement && agreement.payload && agreement.payload.headerTitle) {
         agreementTitle = agreement.payload.headerTitle;
-        console.log(`✅ [LOG-CONTROLLER] Found agreement title: ${agreementTitle}`);
+        logger.debug(`✅ [LOG-CONTROLLER] Found agreement title: ${agreementTitle}`);
       } else {
-        console.log(`⚠️ [LOG-CONTROLLER] No agreement title found, using document title`);
+        logger.debug(`⚠️ [LOG-CONTROLLER] No agreement title found, using document title`);
         agreementTitle = documentTitle;
       }
     } catch (err) {
-      console.error(`❌ [LOG-CONTROLLER] Error fetching agreement title:`, err);
+      logger.error(`❌ [LOG-CONTROLLER] Error fetching agreement title:`, err);
       agreementTitle = documentTitle;
     }
 
     if (overwriteExisting) {
-      console.log(`🔄 [LOG-CONTROLLER] Overwrite mode enabled - reason: ${overwriteReason}`);
+      logger.debug(`🔄 [LOG-CONTROLLER] Overwrite mode enabled - reason: ${overwriteReason}`);
 
       const existingLog = await Log.findOne({ versionId, isDeleted: { $ne: true } });
 
       if (existingLog) {
-        console.log(`📝 [LOG-CONTROLLER] Found existing log, updating: ${existingLog._id}`);
+        logger.debug(`📝 [LOG-CONTROLLER] Found existing log, updating: ${existingLog._id}`);
 
         existingLog.changes = changes || currentChanges || [];
         existingLog.currentChanges = currentChanges || changes || [];
@@ -131,7 +132,7 @@ export const createVersionLog = async (req, res) => {
 
     await logDoc.save();
 
-    console.log('✅ [LOG-CONTROLLER] Log created successfully:', {
+    logger.debug('✅ [LOG-CONTROLLER] Log created successfully:', {
       logId: logDoc._id,
       versionNumber: logDoc.versionNumber,
       changesStored: logDoc.changes?.length || 0,
@@ -159,7 +160,7 @@ export const createVersionLog = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [LOG-CONTROLLER] Error creating log:', error);
+    logger.error('❌ [LOG-CONTROLLER] Error creating log:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create version log',
@@ -172,7 +173,7 @@ export const getVersionLogs = async (req, res) => {
   try {
     const { agreementId } = req.params;
 
-    console.log('📋 [LOG-CONTROLLER] Getting logs for agreement:', agreementId);
+    logger.debug('📋 [LOG-CONTROLLER] Getting logs for agreement:', agreementId);
 
     if (!mongoose.Types.ObjectId.isValid(agreementId)) {
       return res.status(400).json({
@@ -197,7 +198,7 @@ export const getVersionLogs = async (req, res) => {
       .sort({ versionNumber: -1, createdAt: -1 })
       .lean();
 
-    console.log(`✅ [LOG-CONTROLLER] Found ${logs.length} logs for agreement ${agreementId}`);
+    logger.debug(`✅ [LOG-CONTROLLER] Found ${logs.length} logs for agreement ${agreementId}`);
 
     const logDocuments = logs.map(log => ({
       _id: log._id.toString(),
@@ -230,7 +231,7 @@ export const getVersionLogs = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [LOG-CONTROLLER] Error getting logs:', error);
+    logger.error('❌ [LOG-CONTROLLER] Error getting logs:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get version logs',
@@ -245,7 +246,7 @@ export const getAllVersionLogs = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const agreementId = req.query.agreementId;
 
-    console.log('📋 [LOG-CONTROLLER] Getting all logs:', { page, limit, agreementId });
+    logger.debug('📋 [LOG-CONTROLLER] Getting all logs:', { page, limit, agreementId });
 
     const filter = { isDeleted: { $ne: true } };
 
@@ -260,7 +261,7 @@ export const getAllVersionLogs = async (req, res) => {
       .limit(limit)
       .lean();
 
-    console.log(`✅ [LOG-CONTROLLER] Found ${logs.length} logs (page ${page}/${Math.ceil(totalLogs / limit)})`);
+    logger.debug(`✅ [LOG-CONTROLLER] Found ${logs.length} logs (page ${page}/${Math.ceil(totalLogs / limit)})`);
 
     const logDocuments = logs.map(log => ({
       _id: log._id.toString(),
@@ -292,7 +293,7 @@ export const getAllVersionLogs = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [LOG-CONTROLLER] Error getting all logs:', error);
+    logger.error('❌ [LOG-CONTROLLER] Error getting all logs:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get all version logs',
@@ -305,7 +306,7 @@ export const downloadVersionLog = async (req, res) => {
   try {
     const { logId } = req.params;
 
-    console.log('📥 [LOG-CONTROLLER] Downloading log:', logId);
+    logger.debug('📥 [LOG-CONTROLLER] Downloading log:', logId);
 
     if (!mongoose.Types.ObjectId.isValid(logId)) {
       return res.status(400).json({
@@ -334,7 +335,7 @@ export const downloadVersionLog = async (req, res) => {
 
     const textContent = logDoc.generateTextContent();
 
-    console.log(`✅ [LOG-CONTROLLER] Generated TXT content (${Buffer.byteLength(textContent, 'utf8')} bytes)`);
+    logger.debug(`✅ [LOG-CONTROLLER] Generated TXT content (${Buffer.byteLength(textContent, 'utf8')} bytes)`);
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${logDoc.fileName}"`);
@@ -343,7 +344,7 @@ export const downloadVersionLog = async (req, res) => {
     res.status(200).send(textContent);
 
   } catch (error) {
-    console.error('❌ [LOG-CONTROLLER] Error downloading log:', error);
+    logger.error('❌ [LOG-CONTROLLER] Error downloading log:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to download log file',

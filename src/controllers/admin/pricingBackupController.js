@@ -1,5 +1,6 @@
 import PricingBackupService from "../../services/pricingBackupService.js";
 import { BackupPricing as PricingBackup } from "../../models/admin/index.js";
+import logger from "../../utils/logger.js";
 
 class PricingBackupController {
   static async createManualBackup(req, res) {
@@ -35,7 +36,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error creating manual backup:", error);
+      logger.error("Error creating manual backup:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -65,7 +66,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error getting backup list:", error);
+      logger.error("Error getting backup list:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -93,7 +94,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error getting backup details:", error);
+      logger.error("Error getting backup details:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -138,7 +139,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error restoring from backup:", error);
+      logger.error("Error restoring from backup:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -164,7 +165,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error getting backup statistics:", error);
+      logger.error("Error getting backup statistics:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -190,7 +191,7 @@ class PricingBackupController {
         result,
       });
     } catch (error) {
-      console.error("Error enforcing retention policy:", error);
+      logger.error("Error enforcing retention policy:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -230,7 +231,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error deleting backups:", error);
+      logger.error("Error deleting backups:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -243,7 +244,7 @@ class PricingBackupController {
       const { changeDayId } = req.params;
       const { preview = "true" } = req.query;
 
-      console.log(`[BACKUP-SNAPSHOT] Fetching snapshot for: ${changeDayId}, preview: ${preview}`);
+      logger.debug(`[BACKUP-SNAPSHOT] Fetching snapshot for: ${changeDayId}, preview: ${preview}`);
 
       const backup = await PricingBackup.findOne({ changeDayId }).exec();
 
@@ -260,7 +261,7 @@ class PricingBackupController {
           // Use the instance method to decompress
           const snapshot = backup.getSnapshot();
 
-          console.log(`[BACKUP-SNAPSHOT] Decompressed snapshot for ${changeDayId}`);
+          logger.debug(`[BACKUP-SNAPSHOT] Decompressed snapshot for ${changeDayId}`);
 
           res.json({
             success: true,
@@ -272,7 +273,7 @@ class PricingBackupController {
             }
           });
         } catch (decompressError) {
-          console.error("[BACKUP-SNAPSHOT] Decompression error:", decompressError);
+          logger.error("[BACKUP-SNAPSHOT] Decompression error:", decompressError);
           res.status(500).json({
             success: false,
             error: "Failed to decompress backup snapshot",
@@ -293,7 +294,7 @@ class PricingBackupController {
         });
       }
     } catch (error) {
-      console.error("Error getting backup snapshot:", error);
+      logger.error("Error getting backup snapshot:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -361,7 +362,7 @@ class PricingBackupController {
         },
       });
     } catch (error) {
-      console.error("Error getting backup system health:", error);
+      logger.error("Error getting backup system health:", error);
       res.status(500).json({
         success: false,
         error: error.message,

@@ -6,6 +6,7 @@
 import { ProductCatalog } from "../../models/product/index.js";
 import { ServiceConfig } from "../../models/service/index.js";
 import { compilePricingCatalogPdf } from "../../services/pdfService.js";
+import logger from "../../utils/logger.js";
 
 async function generateAndSendPricingPdf(res) {
   const services = await ServiceConfig.find({ isActive: true }).lean();
@@ -33,7 +34,7 @@ export async function exportPricingCatalog(req, res) {
   try {
     return await generateAndSendPricingPdf(res);
   } catch (err) {
-    console.error("exportPricingCatalog error:", err);
+    logger.error("exportPricingCatalog error:", err);
     res.status(500).json({ success: false, error: "Failed to export pricing catalog", detail: err?.message });
   }
 }
@@ -42,7 +43,7 @@ export async function exportPricingCatalogFromDb(req, res) {
   try {
     return await generateAndSendPricingPdf(res);
   } catch (err) {
-    console.error("exportPricingCatalogFromDb error:", err);
+    logger.error("exportPricingCatalogFromDb error:", err);
     res.status(500).json({ success: false, error: "Failed to export pricing catalog", detail: err?.message });
   }
 }

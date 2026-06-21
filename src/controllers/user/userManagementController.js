@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { AdminUser, Employee } from "../../models/user/index.js";
+import logger from "../../utils/logger.js";
 
 /**
  * List all users (admins + employees)
@@ -81,7 +82,7 @@ export async function listUsers(req, res) {
       },
     });
   } catch (err) {
-    console.error("listUsers error:", err);
+    logger.error("listUsers error:", err);
     res.status(500).json({ error: "Failed to fetch users", detail: String(err) });
   }
 }
@@ -139,7 +140,7 @@ export async function createAdmin(req, res) {
       },
     });
   } catch (err) {
-    console.error("createAdmin error:", err);
+    logger.error("createAdmin error:", err);
     res.status(500).json({ error: "Failed to create admin", detail: String(err) });
   }
 }
@@ -199,7 +200,7 @@ export async function createEmployee(req, res) {
       },
     });
   } catch (err) {
-    console.error("createEmployee error:", err);
+    logger.error("createEmployee error:", err);
     res.status(500).json({ error: "Failed to create employee", detail: String(err) });
   }
 }
@@ -300,7 +301,7 @@ export async function updateUser(req, res) {
       });
     }
   } catch (err) {
-    console.error("updateUser error:", err);
+    logger.error("updateUser error:", err);
     res.status(500).json({ error: "Failed to update user", detail: String(err) });
   }
 }
@@ -344,7 +345,7 @@ export async function toggleUserStatus(req, res) {
       isActive: user.isActive,
     });
   } catch (err) {
-    console.error("toggleUserStatus error:", err);
+    logger.error("toggleUserStatus error:", err);
     res.status(500).json({ error: "Failed to toggle user status", detail: String(err) });
   }
 }
@@ -394,7 +395,7 @@ export async function resetUserPassword(req, res) {
       message: "Password reset successfully",
     });
   } catch (err) {
-    console.error("resetUserPassword error:", err);
+    logger.error("resetUserPassword error:", err);
     res.status(500).json({ error: "Failed to reset password", detail: String(err) });
   }
 }
@@ -439,7 +440,7 @@ export async function deleteUser(req, res) {
       message: `${type} deleted successfully`,
     });
   } catch (err) {
-    console.error("deleteUser error:", err);
+    logger.error("deleteUser error:", err);
     res.status(500).json({ error: "Failed to delete user", detail: String(err) });
   }
 }

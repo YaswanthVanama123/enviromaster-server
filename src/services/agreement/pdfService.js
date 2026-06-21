@@ -8,6 +8,7 @@ import {
   PDF_HEADER_TEMPLATE_PATH,
 } from "#config/pdfConfig.js";
 import { cleanupTemporaryArtifacts } from "#utils/tmpCleanup.js";
+import logger from "../../utils/logger.js";
 
 async function remotePostPdf(
   pathname,
@@ -48,7 +49,7 @@ async function remotePostMultipart(
   const to = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    console.log(`📡 [REMOTE PDF] Calling remote PDF service: ${url}`);
+    logger.debug(`📡 [REMOTE PDF] Calling remote PDF service: ${url}`);
 
     // Generate boundary WITHOUT leading dashes (RFC 2046)
     // The -- prefix is added in the body, not in the Content-Type header
@@ -80,7 +81,7 @@ async function remotePostMultipart(
       parts.push(f.data);  // Binary data
       parts.push('\r\n');
 
-      console.log(`📎 [REMOTE PDF] Added file: ${filename}, size: ${f.data.length} bytes, type: ${contentType}`);
+      logger.debug(`📎 [REMOTE PDF] Added file: ${filename}, size: ${f.data.length} bytes, type: ${contentType}`);
     }
 
     // Add closing boundary
@@ -92,7 +93,7 @@ async function remotePostMultipart(
     );
     const body = Buffer.concat(bodyParts);
 
-    console.log(`📡 [REMOTE PDF] Total body size: ${body.length} bytes, boundary: ${boundary}`);
+    logger.debug(`📡 [REMOTE PDF] Total body size: ${body.length} bytes, boundary: ${boundary}`);
 
     const resp = await fetch(url, {
       method: "POST",
@@ -106,7 +107,7 @@ async function remotePostMultipart(
 
     if (!resp.ok) {
       const txt = await resp.text().catch(() => "");
-      console.error(`❌ [REMOTE PDF] Remote compile failed with status ${resp.status}:`, txt.slice(0, 500));
+      logger.error(`❌ [REMOTE PDF] Remote compile failed with status ${resp.status}:`, txt.slice(0, 500));
 
       const err = new Error(`Remote PDF service failed: ${resp.status} ${resp.statusText}`);
       err.detail = txt;
@@ -117,10 +118,10 @@ async function remotePostMultipart(
     }
 
     const ab = await resp.arrayBuffer();
-    console.log(`✅ [REMOTE PDF] Successfully compiled PDF, size: ${ab.byteLength} bytes`);
+    logger.debug(`✅ [REMOTE PDF] Successfully compiled PDF, size: ${ab.byteLength} bytes`);
     return Buffer.from(ab);
   } catch (error) {
-    console.error(`❌ [REMOTE PDF] Error during PDF compilation:`, {
+    logger.error(`❌ [REMOTE PDF] Error during PDF compilation:`, {
       name: error.name,
       message: error.message,
       url,
@@ -147,7 +148,7 @@ async function tidyTempArtifacts(options = {}) {
   try {
     await cleanupTemporaryArtifacts(options);
   } catch (err) {
-    console.warn("⚠️ [TMP CLEANUP] Failed to clean temporary artifacts:", err.message);
+    logger.warn("⚠️ [TMP CLEANUP] Failed to clean temporary artifacts:", err.message);
   }
 }
 
@@ -179,7 +180,7 @@ function buildServiceAgreementLatex(agreementData = {}) {
         // Allow common safe characters: non-breaking space, some punctuation
         if (code === 0xA0) return ' '; // Non-breaking space -> regular space
         if (code >= 0xC0 && code <= 0xFF) return char; // Keep accented letters
-        console.warn(`⚠️ [SERVICE AGREEMENT] Removing high-byte char 0x${code.toString(16)} from ${fieldName}`);
+        logger.warn(`⚠️ [SERVICE AGREEMENT] Removing high-byte char 0x${code.toString(16)} from ${fieldName}`);
         return '';
       })
       // Remove any Unicode replacement characters or other problematic Unicode
@@ -187,8 +188,8 @@ function buildServiceAgreementLatex(agreementData = {}) {
       .replace(/[^\x20-\x7E\xA0-\u024F-\u206F\u2010-\u2027]/g, '');
 
     if (cleaned.length !== originalLength) {
-      console.warn(`⚠️ [SERVICE AGREEMENT] Sanitized field "${fieldName}": removed ${originalLength - cleaned.length} chars`);
-      console.warn(`⚠️ [SERVICE AGREEMENT] Original (first 200 chars):`, value.slice(0, 200).replace(/[^\x20-\x7E]/g, '?'));
+      logger.warn(`⚠️ [SERVICE AGREEMENT] Sanitized field "${fieldName}": removed ${originalLength - cleaned.length} chars`);
+      logger.warn(`⚠️ [SERVICE AGREEMENT] Original (first 200 chars):`, value.slice(0, 200).replace(/[^\x20-\x7E]/g, '?'));
       // Log hex dump of first problematic area
       const firstBadIndex = value.split('').findIndex(c => {
         const code = c.charCodeAt(0);
@@ -198,7 +199,7 @@ function buildServiceAgreementLatex(agreementData = {}) {
         const start = Math.max(0, firstBadIndex - 10);
         const end = Math.min(value.length, firstBadIndex + 20);
         const snippet = value.slice(start, end);
-        console.warn(`⚠️ [SERVICE AGREEMENT] First bad char at index ${firstBadIndex}:`,
+        logger.warn(`⚠️ [SERVICE AGREEMENT] First bad char at index ${firstBadIndex}:`,
           Array.from(snippet).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' '));
       }
     }
@@ -383,8 +384,8 @@ function validatePayloadData(body) {
   }
 
   if (issues.length > 0) {
-    console.warn('⚠️ [PAYLOAD VALIDATION] Found corrupted data in payload:');
-    issues.forEach(issue => console.warn(`  - ${issue}`));
+    logger.warn('⚠️ [PAYLOAD VALIDATION] Found corrupted data in payload:');
+    issues.forEach(issue => logger.warn(`  - ${issue}`));
   }
 
   return issues;
@@ -397,7 +398,7 @@ function deepSanitizeObject(obj, visited = new WeakSet(), path = '') {
     if (typeof obj === 'string') {
       const hasProblems = /[\x00-\x1F\x7F-\xFF\uFFFD]/.test(obj);
       if (hasProblems) {
-        console.warn(`⚠️ [SANITIZE] Corrupted data found at path: "${path}"`, {
+        logger.warn(`⚠️ [SANITIZE] Corrupted data found at path: "${path}"`, {
           originalLength: obj.length,
           preview: obj.slice(0, 50).replace(/[\x00-\x1F\x7F-\xFF]/g, '?'),
           hexDump: Array.from(obj.slice(0, 20)).map(c =>
@@ -442,14 +443,14 @@ function deepSanitizeObject(obj, visited = new WeakSet(), path = '') {
         .replace(/[\u200B-\u200D\uFEFF]/g, '')
         .replace(/[\x7F-\xFF]/g, (char) => {
           const code = char.charCodeAt(0).toString(16).padStart(2, '0');
-          console.warn(`⚠️ [SANITIZE] Unhandled high-bit character at "${path}": 0x${code}`);
+          logger.warn(`⚠️ [SANITIZE] Unhandled high-bit character at "${path}": 0x${code}`);
           return '';
         })
         .replace(/[^\x20-\x7E\n\r\t]/g, '')
         .trim();
 
       if (cleaned.length === 0 && obj.length > 0) {
-        console.warn(`⚠️ [SANITIZE] Field completely removed (was corrupted): "${path}" (original: ${obj.length} chars)`);
+        logger.warn(`⚠️ [SANITIZE] Field completely removed (was corrupted): "${path}" (original: ${obj.length} chars)`);
       }
 
       return cleaned;
@@ -482,7 +483,7 @@ function latexEscape(value = "") {
   const hasBinaryData = /[\x00-\x08\x0E-\x1F]/.test(original);
 
   if (hasControlChars || hasInvalidUTF8 || hasBinaryData) {
-    console.warn('⚠️ [LATEX-ESCAPE] PROBLEMATIC INPUT DETECTED:', {
+    logger.warn('⚠️ [LATEX-ESCAPE] PROBLEMATIC INPUT DETECTED:', {
       hasControlChars,
       hasInvalidUTF8,
       hasBinaryData,
@@ -525,7 +526,7 @@ function latexEscape(value = "") {
     .replace(/[\x7F-\xFF]/g, (char) => {
       const code = char.charCodeAt(0).toString(16).padStart(2, '0');
       if (code !== 'd7' && code !== 'f7' && code !== 'd0' && code !== 'a0') {
-        console.warn(`⚠️ [LATEX-ESCAPE] Unhandled high-bit character: 0x${code}`);
+        logger.warn(`⚠️ [LATEX-ESCAPE] Unhandled high-bit character: 0x${code}`);
       }
       return '';
     })
@@ -536,12 +537,12 @@ function latexEscape(value = "") {
     .trim();
 
   if (sanitized.length === 0 && original.length > 0) {
-    console.warn('⚠️ [LATEX-ESCAPE] Sanitization removed all content! Original had:', original.length, 'chars');
+    logger.warn('⚠️ [LATEX-ESCAPE] Sanitization removed all content! Original had:', original.length, 'chars');
     return '';
   }
 
   if (sanitized.length < original.length * 0.5 && original.length > 10) {
-    console.warn('⚠️ [LATEX-ESCAPE] Sanitization removed', original.length - sanitized.length, 'characters');
+    logger.warn('⚠️ [LATEX-ESCAPE] Sanitization removed', original.length - sanitized.length, 'characters');
   }
 
   // Use placeholder approach to avoid double-escaping braces in LaTeX commands
@@ -747,7 +748,7 @@ function buildProductsLatex(products = {}, customColumns = { products: [], dispe
 
   const productsColSpecLatex = headers.map(() => 'C').join("|");
 
-  console.log('🔍 [PRODUCTS-TABLE] Column specification:', {
+  logger.debug('🔍 [PRODUCTS-TABLE] Column specification:', {
     numCols,
     colWidthFormula: colWidth,
     colTypeDefinition: productsColTypeDefinition,
@@ -952,7 +953,7 @@ function buildServiceRows(rows = []) {
       const lineCommand = "\\serviceLine";
       const command = gapSuffix ? `${lineCommand}${gapSuffix}` : lineCommand;
       if (gapSuffix) {
-        console.debug(`[PDF gap] line ${command} ${label}`);
+        logger.debug(`[PDF gap] line ${command} ${label}`);
       }
       out += `${command}{${latexEscape(label)}}{${latexEscape(value)}}\n`;
     } else if (type === "bold") {
@@ -968,7 +969,7 @@ function buildServiceRows(rows = []) {
       const baseCommand = isTotal ? "\\serviceTotalLine" : "\\serviceBoldLine";
       const command = gapSuffix ? `${baseCommand}Wide` : baseCommand;
       if (gapSuffix) {
-        console.debug(`[PDF gap] bold ${command} ${label}`);
+        logger.debug(`[PDF gap] bold ${command} ${label}`);
       }
       out += `${command}{${latexEscape(label)}}{${latexEscape(value)}}\n`;
     } else if (type === "atCharge") {
@@ -1244,11 +1245,11 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
 
   // Debug logging for pureJanitorial
   if (serviceKey === 'pureJanitorial') {
-    console.log('🧹 [PURE JANITORIAL PDF] serviceKey:', serviceKey);
-    console.log('🧹 [PURE JANITORIAL PDF] serviceData keys:', Object.keys(serviceData));
-    console.log('🧹 [PURE JANITORIAL PDF] serviceData.formData exists:', !!serviceData.formData);
-    console.log('🧹 [PURE JANITORIAL PDF] using data from:', serviceData.formData ? 'serviceData.formData' : 'serviceData');
-    console.log('🧹 [PURE JANITORIAL PDF] data.isActive:', data.isActive);
+    logger.debug('🧹 [PURE JANITORIAL PDF] serviceKey:', serviceKey);
+    logger.debug('🧹 [PURE JANITORIAL PDF] serviceData keys:', Object.keys(serviceData));
+    logger.debug('🧹 [PURE JANITORIAL PDF] serviceData.formData exists:', !!serviceData.formData);
+    logger.debug('🧹 [PURE JANITORIAL PDF] using data from:', serviceData.formData ? 'serviceData.formData' : 'serviceData');
+    logger.debug('🧹 [PURE JANITORIAL PDF] data.isActive:', data.isActive);
   }
 
   const getCorrectRate = (item) => {
@@ -1260,11 +1261,11 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
 
   // Special handling for pureJanitorial service (may come as 'janitorial' or 'pureJanitorial')
   if ((serviceKey === 'pureJanitorial' || serviceKey === 'janitorial') && data.isActive && data.serviceId === 'pureJanitorial') {
-    console.log('🧹 [PURE JANITORIAL PDF] Processing pureJanitorial service');
-    console.log('🧹 [PURE JANITORIAL PDF] data keys:', Object.keys(data));
-    console.log('🧹 [PURE JANITORIAL PDF] data.frequency:', JSON.stringify(data.frequency));
-    console.log('🧹 [PURE JANITORIAL PDF] data.sqFt:', JSON.stringify(data.sqFt));
-    console.log('🧹 [PURE JANITORIAL PDF] data.totals keys:', data.totals ? Object.keys(data.totals) : 'no totals');
+    logger.debug('🧹 [PURE JANITORIAL PDF] Processing pureJanitorial service');
+    logger.debug('🧹 [PURE JANITORIAL PDF] data keys:', Object.keys(data));
+    logger.debug('🧹 [PURE JANITORIAL PDF] data.frequency:', JSON.stringify(data.frequency));
+    logger.debug('🧹 [PURE JANITORIAL PDF] data.sqFt:', JSON.stringify(data.sqFt));
+    logger.debug('🧹 [PURE JANITORIAL PDF] data.totals keys:', data.totals ? Object.keys(data.totals) : 'no totals');
 
     // Add frequency
     if (data.frequency && shouldDisplayField(data.frequency) && data.frequency.value) {
@@ -2511,10 +2512,10 @@ function buildServicesLatex(services = {}) {
     "electrostaticSpray",
   ];
 
-  console.log('🔍 [SERVICES DEBUG] services object keys:', Object.keys(services));
-  console.log('🔍 [SERVICES DEBUG] services.pureJanitorial exists:', !!services.pureJanitorial);
+  logger.debug('🔍 [SERVICES DEBUG] services object keys:', Object.keys(services));
+  logger.debug('🔍 [SERVICES DEBUG] services.pureJanitorial exists:', !!services.pureJanitorial);
   if (services.pureJanitorial) {
-    console.log('🔍 [SERVICES DEBUG] pureJanitorial data:', JSON.stringify(services.pureJanitorial, null, 2).slice(0, 1000));
+    logger.debug('🔍 [SERVICES DEBUG] pureJanitorial data:', JSON.stringify(services.pureJanitorial, null, 2).slice(0, 1000));
   }
 
   for (const serviceKey of allServiceKeys) {
@@ -2522,8 +2523,8 @@ function buildServicesLatex(services = {}) {
     const isUsed = svc && isServiceUsed(svc);
 
     if (serviceKey === 'pureJanitorial') {
-      console.log('🔍 [SERVICES DEBUG] pureJanitorial svc:', !!svc);
-      console.log('🔍 [SERVICES DEBUG] pureJanitorial isUsed:', isUsed);
+      logger.debug('🔍 [SERVICES DEBUG] pureJanitorial svc:', !!svc);
+      logger.debug('🔍 [SERVICES DEBUG] pureJanitorial isUsed:', isUsed);
     }
 
     if (svc && isUsed) {
@@ -2531,7 +2532,7 @@ function buildServicesLatex(services = {}) {
     }
   }
 
-  console.log('🔍 [SERVICES DEBUG] usedServices keys:', Object.keys(usedServices));
+  logger.debug('🔍 [SERVICES DEBUG] usedServices keys:', Object.keys(usedServices));
 
   if (services.customServices && Array.isArray(services.customServices)) {
     const usedCustomServices = services.customServices.filter((cs) => {
@@ -3165,7 +3166,7 @@ export async function compileProposalTemplate() {
 export async function compileCustomerHeader(body = {}, options = {}) {
   const { watermark = false } = options;
 
-  console.log('ÐY"? [PDF COMPILE] Starting compilation with options:', {
+  logger.debug('ÐY"? [PDF COMPILE] Starting compilation with options:', {
     templatePath: PDF_HEADER_TEMPLATE_PATH,
     watermark,
     status: body.status,
@@ -3173,12 +3174,12 @@ export async function compileCustomerHeader(body = {}, options = {}) {
 
   validatePayloadData(body);
 
-  console.log('🧹 [PDF COMPILE] Deep sanitizing payload to remove corrupted characters...');
+  logger.debug('🧹 [PDF COMPILE] Deep sanitizing payload to remove corrupted characters...');
   body = deepSanitizeObject(body);
-  console.log('✅ [PDF COMPILE] Payload sanitization complete');
+  logger.debug('✅ [PDF COMPILE] Payload sanitization complete');
 
   if (body.products) {
-    console.log('🔍 [PRODUCTS VALIDATION] Checking products data for corrupted fields...');
+    logger.debug('🔍 [PRODUCTS VALIDATION] Checking products data for corrupted fields...');
 
     const checkProductData = (product, index, type) => {
       const fields = ['displayName', 'customName', 'productName', 'productKey', 'frequency', 'qty', 'unitPrice', 'amount', 'total'];
@@ -3187,7 +3188,7 @@ export async function compileCustomerHeader(body = {}, options = {}) {
           const value = String(product[field]);
           const hasBadChars = /[\x00-\x1F\x7F-\xFF]/.test(value);
           if (hasBadChars) {
-            console.error(`❌ [PRODUCTS VALIDATION] Found corrupted data in ${type}[${index}].${field}:`, {
+            logger.error(`❌ [PRODUCTS VALIDATION] Found corrupted data in ${type}[${index}].${field}:`, {
               field,
               value,
               valueLength: value.length,
@@ -3301,18 +3302,18 @@ export async function compileCustomerHeader(body = {}, options = {}) {
   const template = await fs.readFile(PDF_HEADER_TEMPLATE_PATH, "utf8");
 
   let tex = Mustache.render(template, view);
-  console.log('🔍 [PDF COMPILE] After Mustache rendering, LaTeX length:', tex.length);
+  logger.debug('🔍 [PDF COMPILE] After Mustache rendering, LaTeX length:', tex.length);
 
   try {
     const debugPath = '/tmp/debug-latex-output.tex';
     await fs.writeFile(debugPath, tex, 'utf8');
-    console.log(`🔍 [PDF DEBUG] Generated LaTeX saved to: ${debugPath}`);
+    logger.debug(`🔍 [PDF DEBUG] Generated LaTeX saved to: ${debugPath}`);
   } catch (err) {
-    console.warn('⚠️ Could not save debug LaTeX:', err.message);
+    logger.warn('⚠️ Could not save debug LaTeX:', err.message);
   }
 
   if (watermark) {
-    console.log('💧 [WATERMARK] Adding DRAFT watermark to PDF');
+    logger.debug('💧 [WATERMARK] Adding DRAFT watermark to PDF');
     const { preamble, command } = buildWatermarkLatex();
 
     tex = tex.replace(/\\begin\{document\}/, preamble + '\\begin{document}');
@@ -3321,41 +3322,41 @@ export async function compileCustomerHeader(body = {}, options = {}) {
   }
 
   if (body.serviceAgreement && body.serviceAgreement.includeInPdf) {
-    console.log('📄 [SERVICE AGREEMENT] Including Service Agreement in PDF');
+    logger.debug('📄 [SERVICE AGREEMENT] Including Service Agreement in PDF');
     const serviceAgreementLatex = buildServiceAgreementLatex(body.serviceAgreement);
     tex = tex.replace(/\\end\{document\}/, serviceAgreementLatex + '\n\\end{document}');
   } else {
-    console.log('📄 [SERVICE AGREEMENT] Service Agreement not included (checkbox not checked or data missing)');
+    logger.debug('📄 [SERVICE AGREEMENT] Service Agreement not included (checkbox not checked or data missing)');
   }
 
   const openBraces = (tex.match(/\{/g) || []).length;
   const closeBraces = (tex.match(/\}/g) || []).length;
   if (openBraces !== closeBraces) {
-    console.error(`❌ [LATEX-VALIDATION] Brace mismatch! Opening: ${openBraces}, Closing: ${closeBraces}, Difference: ${openBraces - closeBraces}`);
+    logger.error(`❌ [LATEX-VALIDATION] Brace mismatch! Opening: ${openBraces}, Closing: ${closeBraces}, Difference: ${openBraces - closeBraces}`);
 
     try {
       const finalDebugPath = '/tmp/debug-latex-final-with-errors.tex';
       await fs.writeFile(finalDebugPath, tex, 'utf8');
-      console.log(`🔍 [PDF DEBUG] Final LaTeX with errors saved to: ${finalDebugPath}`);
+      logger.debug(`🔍 [PDF DEBUG] Final LaTeX with errors saved to: ${finalDebugPath}`);
     } catch (err) {
-      console.warn('⚠️ Could not save final debug LaTeX:', err.message);
+      logger.warn('⚠️ Could not save final debug LaTeX:', err.message);
     }
   }
 
   try {
     const finalDebugPath = '/tmp/debug-latex-final.tex';
     await fs.writeFile(finalDebugPath, tex, 'utf8');
-    console.log(`🔍 [PDF DEBUG] Final LaTeX (after all modifications) saved to: ${finalDebugPath}`);
+    logger.debug(`🔍 [PDF DEBUG] Final LaTeX (after all modifications) saved to: ${finalDebugPath}`);
   } catch (err) {
-    console.warn('⚠️ Could not save final debug LaTeX:', err.message);
+    logger.warn('⚠️ Could not save final debug LaTeX:', err.message);
   }
 
   const headerDir = path.dirname(PDF_HEADER_TEMPLATE_PATH);
   const logoPath = path.join(headerDir, "images", "Envimaster.png");
-  console.log(`📷 [PDF] Reading logo from: ${logoPath}`);
+  logger.debug(`📷 [PDF] Reading logo from: ${logoPath}`);
 
   const logoBuf = await fs.readFile(logoPath);
-  console.log(`📷 [PDF] Logo buffer size: ${logoBuf.length} bytes`);
+  logger.debug(`📷 [PDF] Logo buffer size: ${logoBuf.length} bytes`);
 
   // Add unique timestamp comment to prevent caching issues
   const uniqueMarker = `% Generated: ${new Date().toISOString()} - ${Math.random().toString(36).substring(7)}\n`;
@@ -3367,7 +3368,7 @@ export async function compileCustomerHeader(body = {}, options = {}) {
   const hasBinaryCorruption = /[^\x09\x0A\x0D\x20-\x7E]/.test(texWithMarker);
 
   if (hasBinaryCorruption) {
-    console.error('❌ [PDF FINAL SANITIZE] Binary corruption detected in final LaTeX!');
+    logger.error('❌ [PDF FINAL SANITIZE] Binary corruption detected in final LaTeX!');
 
     // Find the corrupted sections for logging
     const matches = [];
@@ -3381,17 +3382,17 @@ export async function compileCustomerHeader(body = {}, options = {}) {
       matches.push({ index: match.index, charCode: `U+${charCode}`, context });
       if (matches.length >= 10) break; // Limit logging
     }
-    console.error('❌ [PDF FINAL SANITIZE] Corruption locations (first 10):', JSON.stringify(matches, null, 2));
+    logger.error('❌ [PDF FINAL SANITIZE] Corruption locations (first 10):', JSON.stringify(matches, null, 2));
 
     // Remove ALL non-printable characters (only keep printable ASCII + tab + newline + carriage return)
     const beforeLength = texWithMarker.length;
     texWithMarker = texWithMarker.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
-    console.log(`✅ [PDF FINAL SANITIZE] Removed ${beforeLength - texWithMarker.length} corrupted characters, new length: ${texWithMarker.length}`);
+    logger.debug(`✅ [PDF FINAL SANITIZE] Removed ${beforeLength - texWithMarker.length} corrupted characters, new length: ${texWithMarker.length}`);
   }
 
   // Convert tex to Buffer ensuring proper UTF-8 encoding
   const texBuffer = Buffer.from(texWithMarker, 'utf8');
-  console.log(`📷 [PDF] LaTeX buffer size: ${texBuffer.length} bytes, first 100 chars:`, texWithMarker.substring(0, 100));
+  logger.debug(`📷 [PDF] LaTeX buffer size: ${texBuffer.length} bytes, first 100 chars:`, texWithMarker.substring(0, 100));
 
   const files = [
     { field: "main", name: "doc.tex", data: texBuffer, type: "text/plain; charset=utf-8" },
@@ -3401,13 +3402,13 @@ export async function compileCustomerHeader(body = {}, options = {}) {
   // Manifest maps source filename to target path in working directory
   const manifest = { "Envimaster.png": "images/Envimaster.png" };
 
-  console.log(`📷 [PDF] Sending ${files.length} files to remote PDF service`);
+  logger.debug(`📷 [PDF] Sending ${files.length} files to remote PDF service`);
   const filesDesc = files.map(f => {
     const sizeBytes = f.data.length;
     return `${f.name} (${sizeBytes} bytes)`;
   }).join(', ');
-  console.log(`📷 [PDF] Files: ${filesDesc}`);
-  console.log(`📷 [PDF] Manifest:`, JSON.stringify(manifest));
+  logger.debug(`📷 [PDF] Files: ${filesDesc}`);
+  logger.debug(`📷 [PDF] Manifest:`, JSON.stringify(manifest));
 
   try {
     const buffer = await remotePostMultipart("pdf/compile-bundle", files, { assetsManifest: manifest });
@@ -3418,7 +3419,7 @@ export async function compileCustomerHeader(body = {}, options = {}) {
 
     return { buffer, filename };
   } catch (error) {
-    console.error('❌ [PDF COMPILE] PDF compilation failed:', {
+    logger.error('❌ [PDF COMPILE] PDF compilation failed:', {
       errorType: error.errorType,
       message: error.message,
       url: error.url,

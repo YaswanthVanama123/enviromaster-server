@@ -6,6 +6,7 @@
 import { compileCustomerHeader } from "../../services/pdfService.js";
 import { AdminHeaderDoc } from "../../models/agreement/index.js";
 import { ServiceConfig } from "../../models/service/index.js";
+import logger from "../../utils/logger.js";
 
 export async function compileAndStoreAdminHeader(req, res) {
   try {
@@ -39,7 +40,7 @@ export async function compileAndStoreAdminHeader(req, res) {
     res.setHeader("X-AdminHeaderDoc-Id", doc._id.toString());
     res.send(buffer);
   } catch (err) {
-    console.error("compileAndStoreAdminHeader error:", err);
+    logger.error("compileAndStoreAdminHeader error:", err);
     res.status(500).json({
       error: "LaTeX compilation failed",
       detail: err?.detail || String(err),
@@ -66,7 +67,7 @@ export async function getAdminHeaders(req, res) {
 
     res.json({ total, page, limit, items });
   } catch (err) {
-    console.error("getAdminHeaders error:", err);
+    logger.error("getAdminHeaders error:", err);
     res.status(500).json({ error: "Failed to fetch docs", detail: String(err) });
   }
 }
@@ -99,7 +100,7 @@ export async function getAdminHeaderById(req, res) {
       availableServices: serviceMetadata
     });
   } catch (err) {
-    console.error("getAdminHeaderById error:", err);
+    logger.error("getAdminHeaderById error:", err);
     res.status(500).json({ error: "Failed to fetch doc", detail: String(err) });
   }
 }
@@ -179,7 +180,7 @@ export async function updateAdminHeader(req, res) {
 
     return sendResponse(res, doc, buffer, filename);
   } catch (err) {
-    console.error("updateAdminHeader error:", err);
+    logger.error("updateAdminHeader error:", err);
     res.status(500).json({
       error: "Failed to update admin header",
       detail: err?.detail || String(err),

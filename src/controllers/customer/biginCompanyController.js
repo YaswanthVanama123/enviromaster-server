@@ -6,6 +6,7 @@
 import { BiginCompany } from "../../models/customer/index.js";
 import { v4 as uuidv4 } from "uuid";
 import { getAllBiginCompanies } from "../../services/zohoService.js";
+import logger from "../../utils/logger.js";
 import {
   refreshPendingLocationTypes,
   refreshLocationTypeForCompany,
@@ -68,7 +69,7 @@ export const getAllCompanies = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching companies:", error);
+    logger.error("Error fetching companies:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch companies",
@@ -97,7 +98,7 @@ export const getCompanyById = async (req, res) => {
       data: company,
     });
   } catch (error) {
-    console.error("Error fetching company:", error);
+    logger.error("Error fetching company:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch company",
@@ -122,7 +123,7 @@ export const getFetchStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting fetch status:", error);
+    logger.error("Error getting fetch status:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get fetch status",
@@ -167,7 +168,7 @@ export const startFetch = async (req, res) => {
     // Run fetch in background (don't await)
     runFetchInBackground(sessionId);
   } catch (error) {
-    console.error("Error starting fetch:", error);
+    logger.error("Error starting fetch:", error);
     fetchStatus.isRunning = false;
     res.status(500).json({
       success: false,
@@ -181,7 +182,7 @@ export const startFetch = async (req, res) => {
  */
 async function runFetchInBackground(sessionId) {
   try {
-    console.log("🚀 Starting Bigin company fetch via REST API...");
+    logger.debug("🚀 Starting Bigin company fetch via REST API...");
 
     fetchStatus.progress = 10;
     fetchStatus.message = "Connecting to Bigin API...";
@@ -194,7 +195,7 @@ async function runFetchInBackground(sessionId) {
     }
 
     const companies = result.companies || [];
-    console.log(`📋 Fetched ${companies.length} companies from Bigin API`);
+    logger.debug(`📋 Fetched ${companies.length} companies from Bigin API`);
 
     fetchStatus.progress = 50;
     fetchStatus.message = `Saving ${companies.length} companies to database...`;
@@ -210,9 +211,9 @@ async function runFetchInBackground(sessionId) {
     fetchStatus.message = `Fetched ${companies.length} companies, saved/updated ${savedCount}`;
     fetchStatus.currentSessionId = null;
 
-    console.log(`✅ Fetch completed: ${companies.length} companies from API, ${savedCount} saved/updated`);
+    logger.debug(`✅ Fetch completed: ${companies.length} companies from API, ${savedCount} saved/updated`);
   } catch (error) {
-    console.error("❌ Fetch failed:", error);
+    logger.error("❌ Fetch failed:", error);
     fetchStatus.isRunning = false;
     fetchStatus.lastFetchAt = new Date();
     fetchStatus.lastFetchResult = "failed";
@@ -226,7 +227,7 @@ async function runFetchInBackground(sessionId) {
  * Save companies to database (upsert)
  */
 async function saveCompaniesToDatabase(companies, sessionId) {
-  console.log(`💾 Saving ${companies.length} companies to database...`);
+  logger.debug(`💾 Saving ${companies.length} companies to database...`);
 
   let saved = 0;
   let updated = 0;
@@ -269,11 +270,11 @@ async function saveCompaniesToDatabase(companies, sessionId) {
         saved++;
       }
     } catch (err) {
-      console.error(`Error saving company:`, err.message);
+      logger.error(`Error saving company:`, err.message);
     }
   }
 
-  console.log(`✅ Save complete: ${saved} new, ${updated} updated`);
+  logger.debug(`✅ Save complete: ${saved} new, ${updated} updated`);
   return saved + updated;
 }
 
@@ -335,7 +336,7 @@ export const getCompanyStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error getting company stats:", error);
+    logger.error("Error getting company stats:", error);
     res.status(500).json({
       success: false,
       error: "Failed to get company stats",
@@ -364,7 +365,7 @@ export const deleteCompany = async (req, res) => {
       message: "Company deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting company:", error);
+    logger.error("Error deleting company:", error);
     res.status(500).json({
       success: false,
       error: "Failed to delete company",
@@ -398,7 +399,7 @@ export const updateCompany = async (req, res) => {
       data: company,
     });
   } catch (error) {
-    console.error("Error updating company:", error);
+    logger.error("Error updating company:", error);
     res.status(500).json({
       success: false,
       error: "Failed to update company",
@@ -445,7 +446,7 @@ export const refreshLocationTypes = async (req, res) => {
           finishedAt: new Date().toISOString(),
           message: `Done — ${summary.markedExisting} existing of ${summary.checked} checked${summary.failed ? `, ${summary.failed} failed` : ""}`,
         };
-        console.log(`[LOCATION-TYPE] Batch done: checked ${summary.checked}, markedExisting ${summary.markedExisting}, failed ${summary.failed}`);
+        logger.debug(`[LOCATION-TYPE] Batch done: checked ${summary.checked}, markedExisting ${summary.markedExisting}, failed ${summary.failed}`);
       })
       .catch((err) => {
         locationTypeStatus = {
@@ -454,11 +455,11 @@ export const refreshLocationTypes = async (req, res) => {
           finishedAt: new Date().toISOString(),
           message: `Failed: ${err?.message}`,
         };
-        console.error("[LOCATION-TYPE] Batch failed:", err?.message);
+        logger.error("[LOCATION-TYPE] Batch failed:", err?.message);
       });
   } catch (error) {
     locationTypeStatus = { ...locationTypeStatus, isRunning: false };
-    console.error("Error refreshing location types:", error);
+    logger.error("Error refreshing location types:", error);
     res.status(500).json({ success: false, error: "Failed to refresh location types" });
   }
 };
@@ -475,7 +476,7 @@ export const refreshLocationTypeById = async (req, res) => {
     }
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error("Error refreshing location type:", error);
+    logger.error("Error refreshing location type:", error);
     res.status(500).json({ success: false, error: "Failed to refresh location type" });
   }
 };

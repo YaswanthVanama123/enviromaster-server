@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { VersionPdf, CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { compileCustomerHeader } from "../../services/pdfService.js";
+import logger from "../../utils/logger.js";
 
 export async function getAllVersionPdfs(req, res) {
   try {
@@ -26,7 +27,7 @@ export async function getAllVersionPdfs(req, res) {
       filter.isDeleted = { $ne: true };
     }
 
-    console.log(`📋 [VERSIONS] Fetching versions with filter:`, filter);
+    logger.debug(`📋 [VERSIONS] Fetching versions with filter:`, filter);
 
     const total = await VersionPdf.countDocuments(filter);
 
@@ -58,7 +59,7 @@ export async function getAllVersionPdfs(req, res) {
       .limit(limit)
       .lean();
 
-    console.log(`📋 [VERSIONS] Found ${versions.length} versions (total: ${total})`);
+    logger.debug(`📋 [VERSIONS] Found ${versions.length} versions (total: ${total})`);
 
     const transformedVersions = versions.map(version => ({
       id: version._id,
@@ -97,7 +98,7 @@ export async function getAllVersionPdfs(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to fetch versions:", error.message);
+    logger.error("❌ Failed to fetch versions:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -133,7 +134,7 @@ export async function getVersionPdfById(req, res) {
       });
     }
 
-    console.log(`📄 [VERSION] Retrieved version ${version.versionNumber} for agreement ${version.agreementId._id}`);
+    logger.debug(`📄 [VERSION] Retrieved version ${version.versionNumber} for agreement ${version.agreementId._id}`);
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -167,7 +168,7 @@ export async function getVersionPdfById(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to fetch version:", error.message);
+    logger.error("❌ Failed to fetch version:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -180,7 +181,7 @@ export async function updateVersionStatus(req, res) {
     const { id } = req.params;
     const { status } = req.body;
 
-    console.log(`🔄 [VERSION-STATUS] Updating version ${id} status to: ${status}`);
+    logger.debug(`🔄 [VERSION-STATUS] Updating version ${id} status to: ${status}`);
 
     const validStatuses = ["draft", "saved", "pending_approval", "approved_salesman", "approved_admin"];
     if (!status || !validStatuses.includes(status)) {
@@ -205,14 +206,14 @@ export async function updateVersionStatus(req, res) {
     ).select('_id versionNumber status updatedAt').lean();
 
     if (!version) {
-      console.log(`❌ [VERSION-STATUS] Version not found: ${id}`);
+      logger.debug(`❌ [VERSION-STATUS] Version not found: ${id}`);
       return res.status(404).json({
         success: false,
         error: "Version not found"
       });
     }
 
-    console.log(`✅ [VERSION-STATUS] Updated version ${version.versionNumber} status to ${status}`);
+    logger.debug(`✅ [VERSION-STATUS] Updated version ${version.versionNumber} status to ${status}`);
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -230,7 +231,7 @@ export async function updateVersionStatus(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ [VERSION-STATUS] Failed to update version status:", error.message);
+    logger.error("❌ [VERSION-STATUS] Failed to update version status:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -259,13 +260,13 @@ export async function downloadVersionPdf(req, res) {
       });
     }
 
-    console.log(`📥 [VERSION-DOWNLOAD] Downloading version ${version.versionNumber}:`, {
+    logger.debug(`📥 [VERSION-DOWNLOAD] Downloading version ${version.versionNumber}:`, {
       fileName: version.fileName,
       watermark: applyWatermark,
       hasStoredPdf: !!version.pdf_meta?.pdfBuffer
     });
 
-    console.log(`🔄 [ON-DEMAND] Regenerating PDF on-demand with watermark=${applyWatermark}`);
+    logger.debug(`🔄 [ON-DEMAND] Regenerating PDF on-demand with watermark=${applyWatermark}`);
 
     const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, {
       watermark: applyWatermark
@@ -284,18 +285,18 @@ export async function downloadVersionPdf(req, res) {
     res.setHeader('Content-Length', compiledPdf.buffer.length);
 
     res.end(compiledPdf.buffer);
-    console.log(`📥 [VERSION-DOWNLOAD] Downloaded version ${version.versionNumber}: ${fileName}`);
+    logger.debug(`📥 [VERSION-DOWNLOAD] Downloaded version ${version.versionNumber}: ${fileName}`);
 
   } catch (error) {
-    console.error("❌ Failed to download version:", error.message);
+    logger.error("❌ Failed to download version:", error.message);
 
 
     if (error.detail) {
       try {
         const errorDetail = typeof error.detail === 'string' ? JSON.parse(error.detail) : error.detail;
-        console.error("📄 LaTeX Compilation Error Details:", JSON.stringify(errorDetail, null, 2));
+        logger.error("📄 LaTeX Compilation Error Details:", JSON.stringify(errorDetail, null, 2));
       } catch (parseErr) {
-        console.error("📄 LaTeX Compilation Error Details (raw):", error.detail);
+        logger.error("📄 LaTeX Compilation Error Details (raw):", error.detail);
       }
     }
 
@@ -344,7 +345,7 @@ export async function deleteVersionPdf(req, res) {
     version.deletedAt = new Date();
     await version.save();
 
-    console.log(`🗑️ [VERSION-DELETE] Soft deleted version ${version.versionNumber}`);
+    logger.debug(`🗑️ [VERSION-DELETE] Soft deleted version ${version.versionNumber}`);
 
     res.json({
       success: true,
@@ -357,7 +358,7 @@ export async function deleteVersionPdf(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to delete version:", error.message);
+    logger.error("❌ Failed to delete version:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -451,12 +452,12 @@ export async function checkVersionStatus(req, res) {
       }
     };
 
-    console.log(`📋 [VERSION-STATUS] Agreement ${agreementId}: ${totalVersions} active versions, ${deletedVersions.length} deleted, next version: v${nextVersionNumber}, action: ${suggestedAction}`);
+    logger.debug(`📋 [VERSION-STATUS] Agreement ${agreementId}: ${totalVersions} active versions, ${deletedVersions.length} deleted, next version: v${nextVersionNumber}, action: ${suggestedAction}`);
 
     res.json(versionStatus);
 
   } catch (error) {
-    console.error("❌ Failed to check version status:", error.message);
+    logger.error("❌ Failed to check version status:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -479,7 +480,7 @@ export async function createVersion(req, res) {
       });
     }
 
-    console.log(`📝 [VERSION-CREATE] Creating version for agreement ${agreementId}`, {
+    logger.debug(`📝 [VERSION-CREATE] Creating version for agreement ${agreementId}`, {
       watermark,
       replaceRecent,
       isFirstTime
@@ -525,17 +526,17 @@ export async function createVersion(req, res) {
 
     if (replaceRecent && latestVersion) {
       versionNumber = latestVersion.versionNumber;
-      console.log(`🔄 [VERSION-CREATE] User requested replace - will replace v${versionNumber}`);
+      logger.debug(`🔄 [VERSION-CREATE] User requested replace - will replace v${versionNumber}`);
     } else {
       versionNumber = highestVersionNumber + 1;
-      console.log(`✅ [VERSION-CREATE] Creating new version v${versionNumber}`);
+      logger.debug(`✅ [VERSION-CREATE] Creating new version v${versionNumber}`);
     }
 
     const shouldApplyWatermark = watermark === true ||
                                   agreement.status === 'draft' ||
                                   agreement.status === 'pending_approval';
 
-    console.log(`💧 [WATERMARK-CHECK] Watermark decision:`, {
+    logger.debug(`💧 [WATERMARK-CHECK] Watermark decision:`, {
       requestedWatermark: watermark,
       agreementStatus: agreement.status,
       shouldApplyWatermark
@@ -571,7 +572,7 @@ export async function createVersion(req, res) {
       }
     };
 
-    console.log(`📋 [VERSION-CREATE] Creating version with status: ${versionData.status} (inherited from agreement)`);
+    logger.debug(`📋 [VERSION-CREATE] Creating version with status: ${versionData.status} (inherited from agreement)`);
 
     let version;
     let wasReplacement = false;
@@ -588,16 +589,16 @@ export async function createVersion(req, res) {
 
       if (version) {
         wasReplacement = true;
-        console.log(`🔄 [VERSION-CREATE] Replaced version ${versionNumber} (atomic update)`);
+        logger.debug(`🔄 [VERSION-CREATE] Replaced version ${versionNumber} (atomic update)`);
       } else {
         version = new VersionPdf(versionData);
         version = await version.save();
-        console.log(`✅ [VERSION-CREATE] Created new version ${versionNumber} (replacement target not found)`);
+        logger.debug(`✅ [VERSION-CREATE] Created new version ${versionNumber} (replacement target not found)`);
       }
     } else {
       version = new VersionPdf(versionData);
       version = await version.save();
-      console.log(`✅ [VERSION-CREATE] Created new version ${versionNumber}`);
+      logger.debug(`✅ [VERSION-CREATE] Created new version ${versionNumber}`);
     }
 
     const updateData = {
@@ -620,7 +621,7 @@ export async function createVersion(req, res) {
 
       if (latestVersion && latestVersion.status === 'draft') {
         await VersionPdf.findByIdAndUpdate(latestVersion._id, { status: 'saved' });
-        console.log(`✅ [VERSION-CREATE] Auto-updated previous draft (v${latestVersion.versionNumber}) to saved after creating v${versionNumber}`);
+        logger.debug(`✅ [VERSION-CREATE] Auto-updated previous draft (v${latestVersion.versionNumber}) to saved after creating v${versionNumber}`);
       }
     }
 
@@ -639,14 +640,14 @@ export async function createVersion(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to create version:", error.message);
+    logger.error("❌ Failed to create version:", error.message);
 
     if (error.detail) {
       try {
         const errorDetail = typeof error.detail === 'string' ? JSON.parse(error.detail) : error.detail;
-        console.error("📄 LaTeX Compilation Error Details:", JSON.stringify(errorDetail, null, 2));
+        logger.error("📄 LaTeX Compilation Error Details:", JSON.stringify(errorDetail, null, 2));
       } catch (parseErr) {
-        console.error("📄 LaTeX Compilation Error Details (raw):", error.detail);
+        logger.error("📄 LaTeX Compilation Error Details (raw):", error.detail);
       }
     }
 
@@ -670,7 +671,7 @@ export async function replaceMainPdf(req, res) {
       });
     }
 
-    console.log(`🔄 [REPLACE-MAIN] Replacing main PDF for agreement ${agreementId}`);
+    logger.debug(`🔄 [REPLACE-MAIN] Replacing main PDF for agreement ${agreementId}`);
 
     const agreement = await CustomerHeaderDoc.findById(agreementId);
     if (!agreement) {
@@ -695,7 +696,7 @@ export async function replaceMainPdf(req, res) {
     agreement.updatedBy = updatedBy || null;
     await agreement.save();
 
-    console.log(`✅ [REPLACE-MAIN] Replaced main PDF for agreement ${agreementId}`);
+    logger.debug(`✅ [REPLACE-MAIN] Replaced main PDF for agreement ${agreementId}`);
 
     res.json({
       success: true,
@@ -709,7 +710,7 @@ export async function replaceMainPdf(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to replace main PDF:", error.message);
+    logger.error("❌ Failed to replace main PDF:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -769,7 +770,7 @@ export async function getVersionsList(req, res) {
       }
     }));
 
-    console.log(`📋 [VERSION-LIST] Found ${items.length} versions for agreement ${agreementId}`);
+    logger.debug(`📋 [VERSION-LIST] Found ${items.length} versions for agreement ${agreementId}`);
 
     res.json({
       success: true,
@@ -784,7 +785,7 @@ export async function getVersionsList(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to get versions list:", error.message);
+    logger.error("❌ Failed to get versions list:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -813,13 +814,13 @@ export async function viewVersionPdf(req, res) {
       });
     }
 
-    console.log(`👁️ [VERSION-VIEW] Viewing version ${version.versionNumber}:`, {
+    logger.debug(`👁️ [VERSION-VIEW] Viewing version ${version.versionNumber}:`, {
       fileName: version.fileName,
       watermark: applyWatermark,
       hasStoredPdf: !!version.pdf_meta?.pdfBuffer
     });
 
-    console.log(`🔄 [ON-DEMAND] Regenerating PDF on-demand with watermark=${applyWatermark}`);
+    logger.debug(`🔄 [ON-DEMAND] Regenerating PDF on-demand with watermark=${applyWatermark}`);
 
     const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, {
       watermark: applyWatermark
@@ -838,10 +839,10 @@ export async function viewVersionPdf(req, res) {
     res.setHeader('Content-Length', compiledPdf.buffer.length);
 
     res.end(compiledPdf.buffer);
-    console.log(`👁️ [VERSION-VIEW] Viewed version ${version.versionNumber}: ${fileName}`);
+    logger.debug(`👁️ [VERSION-VIEW] Viewed version ${version.versionNumber}: ${fileName}`);
 
   } catch (error) {
-    console.error("❌ Failed to view version:", error.message);
+    logger.error("❌ Failed to view version:", error.message);
 
     const errorResponse = {
       success: false,
@@ -884,7 +885,7 @@ export async function getVersionForEdit(req, res) {
       });
     }
 
-    console.log(`📝 [VERSION-EDIT] Retrieved version ${version.versionNumber} for editing`);
+    logger.debug(`📝 [VERSION-EDIT] Retrieved version ${version.versionNumber} for editing`);
 
     res.json({
       success: true,
@@ -901,7 +902,7 @@ export async function getVersionForEdit(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Failed to get version for edit:", error.message);
+    logger.error("❌ Failed to get version for edit:", error.message);
     res.status(500).json({
       success: false,
       error: error.message

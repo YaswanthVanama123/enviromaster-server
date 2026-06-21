@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import { PriceOverrideLog } from "../../models/logging/index.js";
+import logger from "../../utils/logger.js";
 
 export async function logPriceOverride(req, res) {
   try {
@@ -32,7 +33,7 @@ export async function logPriceOverride(req, res) {
       log: { id: overrideLog._id, changeAmount: overrideLog.changeAmount, changePercentage: overrideLog.changePercentage, isSignificantChange: overrideLog.isSignificantChange, requiresApproval: overrideLog.requiresApproval, reviewStatus: overrideLog.reviewStatus }
     });
   } catch (err) {
-    console.error("logPriceOverride error:", err);
+    logger.error("logPriceOverride error:", err);
     res.status(500).json({ success: false, error: "Failed to log price override", detail: err?.message });
   }
 }
@@ -52,7 +53,7 @@ export async function getPriceOverrideLogs(req, res) {
 
     res.json({ success: true, total: logs.length, logs, statistics: stats });
   } catch (err) {
-    console.error("getPriceOverrideLogs error:", err);
+    logger.error("getPriceOverrideLogs error:", err);
     res.status(500).json({ success: false, error: "Failed to retrieve logs", detail: err?.message });
   }
 }
@@ -69,7 +70,7 @@ export async function getPriceOverrideStats(req, res) {
 
     res.json({ success: true, statistics: stats, recentOverrides: recentLogs });
   } catch (err) {
-    console.error("getPriceOverrideStats error:", err);
+    logger.error("getPriceOverrideStats error:", err);
     res.status(500).json({ success: false, error: "Failed to retrieve stats", detail: err?.message });
   }
 }
@@ -100,7 +101,7 @@ export async function reviewPriceOverride(req, res) {
 
     res.json({ success: true, message: `Price override ${reviewStatus} successfully`, log: { id: log._id, reviewStatus: log.reviewStatus, reviewedBy: log.reviewedBy, reviewedAt: log.reviewedAt } });
   } catch (err) {
-    console.error("reviewPriceOverride error:", err);
+    logger.error("reviewPriceOverride error:", err);
     res.status(500).json({ success: false, error: "Failed to review", detail: err?.message });
   }
 }
@@ -118,7 +119,7 @@ export async function getPendingPriceOverrides(req, res) {
 
     res.json({ success: true, total, page: Number(page), limit: Number(limit), pendingOverrides: logs });
   } catch (err) {
-    console.error("getPendingPriceOverrides error:", err);
+    logger.error("getPendingPriceOverrides error:", err);
     res.status(500).json({ success: false, error: "Failed to retrieve pending overrides", detail: err?.message });
   }
 }

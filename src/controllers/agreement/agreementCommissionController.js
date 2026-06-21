@@ -4,6 +4,7 @@
  */
 
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
+import logger from "../../utils/logger.js";
 
 // Quota level to commission rate mapping
 const QUOTA_COMMISSION_RATES = {
@@ -93,7 +94,7 @@ export async function getUserCommissions(req, res) {
         finalRate = savedCommission.finalCommissionRate || savedCommission.input?.baseRate || 6;
         breakdown = savedCommission.breakdown || {};
 
-        console.log(`[COMMISSION] Agreement ${a._id}: Using saved commission - annual: $${annualCommission.toFixed(2)}, rate: ${finalRate}%`);
+        logger.debug(`[COMMISSION] Agreement ${a._id}: Using saved commission - annual: $${annualCommission.toFixed(2)}, rate: ${finalRate}%`);
       } else {
         // No saved commission => the agreement was NOT connected to Bigin, so there
         // is no commission. We do not fabricate one from revenue.
@@ -103,7 +104,7 @@ export async function getUserCommissions(req, res) {
         finalRate = 0;
         breakdown = {};
 
-        console.log(`[COMMISSION] Agreement ${a._id}: Not connected to Bigin - no commission`);
+        logger.debug(`[COMMISSION] Agreement ${a._id}: Not connected to Bigin - no commission`);
       }
 
       // Contract value = the full contract total (services + products), matching
@@ -192,7 +193,7 @@ export async function getUserCommissions(req, res) {
       commissions
     });
   } catch (err) {
-    console.error("getUserCommissions error:", err);
+    logger.error("getUserCommissions error:", err);
     res.status(500).json({ success: false, error: "Failed to get user commissions", detail: err?.message });
   }
 }
@@ -279,7 +280,7 @@ export async function getAllEmployeesCommissions(req, res) {
       employees
     });
   } catch (err) {
-    console.error("getAllEmployeesCommissions error:", err);
+    logger.error("getAllEmployeesCommissions error:", err);
     res.status(500).json({ success: false, error: "Failed to get all employees commissions", detail: err?.message });
   }
 }
@@ -452,7 +453,7 @@ export async function getEmployeeCommissions(req, res) {
       commissions
     });
   } catch (err) {
-    console.error("getEmployeeCommissions error:", err);
+    logger.error("getEmployeeCommissions error:", err);
     res.status(500).json({ success: false, error: "Failed to get employee commissions", detail: err?.message });
   }
 }

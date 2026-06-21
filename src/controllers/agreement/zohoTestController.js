@@ -1,3 +1,4 @@
+import logger from "../../utils/logger.js";
 /**
  * Zoho Test Controller
  * Handles Zoho API testing and diagnostic endpoints
@@ -13,7 +14,7 @@ import {
 
 export async function testZohoAccessEndpoint(_req, res) {
   try {
-    console.log("🧪 [TEST-ENDPOINT] Testing Zoho access...");
+    logger.debug("🧪 [TEST-ENDPOINT] Testing Zoho access...");
     await testZohoAccess();
 
     res.json({
@@ -21,7 +22,7 @@ export async function testZohoAccessEndpoint(_req, res) {
       message: "Zoho access test completed - check server logs for detailed results"
     });
   } catch (error) {
-    console.error("❌ [TEST-ENDPOINT] Zoho access test failed:", error);
+    logger.error("❌ [TEST-ENDPOINT] Zoho access test failed:", error);
     res.status(500).json({
       success: false,
       error: "Zoho access test failed",
@@ -32,7 +33,7 @@ export async function testZohoAccessEndpoint(_req, res) {
 
 export async function runZohoDiagnosticsEndpoint(_req, res) {
   try {
-    console.log("🧪 [DIAGNOSTICS-ENDPOINT] Running comprehensive Zoho diagnostics...");
+    logger.debug("🧪 [DIAGNOSTICS-ENDPOINT] Running comprehensive Zoho diagnostics...");
     const results = await runZohoDiagnostics();
 
     res.json({
@@ -41,7 +42,7 @@ export async function runZohoDiagnosticsEndpoint(_req, res) {
       results: results
     });
   } catch (error) {
-    console.error("❌ [DIAGNOSTICS-ENDPOINT] Zoho diagnostics failed:", error);
+    logger.error("❌ [DIAGNOSTICS-ENDPOINT] Zoho diagnostics failed:", error);
     res.status(500).json({
       success: false,
       error: "Zoho diagnostics failed",
@@ -52,7 +53,7 @@ export async function runZohoDiagnosticsEndpoint(_req, res) {
 
 export async function testV10CompatibilityEndpoint(_req, res) {
   try {
-    console.log("🧪 [V10-TEST-ENDPOINT] Testing V10 Layout+Pipeline compatibility matching...");
+    logger.debug("🧪 [V10-TEST-ENDPOINT] Testing V10 Layout+Pipeline compatibility matching...");
     const results = await testV10LayoutPipelineCompatibility();
 
     res.json({
@@ -61,7 +62,7 @@ export async function testV10CompatibilityEndpoint(_req, res) {
       results: results
     });
   } catch (error) {
-    console.error("❌ [V10-TEST-ENDPOINT] V10 compatibility test failed:", error);
+    logger.error("❌ [V10-TEST-ENDPOINT] V10 compatibility test failed:", error);
     res.status(500).json({
       success: false,
       error: "V10 compatibility test failed",
@@ -72,7 +73,7 @@ export async function testV10CompatibilityEndpoint(_req, res) {
 
 export async function testV9SimplePipelineEndpoint(_req, res) {
   try {
-    console.log("🧪 [V9-TEST-ENDPOINT] Testing V9 Simple Pipeline detection...");
+    logger.debug("🧪 [V9-TEST-ENDPOINT] Testing V9 Simple Pipeline detection...");
     const results = await testV9SimplePipelineDetection();
 
     res.json({
@@ -81,7 +82,7 @@ export async function testV9SimplePipelineEndpoint(_req, res) {
       results: results
     });
   } catch (error) {
-    console.error("❌ [V9-TEST-ENDPOINT] V9 Simple Pipeline test failed:", error);
+    logger.error("❌ [V9-TEST-ENDPOINT] V9 Simple Pipeline test failed:", error);
     res.status(500).json({
       success: false,
       error: "V9 Simple Pipeline test failed",
@@ -92,7 +93,7 @@ export async function testV9SimplePipelineEndpoint(_req, res) {
 
 export async function testV7LayoutPipelineEndpoint(_req, res) {
   try {
-    console.log("🧪 [V7-TEST-ENDPOINT] Testing V7 Layout+Pipeline detection...");
+    logger.debug("🧪 [V7-TEST-ENDPOINT] Testing V7 Layout+Pipeline detection...");
     const results = await testLayoutPipelineDetection();
 
     res.json({
@@ -101,7 +102,7 @@ export async function testV7LayoutPipelineEndpoint(_req, res) {
       results: results
     });
   } catch (error) {
-    console.error("❌ [V7-TEST-ENDPOINT] V7 Layout+Pipeline test failed:", error);
+    logger.error("❌ [V7-TEST-ENDPOINT] V7 Layout+Pipeline test failed:", error);
     res.status(500).json({
       success: false,
       error: "V7 Layout+Pipeline test failed",

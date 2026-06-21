@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import { Employee } from "../../models/user/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { AdminSettings } from "../../models/admin/index.js";
+import logger from "../../utils/logger.js";
 import {
   Agreement,
   QuotaPeriod,
@@ -292,7 +293,7 @@ export const getAllSalesPersons = async (req, res) => {
       count: salesPersons.length,
     });
   } catch (error) {
-    console.error("Error fetching sales persons:", error);
+    logger.error("Error fetching sales persons:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch sales persons",
@@ -342,7 +343,7 @@ export const getSalesPersonById = async (req, res) => {
       data: salesPerson,
     });
   } catch (error) {
-    console.error("Error fetching sales person:", error);
+    logger.error("Error fetching sales person:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch sales person",
@@ -414,7 +415,7 @@ export const updateSalesPerson = async (req, res) => {
       message: "Sales person updated successfully",
     });
   } catch (error) {
-    console.error("Error updating sales person:", error);
+    logger.error("Error updating sales person:", error);
     res.status(500).json({
       success: false,
       error: "Failed to update sales person",
@@ -477,7 +478,7 @@ export const updateSalesPersonQuota = async (req, res) => {
       message: "Quota updated successfully",
     });
   } catch (error) {
-    console.error("Error updating quota:", error);
+    logger.error("Error updating quota:", error);
     res.status(500).json({
       success: false,
       error: "Failed to update quota",
@@ -632,7 +633,7 @@ export const createAgreement = async (req, res) => {
       message: "Agreement created successfully",
     });
   } catch (error) {
-    console.error("Error creating agreement:", error);
+    logger.error("Error creating agreement:", error);
     res.status(500).json({
       success: false,
       error: "Failed to create agreement",
@@ -677,7 +678,7 @@ export const getAllAgreements = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching agreements:", error);
+    logger.error("Error fetching agreements:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch agreements",
@@ -707,7 +708,7 @@ export const getAgreementById = async (req, res) => {
       data: agreement,
     });
   } catch (error) {
-    console.error("Error fetching agreement:", error);
+    logger.error("Error fetching agreement:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch agreement",
@@ -746,7 +747,7 @@ export const updateAgreementStatus = async (req, res) => {
       message: "Agreement status updated",
     });
   } catch (error) {
-    console.error("Error updating agreement status:", error);
+    logger.error("Error updating agreement status:", error);
     res.status(500).json({
       success: false,
       error: "Failed to update agreement status",
@@ -835,14 +836,14 @@ export const getQuotaStatus = async (req, res) => {
       // Check if annualCommission exists and is a valid positive number
       if (commission?.annualCommission && typeof commission.annualCommission === 'number' && commission.annualCommission > 0) {
         totalCommissionEarned += commission.annualCommission;
-        console.log(`[QUOTA] Agreement ${pdf._id}: Using annualCommission = ${commission.annualCommission}`);
+        logger.debug(`[QUOTA] Agreement ${pdf._id}: Using annualCommission = ${commission.annualCommission}`);
       } else if (commission?.contractCommission && typeof commission.contractCommission === 'number' && commission.contractCommission > 0) {
         // Fallback: convert contract commission to annual
         const annualFromContract = commission.contractCommission / years;
         totalCommissionEarned += annualFromContract;
-        console.log(`[QUOTA] Agreement ${pdf._id}: Using contractCommission/years = ${commission.contractCommission}/${years} = ${annualFromContract}`);
+        logger.debug(`[QUOTA] Agreement ${pdf._id}: Using contractCommission/years = ${commission.contractCommission}/${years} = ${annualFromContract}`);
       } else {
-        console.log(`[QUOTA] Agreement ${pdf._id}: No valid commission found`, commission);
+        logger.debug(`[QUOTA] Agreement ${pdf._id}: No valid commission found`, commission);
       }
 
       // Count business types (for now, treat all as new business)
@@ -934,7 +935,7 @@ export const getQuotaStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching quota status:", error);
+    logger.error("Error fetching quota status:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch quota status",
@@ -1092,7 +1093,7 @@ export const getQuotaHistory = async (req, res) => {
       data: quotaPeriods,
     });
   } catch (error) {
-    console.error("Error fetching quota history:", error);
+    logger.error("Error fetching quota history:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch quota history",
@@ -1160,7 +1161,7 @@ export const getCurrentQuotaLevel = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching quota level:", error);
+    logger.error("Error fetching quota level:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch quota level",
@@ -1273,7 +1274,7 @@ export const getLeaderboard = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching leaderboard:", error);
+    logger.error("Error fetching leaderboard:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch leaderboard",

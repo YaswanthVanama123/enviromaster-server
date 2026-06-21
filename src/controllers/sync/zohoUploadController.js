@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import { ZohoMapping } from "../../models/sync/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
+import logger from "../../utils/logger.js";
 import {
   getAllBiginCompanies,
   searchBiginCompanies,
@@ -25,7 +26,7 @@ export async function getUploadStatus(req, res) {
   try {
     const { agreementId } = req.params;
 
-    console.log(`🔍 Checking upload status for agreement: ${agreementId}`);
+    logger.debug(`🔍 Checking upload status for agreement: ${agreementId}`);
 
     if (!mongoose.Types.ObjectId.isValid(agreementId)) {
       return res.status(400).json({
@@ -46,19 +47,19 @@ export async function getUploadStatus(req, res) {
     ]);
 
     if (!agreement) {
-      console.error(`❌ CustomerHeaderDoc not found: ${agreementId}`);
+      logger.error(`❌ CustomerHeaderDoc not found: ${agreementId}`);
       return res.status(404).json({
         success: false,
         error: "Agreement not found",
       });
     }
 
-    console.log(`✅ Found CustomerHeaderDoc: ${agreement._id}`);
+    logger.debug(`✅ Found CustomerHeaderDoc: ${agreement._id}`);
 
     if (mapping) {
       const nextVersion = (mapping.currentVersion || 0) + 1;
 
-      console.log(`✅ Existing mapping - UPDATE mode (v${mapping.currentVersion} → v${nextVersion})`);
+      logger.debug(`✅ Existing mapping - UPDATE mode (v${mapping.currentVersion} → v${nextVersion})`);
 
       return res.json({
         success: true,
@@ -79,7 +80,7 @@ export async function getUploadStatus(req, res) {
         },
       });
     } else {
-      console.log(`🆕 No mapping - FIRST-TIME upload`);
+      logger.debug(`🆕 No mapping - FIRST-TIME upload`);
 
       return res.json({
         success: true,
@@ -92,7 +93,7 @@ export async function getUploadStatus(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to check upload status:", error.message);
+    logger.error("❌ Failed to check upload status:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -107,7 +108,7 @@ export async function getCompanies(req, res) {
   try {
     const { search } = req.query;
 
-    console.log(`📋 Fetching companies for selection (search: "${search || "none"}")`);
+    logger.debug(`📋 Fetching companies for selection (search: "${search || "none"}")`);
 
     let result;
 
@@ -131,7 +132,7 @@ export async function getCompanies(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to fetch companies:", error.message);
+    logger.error("❌ Failed to fetch companies:", error.message);
 
     if (error.message === "ZOHO_AUTH_REQUIRED") {
       return res.status(401).json({
@@ -159,11 +160,11 @@ export async function getCompanies(req, res) {
  */
 export async function getUsers(req, res) {
   try {
-    console.log("👥 Fetching Bigin users");
+    logger.debug("👥 Fetching Bigin users");
     const result = await getBiginUsers();
     return res.json(result);
   } catch (error) {
-    console.error("❌ Failed to fetch users:", error.message);
+    logger.error("❌ Failed to fetch users:", error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -182,7 +183,7 @@ export async function createCompany(req, res) {
       });
     }
 
-    console.log(`🏢 Creating new company: ${name}`);
+    logger.debug(`🏢 Creating new company: ${name}`);
 
     const result = await createBiginCompany({
       name: name.trim(),
@@ -193,7 +194,7 @@ export async function createCompany(req, res) {
     });
 
     if (result.success) {
-      console.log(`✅ Company created successfully: ${result.company.id}`);
+      logger.debug(`✅ Company created successfully: ${result.company.id}`);
       res.json({
         success: true,
         company: result.company,
@@ -205,7 +206,7 @@ export async function createCompany(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to create company:", error.message);
+    logger.error("❌ Failed to create company:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -220,7 +221,7 @@ export async function getUploadHistory(req, res) {
   try {
     const { agreementId } = req.params;
 
-    console.log(`📋 Fetching upload history for agreement: ${agreementId}`);
+    logger.debug(`📋 Fetching upload history for agreement: ${agreementId}`);
 
     const mapping = await ZohoMapping.findByAgreementId(agreementId);
     if (!mapping) {
@@ -256,7 +257,7 @@ export async function getUploadHistory(req, res) {
       lastUploadedAt: mapping.lastUploadedAt,
     });
   } catch (error) {
-    console.error("❌ Failed to fetch upload history:", error.message);
+    logger.error("❌ Failed to fetch upload history:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -269,7 +270,7 @@ export async function getUploadHistory(req, res) {
  */
 export async function getModules(req, res) {
   try {
-    console.log(`📋 Fetching Zoho Bigin modules...`);
+    logger.debug(`📋 Fetching Zoho Bigin modules...`);
 
     const result = await getBiginModules();
 
@@ -285,7 +286,7 @@ export async function getModules(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to fetch modules:", error.message);
+    logger.error("❌ Failed to fetch modules:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -299,7 +300,7 @@ export async function getModules(req, res) {
 export async function getPipelineOptionsForCompany(req, res) {
   try {
     const { companyId } = req.params;
-    console.log(`📋 Fetching pipeline options for company: ${companyId}`);
+    logger.debug(`📋 Fetching pipeline options for company: ${companyId}`);
 
     const result = await getBiginPipelineStages();
 
@@ -316,7 +317,7 @@ export async function getPipelineOptionsForCompany(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to fetch pipeline options:", error.message);
+    logger.error("❌ Failed to fetch pipeline options:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -329,7 +330,7 @@ export async function getPipelineOptionsForCompany(req, res) {
  */
 export async function getPipelineOptions(req, res) {
   try {
-    console.log(`📋 Fetching pipeline options...`);
+    logger.debug(`📋 Fetching pipeline options...`);
 
     const result = await getBiginPipelineStages();
 
@@ -346,7 +347,7 @@ export async function getPipelineOptions(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to fetch pipeline options:", error.message);
+    logger.error("❌ Failed to fetch pipeline options:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -360,7 +361,7 @@ export async function getPipelineOptions(req, res) {
 export async function getDealsForCompany(req, res) {
   try {
     const { companyId } = req.params;
-    console.log(`📋 Fetching deals for company: ${companyId}`);
+    logger.debug(`📋 Fetching deals for company: ${companyId}`);
 
     const result = await getBiginDealsByCompany(companyId);
 
@@ -376,7 +377,7 @@ export async function getDealsForCompany(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to fetch deals:", error.message);
+    logger.error("❌ Failed to fetch deals:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -391,13 +392,13 @@ export async function validateDealFields(req, res) {
   try {
     const { pipelineName, stage } = req.body;
 
-    console.log(`🔍 Validating deal fields: pipeline="${pipelineName}", stage="${stage}"`);
+    logger.debug(`🔍 Validating deal fields: pipeline="${pipelineName}", stage="${stage}"`);
 
     const result = await validatePipelineStage(pipelineName, stage);
 
     res.json(result);
   } catch (error) {
-    console.error("❌ Failed to validate deal fields:", error.message);
+    logger.error("❌ Failed to validate deal fields:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -419,7 +420,7 @@ export async function cleanupFailed(req, res) {
       });
     }
 
-    console.log(`🧹 Cleaning up failed mapping for agreement: ${agreementId}`);
+    logger.debug(`🧹 Cleaning up failed mapping for agreement: ${agreementId}`);
 
     const mapping = await ZohoMapping.findOne({ agreementId, lastUploadStatus: "failed" });
 
@@ -432,7 +433,7 @@ export async function cleanupFailed(req, res) {
 
     await ZohoMapping.findByIdAndDelete(mapping._id);
 
-    console.log(`✅ Cleaned up failed mapping: ${mapping._id}`);
+    logger.debug(`✅ Cleaned up failed mapping: ${mapping._id}`);
 
     res.json({
       success: true,
@@ -440,7 +441,7 @@ export async function cleanupFailed(req, res) {
       deletedMappingId: mapping._id,
     });
   } catch (error) {
-    console.error("❌ Failed to cleanup:", error.message);
+    logger.error("❌ Failed to cleanup:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -456,7 +457,7 @@ export async function createTaskForAgreement(req, res) {
     const { agreementId } = req.params;
     const { subject, dueDate, priority, description, assignTo } = req.body;
 
-    console.log(`📝 Creating task for agreement: ${agreementId}`);
+    logger.debug(`📝 Creating task for agreement: ${agreementId}`);
 
     const mapping = await ZohoMapping.findByAgreementId(agreementId);
     if (!mapping) {
@@ -487,7 +488,7 @@ export async function createTaskForAgreement(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to create task:", error.message);
+    logger.error("❌ Failed to create task:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -503,7 +504,7 @@ export async function createTaskForCompany(req, res) {
     const { companyId } = req.params;
     const { subject, dueDate, priority, description, assignTo } = req.body;
 
-    console.log(`📝 Creating task for company: ${companyId}`);
+    logger.debug(`📝 Creating task for company: ${companyId}`);
 
     const result = await createBiginTask({
       companyId,
@@ -526,7 +527,7 @@ export async function createTaskForCompany(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to create task:", error.message);
+    logger.error("❌ Failed to create task:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -542,7 +543,7 @@ export async function createAutoApprovalTask(req, res) {
     const { agreementId } = req.params;
     const { assignTo } = req.body;
 
-    console.log(`📝 Creating auto-approval task for agreement: ${agreementId}`);
+    logger.debug(`📝 Creating auto-approval task for agreement: ${agreementId}`);
 
     const mapping = await ZohoMapping.findByAgreementId(agreementId);
     if (!mapping) {
@@ -573,7 +574,7 @@ export async function createAutoApprovalTask(req, res) {
       });
     }
   } catch (error) {
-    console.error("❌ Failed to create auto-approval task:", error.message);
+    logger.error("❌ Failed to create auto-approval task:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,

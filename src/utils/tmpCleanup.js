@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { PDF_OUTPUT_DIR } from "../config/storagePaths.js";
+import logger from "./logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TMP_ROOT = path.join(__dirname, "..", "tmp");
@@ -13,7 +14,7 @@ async function cleanupDirectory(dirPath, options) {
     await fs.mkdir(dirPath, { recursive: true });
   } catch (err) {
     if (err.code !== "EEXIST") {
-      console.warn(`[TMP CLEANUP] Unable to ensure directory ${dirPath}:`, err.message);
+      logger.warn(`[TMP CLEANUP] Unable to ensure directory ${dirPath}:`, err.message);
     }
   }
 
@@ -28,7 +29,7 @@ async function cleanupDirectory(dirPath, options) {
         stats = await fs.stat(entryPath);
       } catch (statErr) {
         if (statErr.code === "ENOENT") continue;
-        console.warn(`[TMP CLEANUP] Failed to inspect ${entryPath}:`, statErr.message);
+        logger.warn(`[TMP CLEANUP] Failed to inspect ${entryPath}:`, statErr.message);
         continue;
       }
 
@@ -40,17 +41,17 @@ async function cleanupDirectory(dirPath, options) {
         await fs.rm(entryPath, { recursive: true, force: true });
         removed += 1;
       } catch (rmErr) {
-        console.warn(`[TMP CLEANUP] Failed to remove ${entryPath}:`, rmErr.message);
+        logger.warn(`[TMP CLEANUP] Failed to remove ${entryPath}:`, rmErr.message);
       }
     }
   } catch (readErr) {
     if (readErr.code !== "ENOENT") {
-      console.warn(`[TMP CLEANUP] Failed to read ${dirPath}:`, readErr.message);
+      logger.warn(`[TMP CLEANUP] Failed to read ${dirPath}:`, readErr.message);
     }
   }
 
   if (removed > 0) {
-    console.log(`[TMP CLEANUP] Removed ${removed} entries from ${path.basename(dirPath)} (purgeAll=${purgeAll}).`);
+    logger.debug(`[TMP CLEANUP] Removed ${removed} entries from ${path.basename(dirPath)} (purgeAll=${purgeAll}).`);
   }
 }
 

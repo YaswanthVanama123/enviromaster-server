@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import { VersionPdf } from "../../models/agreement/index.js";
+import logger from "../../utils/logger.js";
 
 const DONE_STATUSES = ['approved', 'approved_salesman', 'approved_admin', 'active', 'finalized'];
 
@@ -72,7 +73,7 @@ export async function getDocumentStatusCounts(req, res) {
       ...(timeSeries ? { timeSeries } : {}),
     });
   } catch (err) {
-    console.error("getDocumentStatusCounts error:", err);
+    logger.error("getDocumentStatusCounts error:", err);
     res.status(500).json({ success: false, error: "Failed to get status counts", detail: err?.message });
   }
 }

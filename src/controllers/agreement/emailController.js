@@ -2,12 +2,13 @@ import { sendEmail as sendEmailService, verifyEmailConfig } from '../../services
 import { CustomerHeaderDoc, VersionPdf, ManualUploadDocument } from "../../models/agreement/index.js";
 import { Log } from "../../models/logging/index.js";
 import { compileCustomerHeader } from '../../services/pdfService.js';
+import logger from "../../utils/logger.js";
 
 export async function sendEmailWithPdf(req, res) {
   try {
     const { to, subject, body, documentId, documentType, watermark = false, waitForSend = false } = req.body;
 
-    console.log('⚡ [EMAIL-CONTROLLER] Received email request:', {
+    logger.debug('⚡ [EMAIL-CONTROLLER] Received email request:', {
       to,
       subject,
       documentId,
@@ -48,7 +49,7 @@ export async function sendEmailWithPdf(req, res) {
     };
     const requestedCategory = resolveCategory(normalizedType) || "agreement";
 
-    console.log('🔍 [EMAIL-CONTROLLER] Resolved document type:', normalizedType, '→ category:', requestedCategory);
+    logger.debug('🔍 [EMAIL-CONTROLLER] Resolved document type:', normalizedType, '→ category:', requestedCategory);
 
     const loadPdfAsync = async () => {
       let pdfBuffer;
@@ -62,7 +63,7 @@ export async function sendEmailWithPdf(req, res) {
 
         let skipVersionCompile = false;
         if (!version) {
-          console.log(`🔍 [EMAIL-CONTROLLER] Version not found, trying fallback lookups...`);
+          logger.debug(`🔍 [EMAIL-CONTROLLER] Version not found, trying fallback lookups...`);
 
           const manualUpload = await ManualUploadDocument.findById(documentId)
             .select('pdfBuffer fileName mimeType')
@@ -77,7 +78,7 @@ export async function sendEmailWithPdf(req, res) {
             fileName = manualUpload.fileName;
             attachmentContentType = manualUpload.mimeType || "application/pdf";
             skipVersionCompile = true;
-            console.log(`✅ [EMAIL-CONTROLLER] Found as manual upload (${pdfBuffer.length} bytes)`);
+            logger.debug(`✅ [EMAIL-CONTROLLER] Found as manual upload (${pdfBuffer.length} bytes)`);
           } else {
             const logDoc = await Log.findById(documentId);
             if (logDoc) {
@@ -86,7 +87,7 @@ export async function sendEmailWithPdf(req, res) {
               fileName = logDoc.fileName || `Version_${logDoc.versionNumber}_Changes.txt`;
               attachmentContentType = logDoc.contentType || 'text/plain; charset=utf-8';
               skipVersionCompile = true;
-              console.log(`✅ [EMAIL-CONTROLLER] Found as log file`);
+              logger.debug(`✅ [EMAIL-CONTROLLER] Found as log file`);
             } else {
               throw new Error(`Version not found with ID: ${documentId}`);
             }
@@ -94,7 +95,7 @@ export async function sendEmailWithPdf(req, res) {
         }
 
         if (!skipVersionCompile) {
-          console.log(`📄 [EMAIL-CONTROLLER] Compiling version PDF: ${version.versionLabel}`);
+          logger.debug(`📄 [EMAIL-CONTROLLER] Compiling version PDF: ${version.versionLabel}`);
           const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, { watermark });
           if (!compiledPdf?.buffer) {
             throw new Error('Failed to compile version PDF');
@@ -125,7 +126,7 @@ export async function sendEmailWithPdf(req, res) {
 
         fileName = manualUpload.fileName;
         attachmentContentType = manualUpload.mimeType || "application/pdf";
-        console.log(`📄 [EMAIL-CONTROLLER] Loaded manual upload: ${fileName} (${pdfBuffer.length} bytes)`);
+        logger.debug(`📄 [EMAIL-CONTROLLER] Loaded manual upload: ${fileName} (${pdfBuffer.length} bytes)`);
 
       } else if (requestedCategory === 'log') {
         const logDoc = await Log.findById(documentId);
@@ -137,7 +138,7 @@ export async function sendEmailWithPdf(req, res) {
         pdfBuffer = Buffer.from(logContent || '', 'utf8');
         fileName = logDoc.fileName || `Version_${logDoc.versionNumber}_Changes.txt`;
         attachmentContentType = logDoc.contentType || 'text/plain; charset=utf-8';
-        console.log(`📄 [EMAIL-CONTROLLER] Loaded log file: ${fileName} (${pdfBuffer.length} bytes)`);
+        logger.debug(`📄 [EMAIL-CONTROLLER] Loaded log file: ${fileName} (${pdfBuffer.length} bytes)`);
 
       } else if (requestedCategory === 'agreement') {
         const agreement = await CustomerHeaderDoc.findById(documentId)
@@ -151,7 +152,7 @@ export async function sendEmailWithPdf(req, res) {
               .lean();
 
             if (version) {
-              console.log(`📄 [EMAIL-CONTROLLER] Auto-detected as version PDF`);
+              logger.debug(`📄 [EMAIL-CONTROLLER] Auto-detected as version PDF`);
               const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, { watermark });
               if (!compiledPdf?.buffer) {
                 throw new Error('Failed to compile version PDF');
@@ -178,7 +179,7 @@ export async function sendEmailWithPdf(req, res) {
           pdfBuffer = isBufferInstance ? bufferChoice : Buffer.from(rawBuffer);
 
           fileName = `${agreement.payload?.headerTitle || 'Agreement'}.pdf`;
-          console.log(`📄 [EMAIL-CONTROLLER] Loaded agreement PDF: ${fileName} (${pdfBuffer.length} bytes)`);
+          logger.debug(`📄 [EMAIL-CONTROLLER] Loaded agreement PDF: ${fileName} (${pdfBuffer.length} bytes)`);
         }
       } else {
         throw new Error('Invalid document type');
@@ -188,7 +189,7 @@ export async function sendEmailWithPdf(req, res) {
         throw new Error('File buffer missing');
       }
 
-      console.log('📎 [EMAIL-CONTROLLER] PDF ready:', {
+      logger.debug('📎 [EMAIL-CONTROLLER] PDF ready:', {
         fileName,
         size: `${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`
       });
@@ -197,7 +198,7 @@ export async function sendEmailWithPdf(req, res) {
     };
 
     if (!waitForSend) {
-      console.log('🚀 [EMAIL-CONTROLLER] ULTRA-FAST MODE: Queuing email, returning immediately');
+      logger.debug('🚀 [EMAIL-CONTROLLER] ULTRA-FAST MODE: Queuing email, returning immediately');
 
       loadPdfAsync()
         .then(async ({ pdfBuffer, fileName, attachmentContentType }) => {
@@ -215,13 +216,13 @@ export async function sendEmailWithPdf(req, res) {
           });
 
           if (emailResult.success) {
-            console.log('✅ [EMAIL-CONTROLLER] Background email sent:', fileName);
+            logger.debug('✅ [EMAIL-CONTROLLER] Background email sent:', fileName);
           } else {
-            console.error('❌ [EMAIL-CONTROLLER] Background email failed:', emailResult.error);
+            logger.error('❌ [EMAIL-CONTROLLER] Background email failed:', emailResult.error);
           }
         })
         .catch(error => {
-          console.error('❌ [EMAIL-CONTROLLER] Background processing error:', error.message);
+          logger.error('❌ [EMAIL-CONTROLLER] Background processing error:', error.message);
         });
 
       return res.json({
@@ -233,7 +234,7 @@ export async function sendEmailWithPdf(req, res) {
       });
     }
 
-    console.log('⏳ [EMAIL-CONTROLLER] NORMAL MODE: Waiting for completion...');
+    logger.debug('⏳ [EMAIL-CONTROLLER] NORMAL MODE: Waiting for completion...');
     const { pdfBuffer, fileName, attachmentContentType } = await loadPdfAsync();
 
     const emailResult = await sendEmailService({
@@ -250,7 +251,7 @@ export async function sendEmailWithPdf(req, res) {
     });
 
     if (emailResult.success) {
-      console.log('✅ [EMAIL-CONTROLLER] Email sent successfully');
+      logger.debug('✅ [EMAIL-CONTROLLER] Email sent successfully');
       return res.json({
         success: true,
         message: 'Email sent successfully',
@@ -258,7 +259,7 @@ export async function sendEmailWithPdf(req, res) {
         fileName
       });
     } else {
-      console.error('❌ [EMAIL-CONTROLLER] Failed to send email:', emailResult.error);
+      logger.error('❌ [EMAIL-CONTROLLER] Failed to send email:', emailResult.error);
       return res.status(500).json({
         success: false,
         error: 'Failed to send email',
@@ -267,7 +268,7 @@ export async function sendEmailWithPdf(req, res) {
     }
 
   } catch (error) {
-    console.error('❌ [EMAIL-CONTROLLER] Error in sendEmailWithPdf:', error);
+    logger.error('❌ [EMAIL-CONTROLLER] Error in sendEmailWithPdf:', error);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -287,7 +288,7 @@ export async function verifyEmailConfiguration(req, res) {
     }
 
   } catch (error) {
-    console.error('❌ [EMAIL-CONTROLLER] Error verifying email config:', error);
+    logger.error('❌ [EMAIL-CONTROLLER] Error verifying email config:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to verify email configuration',
@@ -341,7 +342,7 @@ export async function sendTestEmail(req, res) {
     }
 
   } catch (error) {
-    console.error('❌ [EMAIL-CONTROLLER] Error sending test email:', error);
+    logger.error('❌ [EMAIL-CONTROLLER] Error sending test email:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to send test email',

@@ -7,6 +7,7 @@ import {
 import { CompanyMapping, BiginCompany } from "#models/customer/index.js";
 import { refreshLocationTypeForCompany } from "#services/sync/locationTypeService.js";
 import { runAccountTypeBatch } from "../../controllers/sync/mapDistanceController.js";
+import logger from "../../utils/logger.js";
 import {
   computeGlobalCommission,
   resolveCommissionRules,
@@ -72,9 +73,9 @@ async function ensureAccountTypeCache(doc, biginCompanyId) {
     }
     doc.payload.accountTypeCache = merged;
     doc.markModified("payload.accountTypeCache");
-    console.log(`[COMMISSION-AUTO] detected account types for agreement ${doc._id}: ${[...needed].join(",")}`);
+    logger.debug(`[COMMISSION-AUTO] detected account types for agreement ${doc._id}: ${[...needed].join(",")}`);
   } catch (err) {
-    console.error(`[COMMISSION-AUTO] account-type detect failed for ${doc._id}:`, err?.message);
+    logger.error(`[COMMISSION-AUTO] account-type detect failed for ${doc._id}:`, err?.message);
   }
 }
 
@@ -357,7 +358,7 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
     ? await CompanyMapping.findOne({ biginId: String(biginCompanyId) }).lean()
     : null;
   const mapped = !!(mapping && mapping.routeStarId && mapping.mappingStatus === "mapped");
-  console.log(
+  logger.debug(
     `[COMMISSION-AUTO] agreement ${agreementId}: biginCompanyId=${biginCompanyId} companyMappingFound=${!!mapping} mappingStatus=${mapping?.mappingStatus || "none"} routeStarId=${mapping?.routeStarId || "none"} mapped=${mapped}`,
   );
   if (!mapped) {
@@ -375,7 +376,7 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
     try {
       ltResult = await refreshLocationTypeForCompany(biginCompanyId);
     } catch (err) {
-      console.error(`[COMMISSION-AUTO] location-type refresh failed for ${biginCompanyId}:`, err?.message);
+      logger.error(`[COMMISSION-AUTO] location-type refresh failed for ${biginCompanyId}:`, err?.message);
     }
     let existing;
     if (ltResult && ltResult.success) {
@@ -388,7 +389,7 @@ export async function recalcCommissionForAgreement(agreementId, biginCompanyId) 
     }
     doc.isNewLocation = !existing;
     doc.locationTypeCheckedAt = new Date();
-    console.log(`[COMMISSION-AUTO] agreement ${agreementId}: froze isNewLocation=${doc.isNewLocation} at link time`);
+    logger.debug(`[COMMISSION-AUTO] agreement ${agreementId}: froze isNewLocation=${doc.isNewLocation} at link time`);
   }
 
   const isExistingLocation = !doc.isNewLocation;

@@ -1,5 +1,6 @@
 import { ManualUploadDocument } from "../../models/agreement/index.js";
 import { uploadToZohoBigin, uploadToZohoCRM } from "../../services/zohoService.js";
+import logger from "../../utils/logger.js";
 
 export async function uploadManualPdf(req, res) {
   try {
@@ -36,7 +37,7 @@ export async function uploadManualPdf(req, res) {
       },
     });
   } catch (err) {
-    console.error("Error uploading manual PDF:", err);
+    logger.error("Error uploading manual PDF:", err);
     res.status(500).json({
       error: "Failed to upload file",
       detail: String(err),
@@ -64,7 +65,7 @@ async function uploadToZohoServices(docId) {
         url: biginResult?.url || null,
       };
     } catch (biginErr) {
-      console.error("Zoho Bigin upload failed:", biginErr);
+      logger.error("Zoho Bigin upload failed:", biginErr);
     }
 
     try {
@@ -79,15 +80,15 @@ async function uploadToZohoServices(docId) {
         url: crmResult?.url || null,
       };
     } catch (crmErr) {
-      console.error("Zoho CRM upload failed:", crmErr);
+      logger.error("Zoho CRM upload failed:", crmErr);
     }
 
     doc.status = "completed";
     await doc.save();
 
-    console.log(`Manual upload ${docId} uploaded to Zoho successfully`);
+    logger.debug(`Manual upload ${docId} uploaded to Zoho successfully`);
   } catch (err) {
-    console.error("Error in Zoho upload:", err);
+    logger.error("Error in Zoho upload:", err);
     try {
       const doc = await ManualUploadDocument.findById(docId);
       if (doc) {
@@ -95,7 +96,7 @@ async function uploadToZohoServices(docId) {
         await doc.save();
       }
     } catch (updateErr) {
-      console.error("Failed to update status:", updateErr);
+      logger.error("Failed to update status:", updateErr);
     }
   }
 }
@@ -125,7 +126,7 @@ export async function getManualUploads(req, res) {
       skip: parseInt(skip),
     });
   } catch (err) {
-    console.error("Error fetching manual uploads:", err);
+    logger.error("Error fetching manual uploads:", err);
     res.status(500).json({
       error: "Failed to fetch uploads",
       detail: String(err),
@@ -155,7 +156,7 @@ export async function getManualUploadById(req, res) {
       document: doc,
     });
   } catch (err) {
-    console.error("Error fetching manual upload:", err);
+    logger.error("Error fetching manual upload:", err);
     res.status(500).json({
       error: "Failed to fetch upload",
       detail: String(err),
@@ -180,7 +181,7 @@ export async function downloadManualUpload(req, res) {
     );
     res.send(doc.pdfBuffer);
   } catch (err) {
-    console.error("Error downloading manual upload:", err);
+    logger.error("Error downloading manual upload:", err);
     res.status(500).json({
       error: "Failed to download file",
       detail: String(err),
@@ -193,7 +194,7 @@ export async function updateManualUploadStatus(req, res) {
     const { id } = req.params;
     const { status } = req.body;
 
-    console.log(`🔄 [MANUAL-UPLOAD-STATUS] Updating manual upload ${id} status to: ${status}`);
+    logger.debug(`🔄 [MANUAL-UPLOAD-STATUS] Updating manual upload ${id} status to: ${status}`);
 
     const validStatuses = ["uploaded", "processing", "completed", "failed", "pending_approval", "approved_salesman", "approved_admin"];
     if (!status || !validStatuses.includes(status)) {
@@ -211,14 +212,14 @@ export async function updateManualUploadStatus(req, res) {
     ).select("-pdfBuffer").lean();
 
     if (!doc) {
-      console.log(`❌ [MANUAL-UPLOAD-STATUS] Manual upload not found: ${id}`);
+      logger.debug(`❌ [MANUAL-UPLOAD-STATUS] Manual upload not found: ${id}`);
       return res.status(404).json({
         success: false,
         error: "Manual upload not found"
       });
     }
 
-    console.log(`✅ [MANUAL-UPLOAD-STATUS] Updated manual upload ${doc.fileName} status to ${status}`);
+    logger.debug(`✅ [MANUAL-UPLOAD-STATUS] Updated manual upload ${doc.fileName} status to ${status}`);
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -236,7 +237,7 @@ export async function updateManualUploadStatus(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ [MANUAL-UPLOAD-STATUS] Failed to update manual upload status:", error.message);
+    logger.error("❌ [MANUAL-UPLOAD-STATUS] Failed to update manual upload status:", error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -259,7 +260,7 @@ export async function deleteManualUpload(req, res) {
       message: "Document deleted successfully",
     });
   } catch (err) {
-    console.error("Error deleting manual upload:", err);
+    logger.error("Error deleting manual upload:", err);
     res.status(500).json({
       error: "Failed to delete document",
       detail: String(err),

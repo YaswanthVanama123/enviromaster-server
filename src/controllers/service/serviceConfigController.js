@@ -6,6 +6,7 @@ import {
 
 import mongoose from "mongoose";
 import { ServiceAgreementTemplate } from "../../models/service/index.js";
+import logger from "../../utils/logger.js";
 
 import {
   createServiceConfig,
@@ -66,7 +67,7 @@ export async function getActiveServiceConfigsController(req, res, next) {
 export async function getAllServicePricingController(req, res, next) {
   try {
     const startTime = Date.now();
-    console.log('⚡ [GET-ALL-PRICING] Starting optimized query...');
+    logger.debug('⚡ [GET-ALL-PRICING] Starting optimized query...');
 
     const [allConfigs, serviceAgreementTemplate] = await Promise.all([
       getAllServiceConfigs({}),
@@ -78,7 +79,7 @@ export async function getAllServicePricingController(req, res, next) {
 
     let template = serviceAgreementTemplate;
     if (!template) {
-      console.log('📝 [GET-ALL-PRICING] No template found, creating default...');
+      logger.debug('📝 [GET-ALL-PRICING] No template found, creating default...');
       const newTemplate = await ServiceAgreementTemplate.create({
         name: 'default',
         isActive: true
@@ -96,7 +97,7 @@ export async function getAllServicePricingController(req, res, next) {
     }));
 
     const queryTime = Date.now() - startTime;
-    console.log(`⚡ [GET-ALL-PRICING] Returned ${pricingData.length} configs + service agreement template in ${queryTime}ms`);
+    logger.debug(`⚡ [GET-ALL-PRICING] Returned ${pricingData.length} configs + service agreement template in ${queryTime}ms`);
 
     res.json({
       serviceConfigs: pricingData,

@@ -1,6 +1,7 @@
 import { BackupPricing } from "#models/admin/index.js";
 import { PriceFix, ProductCatalog } from "#models/product/index.js";
 import { ServiceConfig } from "#models/service/index.js";
+import logger from "../../utils/logger.js";
 
 class PricingBackupService {
 
@@ -68,7 +69,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Backup creation failed:', error);
+      logger.error('Backup creation failed:', error);
       return {
         success: false,
         error: error.message,
@@ -152,7 +153,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Manual backup creation failed:', error);
+      logger.error('Manual backup creation failed:', error);
       return {
         success: false,
         error: error.message,
@@ -331,7 +332,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Restoration failed:', error);
+      logger.error('Restoration failed:', error);
       return {
         success: false,
         error: error.message,
@@ -343,12 +344,12 @@ class PricingBackupService {
   static async getAvailableBackups(limit = 10) {
     try {
       const startTime = Date.now();
-      console.log(`[BACKUP-LIST] Starting optimized backup list fetch (limit: ${limit})...`);
+      logger.debug(`[BACKUP-LIST] Starting optimized backup list fetch (limit: ${limit})...`);
 
       const backups = await BackupPricing.getLastNChangeDays(limit);
       const queryTime = Date.now() - startTime;
 
-      console.log(`⚡ [BACKUP-LIST] Fetched ${backups.length} backups in ${queryTime}ms`);
+      logger.debug(`⚡ [BACKUP-LIST] Fetched ${backups.length} backups in ${queryTime}ms`);
 
       const backupSummary = backups.map((item, index) => {
         const changeDayId = item.backup.changeDayId;
@@ -357,7 +358,7 @@ class PricingBackupService {
           ...item.backup.snapshotMetadata.documentCounts
         };
 
-        console.log(`[BACKUP-LIST] Backup ${index + 1}/${backups.length}: ${changeDayId} - ${documentCounts.productCatalogCount} products`);
+        logger.debug(`[BACKUP-LIST] Backup ${index + 1}/${backups.length}: ${changeDayId} - ${documentCounts.productCatalogCount} products`);
 
         return {
           changeDayId: item.backup.changeDayId,
@@ -387,7 +388,7 @@ class PricingBackupService {
       });
 
       const totalTime = Date.now() - startTime;
-      console.log(`⚡ [BACKUP-LIST] Optimized list processing completed in ${totalTime}ms (${backupSummary.length} backups)`);
+      logger.debug(`⚡ [BACKUP-LIST] Optimized list processing completed in ${totalTime}ms (${backupSummary.length} backups)`);
 
       return {
         success: true,
@@ -403,7 +404,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Failed to get available backups:', error);
+      logger.error('Failed to get available backups:', error);
       return {
         success: false,
         error: error.message,
@@ -425,23 +426,23 @@ class PricingBackupService {
         };
       }
 
-      console.log(`[DEBUG] Processing backup details for ${changeDayId}`);
-      console.log(`[DEBUG] Stored metadata productCatalogCount:`, backup.snapshotMetadata?.documentCounts?.productCatalogCount);
+      logger.debug(`[DEBUG] Processing backup details for ${changeDayId}`);
+      logger.debug(`[DEBUG] Stored metadata productCatalogCount:`, backup.snapshotMetadata?.documentCounts?.productCatalogCount);
 
       let actualProductCount = backup.snapshotMetadata?.documentCounts?.productCatalogCount || 0;
 
       try {
-        console.log(`[DEBUG] Attempting to decompress snapshot...`);
+        logger.debug(`[DEBUG] Attempting to decompress snapshot...`);
 
         let compressedData = backup.compressedSnapshot;
         if (compressedData && typeof compressedData === 'object' && compressedData.buffer) {
           compressedData = compressedData.buffer;
         }
-        console.log(`[DEBUG] Compressed data type: ${typeof compressedData}, constructor: ${compressedData.constructor.name}`);
+        logger.debug(`[DEBUG] Compressed data type: ${typeof compressedData}, constructor: ${compressedData.constructor.name}`);
 
         const snapshot = BackupPricing.decompressPricingData(compressedData);
-        console.log(`[DEBUG] Snapshot decompressed successfully`);
-        console.log(`[DEBUG] Snapshot structure:`, {
+        logger.debug(`[DEBUG] Snapshot decompressed successfully`);
+        logger.debug(`[DEBUG] Snapshot structure:`, {
           hasDataTypes: !!snapshot.dataTypes,
           hasProductCatalog: !!snapshot.dataTypes?.productCatalog,
           hasActive: !!snapshot.dataTypes?.productCatalog?.active,
@@ -450,11 +451,11 @@ class PricingBackupService {
 
         if (snapshot.dataTypes?.productCatalog?.active?.families) {
           const families = snapshot.dataTypes.productCatalog.active.families;
-          console.log(`[DEBUG] Found ${families.length} families in active catalog`);
+          logger.debug(`[DEBUG] Found ${families.length} families in active catalog`);
 
           families.forEach((family, index) => {
             const productCount = family.products ? family.products.length : 0;
-            console.log(`[DEBUG] Family ${index + 1} (${family.familyName || family.name || 'unnamed'}): ${productCount} products`);
+            logger.debug(`[DEBUG] Family ${index + 1} (${family.familyName || family.name || 'unnamed'}): ${productCount} products`);
           });
 
           actualProductCount = families.reduce((count, family) => {
@@ -462,14 +463,14 @@ class PricingBackupService {
             return count + familyProductCount;
           }, 0);
 
-          console.log(`[DEBUG] Calculated total product count: ${actualProductCount}`);
+          logger.debug(`[DEBUG] Calculated total product count: ${actualProductCount}`);
         } else {
-          console.log(`[DEBUG] No families found in snapshot structure`);
-          console.log(`[DEBUG] Full productCatalog structure:`, JSON.stringify(snapshot.dataTypes?.productCatalog, null, 2));
+          logger.debug(`[DEBUG] No families found in snapshot structure`);
+          logger.debug(`[DEBUG] Full productCatalog structure:`, JSON.stringify(snapshot.dataTypes?.productCatalog, null, 2));
         }
       } catch (error) {
-        console.error(`[DEBUG] Error decompressing or processing snapshot:`, error);
-        console.warn('Could not recalculate product count from snapshot, using stored metadata');
+        logger.error(`[DEBUG] Error decompressing or processing snapshot:`, error);
+        logger.warn('Could not recalculate product count from snapshot, using stored metadata');
       }
 
       const correctedMetadata = {
@@ -480,8 +481,8 @@ class PricingBackupService {
         }
       };
 
-      console.log(`[DEBUG] Final product count being returned: ${actualProductCount}`);
-      console.log(`[DEBUG] Corrected document counts:`, correctedMetadata.documentCounts);
+      logger.debug(`[DEBUG] Final product count being returned: ${actualProductCount}`);
+      logger.debug(`[DEBUG] Corrected document counts:`, correctedMetadata.documentCounts);
 
       return {
         success: true,
@@ -501,7 +502,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Failed to get backup details:', error);
+      logger.error('Failed to get backup details:', error);
       return {
         success: false,
         error: error.message,
@@ -525,7 +526,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Failed to delete backups:', error);
+      logger.error('Failed to delete backups:', error);
       return {
         success: false,
         error: error.message,
@@ -537,7 +538,7 @@ class PricingBackupService {
   static async getBackupStatistics() {
     try {
       const startTime = Date.now();
-      console.log('[BACKUP-STATS] Starting optimized statistics collection...');
+      logger.debug('[BACKUP-STATS] Starting optimized statistics collection...');
 
       const statsData = await BackupPricing.aggregate([
         {
@@ -596,7 +597,7 @@ class PricingBackupService {
       const triggerStats = result.triggerStats || [];
       const recentBackups = result.recentBackups || [];
 
-      console.log(`⚡ [BACKUP-STATS] Optimized statistics collected in ${queryTime}ms`);
+      logger.debug(`⚡ [BACKUP-STATS] Optimized statistics collected in ${queryTime}ms`);
 
       return {
         success: true,
@@ -622,7 +623,7 @@ class PricingBackupService {
       };
 
     } catch (error) {
-      console.error('Failed to get backup statistics:', error);
+      logger.error('Failed to get backup statistics:', error);
       return {
         success: false,
         error: error.message,

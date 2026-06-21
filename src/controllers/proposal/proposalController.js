@@ -1,5 +1,6 @@
 import { Proposal, Catalog, FileAsset } from "../../models/proposal/index.js";
 import { archiveOverflowAndTrim } from "../../utils/archiveOverflow.js";
+import logger from "../../utils/logger.js";
 
 const PROPOSAL_PDF_HISTORY_CAP = 10;
 const PROPOSAL_CRM_ATTEMPTS_CAP = 20;
@@ -21,7 +22,7 @@ export const createProposal = async (req, res) => {
     });
     return res.status(201).json({ ok: true, id: doc._id, ref: doc.publicRef });
   } catch (err) {
-    console.error('createProposal error:', err);
+    logger.error('createProposal error:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
@@ -50,7 +51,7 @@ export const updateProposal = async (req, res) => {
     if (!doc) return res.status(404).json({ ok: false, error: 'Proposal not found' });
     return res.json({ ok: true, id: doc._id });
   } catch (err) {
-    console.error('updateProposal error:', err);
+    logger.error('updateProposal error:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
@@ -62,7 +63,7 @@ export const getProposalById = async (req, res) => {
     if (!doc) return res.status(404).json({ ok: false, error: 'Proposal not found' });
     return res.json({ ok: true, data: doc });
   } catch (err) {
-    console.error('getProposalById error:', err);
+    logger.error('getProposalById error:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
@@ -77,7 +78,7 @@ export const listProposals = async (_req, res) => {
       .limit(100);
     return res.json({ ok: true, data: docs });
   } catch (err) {
-    console.error('listProposals error:', err);
+    logger.error('listProposals error:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
@@ -92,7 +93,7 @@ export const getFormCatalog = async (_req, res) => {
       });
     return res.json({ ok: true, data: cat.payload });
   } catch (err) {
-    console.error('getFormCatalog error:', err);
+    logger.error('getFormCatalog error:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
@@ -173,7 +174,7 @@ export const attachPdfAndMarkForZoho = async (req, res) => {
 
     return res.json({ ok: true, pdfAssetId: asset._id });
   } catch (err) {
-    console.error('attachPdfAndMarkForZoho error:', err);
+    logger.error('attachPdfAndMarkForZoho error:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };

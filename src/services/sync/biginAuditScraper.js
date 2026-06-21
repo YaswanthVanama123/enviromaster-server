@@ -8,6 +8,7 @@ import { chromium } from 'playwright-core';
 import path from 'path';
 import fs from 'fs';
 import { BiginAuditLog } from "#models/logging/index.js";
+import logger from "../../utils/logger.js";
 
 const BIGIN_AUDIT_URL = 'https://bigin.zoho.com/bigin/Home#/settings/data-administration/audit-log';
 const BIGIN_SIGNIN_URL = 'https://accounts.zoho.in/signin?servicename=ZohoBigin&signupurl=https://www.bigin.com/signup.html';
@@ -37,10 +38,10 @@ async function takeScreenshot(page, stepName) {
     const filename = `${timestamp}_${stepName}.png`;
     const filepath = path.join(SCREENSHOTS_DIR, filename);
     await page.screenshot({ path: filepath, fullPage: true });
-    console.log(`📸 Screenshot saved: ${filename}`);
+    logger.debug(`📸 Screenshot saved: ${filename}`);
     return filepath;
   } catch (err) {
-    console.error(`📸 Failed to take screenshot (${stepName}):`, err.message);
+    logger.error(`📸 Failed to take screenshot (${stepName}):`, err.message);
     return null;
   }
 }
@@ -55,7 +56,7 @@ async function getLatestStoredLogTimestamp() {
     .lean();
 
   if (latestLog) {
-    console.log('📅 Latest stored log:', {
+    logger.debug('📅 Latest stored log:', {
       timestamp: latestLog.timestamp,
       user: latestLog.user,
       action: latestLog.action,
@@ -184,7 +185,7 @@ function parseActionText(actionText) {
  * Login to Zoho Bigin
  */
 async function login(page) {
-  console.log('🔐 Logging into Zoho Bigin...');
+  logger.debug('🔐 Logging into Zoho Bigin...');
 
   if (!BIGIN_EMAIL || !BIGIN_PASSWORD) {
     throw new Error('BIGIN_EMAIL or BIGIN_PASSWORD not set');
@@ -196,14 +197,14 @@ async function login(page) {
   });
 
   await page.waitForSelector('#login_id', { timeout: 30000 });
-  console.log('   Login form loaded');
+  logger.debug('   Login form loaded');
   await takeScreenshot(page, '01_login_form_loaded');
 
   // Enter email
   await page.type('#login_id', BIGIN_EMAIL, { delay: 50 });
   await new Promise(resolve => setTimeout(resolve, 1000));
   await page.click('#nextbtn');
-  console.log('   Entered email, clicked Next');
+  logger.debug('   Entered email, clicked Next');
   await takeScreenshot(page, '02_entered_email');
 
   // Wait for password field
@@ -219,7 +220,7 @@ async function login(page) {
   await page.type('#password', BIGIN_PASSWORD, { delay: 50 });
   await new Promise(resolve => setTimeout(resolve, 500));
   await page.click('#nextbtn');
-  console.log('   Entered password, clicked Sign in');
+  logger.debug('   Entered password, clicked Sign in');
   await takeScreenshot(page, '04_clicked_sign_in');
 
   // Wait for navigation
@@ -231,14 +232,14 @@ async function login(page) {
   await takeScreenshot(page, '05_after_login_navigation');
 
   const currentUrl = page.url();
-  console.log('   Current URL after login:', currentUrl);
+  logger.debug('   Current URL after login:', currentUrl);
 
   if (currentUrl.includes('signin') || currentUrl.includes('login')) {
     await takeScreenshot(page, '05_ERROR_still_on_login');
     throw new Error('Login may have failed - still on login page');
   }
 
-  console.log('✅ Login successful');
+  logger.debug('✅ Login successful');
   return true;
 }
 
@@ -246,7 +247,7 @@ async function login(page) {
  * Close any promotional modals that may appear (like "Meet Bigin AI")
  */
 async function closePromotionalModals(page) {
-  console.log('   Checking for promotional modals...');
+  logger.debug('   Checking for promotional modals...');
 
   // First, try clicking the X button directly using coordinates or specific Lyte selectors
   const closedViaEval = await page.evaluate(() => {
@@ -293,7 +294,7 @@ async function closePromotionalModals(page) {
   });
 
   if (closedViaEval) {
-    console.log('   Closed modal via evaluate method');
+    logger.debug('   Closed modal via evaluate method');
     await new Promise(resolve => setTimeout(resolve, 1000));
     return true;
   }
@@ -301,7 +302,7 @@ async function closePromotionalModals(page) {
   // Try clicking at the exact position of the X button (based on screenshot analysis)
   // The X appears to be around coordinates (1081, 58) in a 1920x1080 viewport
   try {
-    console.log('   Trying to click X button at position...');
+    logger.debug('   Trying to click X button at position...');
     await page.mouse.click(1081, 58);
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -317,20 +318,20 @@ async function closePromotionalModals(page) {
     });
 
     if (!modalStillExists) {
-      console.log('   Modal closed via position click');
+      logger.debug('   Modal closed via position click');
       return true;
     }
   } catch (e) {
-    console.log('   Position click failed:', e.message);
+    logger.debug('   Position click failed:', e.message);
   }
 
   // Try pressing Escape key
-  console.log('   Trying Escape key...');
+  logger.debug('   Trying Escape key...');
   await page.keyboard.press('Escape');
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   // Click outside the modal to close it
-  console.log('   Trying to click outside modal...');
+  logger.debug('   Trying to click outside modal...');
   await page.mouse.click(100, 400);
   await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -355,13 +356,13 @@ async function dismissTimezonePopup(page) {
     });
 
     if (clicked) {
-      console.log('   ✓ Dismissed "Update your time zone" popup via Remind me later');
+      logger.debug('   ✓ Dismissed "Update your time zone" popup via Remind me later');
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     return clicked;
   } catch (e) {
-    console.log('   ⚠️ Could not dismiss time zone popup:', e.message);
+    logger.debug('   ⚠️ Could not dismiss time zone popup:', e.message);
     return false;
   }
 }
@@ -371,14 +372,14 @@ async function dismissTimezonePopup(page) {
  * Direct URL navigation loses the session and redirects to public page
  */
 async function navigateToAuditLogs(page) {
-  console.log('📍 Navigating to audit logs via UI...');
+  logger.debug('📍 Navigating to audit logs via UI...');
 
   await takeScreenshot(page, '06_before_audit_navigation');
 
   try {
     // First, make sure we're on the Bigin app (not public page)
     const currentUrl = page.url();
-    console.log('   Current URL before navigation:', currentUrl);
+    logger.debug('   Current URL before navigation:', currentUrl);
 
     // Close any promotional modals that may appear
     await closePromotionalModals(page);
@@ -404,7 +405,7 @@ async function navigateToAuditLogs(page) {
       '[data-icon="gear"]'
     ];
 
-    console.log('   Looking for Settings button...');
+    logger.debug('   Looking for Settings button...');
     let settingsFound = false;
 
     for (const selector of settingsSelectors) {
@@ -417,7 +418,7 @@ async function navigateToAuditLogs(page) {
           }, element);
 
           if (isVisible) {
-            console.log(`   Found Settings button: ${selector}`);
+            logger.debug(`   Found Settings button: ${selector}`);
             await element.click();
             settingsFound = true;
             break;
@@ -430,7 +431,7 @@ async function navigateToAuditLogs(page) {
 
     if (!settingsFound) {
       // Alternative: Use keyboard shortcut or direct URL manipulation within the app
-      console.log('   Settings button not found, trying alternative approach...');
+      logger.debug('   Settings button not found, trying alternative approach...');
 
       // Try to find and click the settings link in any sidebar/menu
       const menuSettingsClicked = await page.evaluate(() => {
@@ -455,7 +456,7 @@ async function navigateToAuditLogs(page) {
       });
 
       if (menuSettingsClicked) {
-        console.log('   Clicked Settings via text/icon search');
+        logger.debug('   Clicked Settings via text/icon search');
         settingsFound = true;
       }
     }
@@ -464,7 +465,7 @@ async function navigateToAuditLogs(page) {
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Now look for Data Administration in the settings sidebar, then Audit Log
-    console.log('   Looking for Data Administration link...');
+    logger.debug('   Looking for Data Administration link...');
 
     // First click on Data Administration
     const dataAdminClicked = await page.evaluate(() => {
@@ -480,13 +481,13 @@ async function navigateToAuditLogs(page) {
     });
 
     if (dataAdminClicked) {
-      console.log('   Clicked Data Administration');
+      logger.debug('   Clicked Data Administration');
       await new Promise(resolve => setTimeout(resolve, 2000));
       await takeScreenshot(page, '07b_after_data_admin_click');
     }
 
     // Now look for Audit Log link
-    console.log('   Looking for Audit Log link...');
+    logger.debug('   Looking for Audit Log link...');
 
     const auditLogSelectors = [
       '[data-zcqa*="audit"]',
@@ -502,7 +503,7 @@ async function navigateToAuditLogs(page) {
       try {
         const element = await page.$(selector);
         if (element) {
-          console.log(`   Found Audit Log link: ${selector}`);
+          logger.debug(`   Found Audit Log link: ${selector}`);
           await element.click();
           auditLogFound = true;
           break;
@@ -527,7 +528,7 @@ async function navigateToAuditLogs(page) {
       });
 
       if (auditClicked) {
-        console.log('   Clicked Audit Log via text search');
+        logger.debug('   Clicked Audit Log via text search');
         auditLogFound = true;
       }
     }
@@ -537,7 +538,7 @@ async function navigateToAuditLogs(page) {
 
     // If UI navigation didn't work, try hash navigation within the current page
     if (!settingsFound || !auditLogFound) {
-      console.log('   UI navigation incomplete, trying hash navigation...');
+      logger.debug('   UI navigation incomplete, trying hash navigation...');
 
       // Use evaluate to change the hash without losing session
       // Correct path: Settings > Data Administration > Audit Log
@@ -559,7 +560,7 @@ async function navigateToAuditLogs(page) {
 
     // Check current URL
     const finalUrl = page.url();
-    console.log('   Final URL:', finalUrl);
+    logger.debug('   Final URL:', finalUrl);
 
     // Wait for timeline to load (try multiple selectors)
     const timelineSelectors = [
@@ -576,7 +577,7 @@ async function navigateToAuditLogs(page) {
     for (const selector of timelineSelectors) {
       try {
         await page.waitForSelector(selector, { timeout: 10000 });
-        console.log(`   Found timeline element: ${selector}`);
+        logger.debug(`   Found timeline element: ${selector}`);
         timelineFound = true;
         break;
       } catch (e) {
@@ -585,7 +586,7 @@ async function navigateToAuditLogs(page) {
     }
 
     if (!timelineFound) {
-      console.log('   Timeline element not found, checking page content...');
+      logger.debug('   Timeline element not found, checking page content...');
 
       // Log what elements are on the page
       const pageInfo = await page.evaluate(() => {
@@ -599,22 +600,22 @@ async function navigateToAuditLogs(page) {
           visibleText: document.body.innerText.substring(0, 1000)
         };
       });
-      console.log('   Page info:', JSON.stringify(pageInfo, null, 2));
+      logger.debug('   Page info:', JSON.stringify(pageInfo, null, 2));
     }
 
     await new Promise(resolve => setTimeout(resolve, 2000));
     await takeScreenshot(page, '09_audit_page_final');
 
-    console.log('   Audit log page loaded');
+    logger.debug('   Audit log page loaded');
     return true;
 
   } catch (error) {
-    console.error('   Navigation error:', error.message);
+    logger.error('   Navigation error:', error.message);
     await takeScreenshot(page, '09_ERROR_navigation_failed');
 
     // Log current page state
     const currentUrl = page.url();
-    console.log('   Current URL on error:', currentUrl);
+    logger.debug('   Current URL on error:', currentUrl);
 
     throw error;
   }
@@ -747,8 +748,8 @@ export async function scrapeBiginAuditLogs(onProgress) {
   const MAX_VIEW_MORE_CLICKS = 50; // Safety limit
 
   try {
-    console.log('🚀 Starting Zoho Bigin audit log scrape...');
-    console.log(`📁 Screenshots will be saved to: ${SCREENSHOTS_DIR}`);
+    logger.debug('🚀 Starting Zoho Bigin audit log scrape...');
+    logger.debug(`📁 Screenshots will be saved to: ${SCREENSHOTS_DIR}`);
     onProgress?.(5, 'Launching browser...');
 
     // Get latest stored log to know when to stop
@@ -791,7 +792,7 @@ export async function scrapeBiginAuditLogs(onProgress) {
 
     while (!reachedExisting && viewMoreClicks < MAX_VIEW_MORE_CLICKS) {
       const visibleLogs = await scrapeVisibleLogs(page);
-      console.log(`   Found ${visibleLogs.length} visible logs`);
+      logger.debug(`   Found ${visibleLogs.length} visible logs`);
 
       for (const log of visibleLogs) {
         // Create unique key for this log
@@ -813,8 +814,8 @@ export async function scrapeBiginAuditLogs(onProgress) {
           );
 
           if (existsInDb) {
-            console.log(`   ✅ Found existing log - stopping scrape`);
-            console.log(`      Log: ${log.user} - ${log.action} - ${log.recordName}`);
+            logger.debug(`   ✅ Found existing log - stopping scrape`);
+            logger.debug(`      Log: ${log.user} - ${log.action} - ${log.recordName}`);
             reachedExisting = true;
             break;
           }
@@ -840,7 +841,7 @@ export async function scrapeBiginAuditLogs(onProgress) {
       // Click "View More" to load more logs
       const moreAvailable = await clickViewMore(page);
       if (!moreAvailable) {
-        console.log('   No more logs to load');
+        logger.debug('   No more logs to load');
         break;
       }
 
@@ -848,13 +849,13 @@ export async function scrapeBiginAuditLogs(onProgress) {
       const progress = Math.min(40 + (viewMoreClicks * 2), 90);
       onProgress?.(progress, `Loaded ${totalScraped} new logs... (click ${viewMoreClicks})`);
 
-      console.log(`   Clicked View More (${viewMoreClicks}), total new logs: ${totalScraped}`);
+      logger.debug(`   Clicked View More (${viewMoreClicks}), total new logs: ${totalScraped}`);
     }
 
     await browser.close();
     browser = null;
 
-    console.log(`🎉 Scrape completed! Found ${newLogs.length} new audit logs`);
+    logger.debug(`🎉 Scrape completed! Found ${newLogs.length} new audit logs`);
 
     return {
       success: true,
@@ -865,14 +866,14 @@ export async function scrapeBiginAuditLogs(onProgress) {
       scrapedAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('❌ Audit log scrape failed:', error);
+    logger.error('❌ Audit log scrape failed:', error);
 
     // Try to capture error screenshot
     if (page) {
       try {
         await takeScreenshot(page, 'ERROR_scrape_failed');
       } catch (e) {
-        console.error('Could not capture error screenshot:', e.message);
+        logger.error('Could not capture error screenshot:', e.message);
       }
     }
 

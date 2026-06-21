@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
 import { Log } from "../../models/logging/index.js";
+import logger from "../../utils/logger.js";
 
 const isAgreementMarkedDeleted = async (agreementId) => {
   if (!agreementId || !mongoose.isValidObjectId(agreementId)) return false;
@@ -55,7 +56,7 @@ export async function restoreAgreement(req, res) {
       breakdown: { agreement: agreementRestored, versionPdfs: versionResult.modifiedCount, attachedFiles: manualResult.modifiedCount, versionLogs: logResult.modifiedCount }
     });
   } catch (err) {
-    console.error("restoreAgreement error:", err);
+    logger.error("restoreAgreement error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -91,7 +92,7 @@ export async function restoreFile(req, res) {
 
     res.json({ success: true, message: "File restored successfully", file: { id: file._id, title: fileName, type: fileType } });
   } catch (err) {
-    console.error("restoreFile error:", err);
+    logger.error("restoreFile error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -133,7 +134,7 @@ export async function deleteAgreement(req, res) {
       breakdown: { agreement: 1, versionPdfs: versionResult.modifiedCount, attachedFiles: manualResult.modifiedCount, versionLogs: logResult.modifiedCount }
     });
   } catch (err) {
-    console.error("deleteAgreement error:", err);
+    logger.error("deleteAgreement error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -189,7 +190,7 @@ export async function deleteFile(req, res) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json({ success: true, message: "File moved to trash successfully", fileType, fileName });
   } catch (err) {
-    console.error("deleteFile error:", err);
+    logger.error("deleteFile error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -221,7 +222,7 @@ export async function permanentlyDeleteAgreement(req, res) {
       deletedData: { agreementId, deletedAttachedFiles: manualResult.deletedCount, deletedVersions: versionResult.deletedCount, deletedLogs: logResult.deletedCount }
     });
   } catch (err) {
-    console.error("permanentlyDeleteAgreement error:", err);
+    logger.error("permanentlyDeleteAgreement error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -260,7 +261,7 @@ export async function permanentlyDeleteFile(req, res) {
 
     res.json({ success: true, message: "File permanently deleted", deletedData: { fileId, fileName, fileType } });
   } catch (err) {
-    console.error("permanentlyDeleteFile error:", err);
+    logger.error("permanentlyDeleteFile error:", err);
     res.status(500).json({ success: false, error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -283,7 +284,7 @@ export async function debugGetAllFiles(req, res) {
       data: { versionPdfs, manualUploads, agreements }
     });
   } catch (err) {
-    console.error('debugGetAllFiles error:', err);
+    logger.error('debugGetAllFiles error:', err);
     res.status(500).json({ success: false, error: err?.message || String(err) });
   }
 }
@@ -315,7 +316,7 @@ export async function verifyTrashWorkflow(req, res) {
 
     res.json({ success: true, ...results });
   } catch (err) {
-    console.error('verifyTrashWorkflow error:', err);
+    logger.error('verifyTrashWorkflow error:', err);
     res.status(500).json({ success: false, error: err?.message || String(err) });
   }
 }

@@ -5,6 +5,7 @@
 
 import { chromium } from 'playwright-core';
 import { BiginCompany } from "#models/customer/index.js";
+import logger from "../../utils/logger.js";
 
 const BIGIN_COMPANIES_URL = 'https://bigin.zoho.in/bigin/Home#/tab/Accounts/list';
 const BIGIN_SIGNIN_URL = 'https://accounts.zoho.in/signin?servicename=ZohoBigin&signupurl=https://www.bigin.com/signup.html';
@@ -15,7 +16,7 @@ const BIGIN_PASSWORD = process.env.BIGIN_PASSWORD || 'Satyavani@970';
  * Login to Zoho Bigin
  */
 async function login(page) {
-  console.log('🔐 Logging into Zoho Bigin...');
+  logger.debug('🔐 Logging into Zoho Bigin...');
 
   if (!BIGIN_EMAIL || !BIGIN_PASSWORD) {
     throw new Error('BIGIN_EMAIL or BIGIN_PASSWORD not set');
@@ -27,13 +28,13 @@ async function login(page) {
   });
 
   await page.waitForSelector('#login_id', { timeout: 30000 });
-  console.log('   Login form loaded');
+  logger.debug('   Login form loaded');
 
   // Enter email
   await page.type('#login_id', BIGIN_EMAIL, { delay: 50 });
   await new Promise(resolve => setTimeout(resolve, 1000));
   await page.click('#nextbtn');
-  console.log('   Entered email, clicked Next');
+  logger.debug('   Entered email, clicked Next');
 
   // Wait for password field
   await page.waitForFunction(() => {
@@ -47,7 +48,7 @@ async function login(page) {
   await page.type('#password', BIGIN_PASSWORD, { delay: 50 });
   await new Promise(resolve => setTimeout(resolve, 500));
   await page.click('#nextbtn');
-  console.log('   Entered password, clicked Sign in');
+  logger.debug('   Entered password, clicked Sign in');
 
   // Wait for navigation
   await Promise.race([
@@ -60,7 +61,7 @@ async function login(page) {
     throw new Error('Login may have failed - still on login page');
   }
 
-  console.log('✅ Login successful');
+  logger.debug('✅ Login successful');
   return true;
 }
 
@@ -68,7 +69,7 @@ async function login(page) {
  * Navigate to companies list page
  */
 async function navigateToCompanies(page) {
-  console.log('📍 Navigating to Companies (Accounts) list...');
+  logger.debug('📍 Navigating to Companies (Accounts) list...');
 
   await page.goto(BIGIN_COMPANIES_URL, {
     waitUntil: 'networkidle',
@@ -82,7 +83,7 @@ async function navigateToCompanies(page) {
 
   await new Promise(resolve => setTimeout(resolve, 3000));
 
-  console.log('   Companies list page loaded');
+  logger.debug('   Companies list page loaded');
   return true;
 }
 
@@ -159,7 +160,7 @@ async function scrapeVisibleCompanies(page) {
           });
         }
       } catch (e) {
-        console.error('Error parsing row:', e);
+        logger.error('Error parsing row:', e);
       }
     });
 
@@ -216,7 +217,7 @@ async function getCompanyDetails(page, biginId) {
 
     return details;
   } catch (error) {
-    console.error(`Error getting details for company ${biginId}:`, error.message);
+    logger.error(`Error getting details for company ${biginId}:`, error.message);
     return {};
   }
 }
@@ -278,7 +279,7 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
   const { fetchDetails = false } = options;
 
   try {
-    console.log('🚀 Starting Zoho Bigin company scrape...');
+    logger.debug('🚀 Starting Zoho Bigin company scrape...');
     onProgress?.(5, 'Launching browser...');
 
     browser = await chromium.launch({
@@ -315,7 +316,7 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
 
     while (scrollAttempts < MAX_SCROLL_ATTEMPTS) {
       const visibleCompanies = await scrapeVisibleCompanies(page);
-      console.log(`   Found ${visibleCompanies.length} visible companies`);
+      logger.debug(`   Found ${visibleCompanies.length} visible companies`);
 
       let newCompaniesThisRound = 0;
 
@@ -339,13 +340,13 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
         totalScraped++;
       }
 
-      console.log(`   New companies this round: ${newCompaniesThisRound}, Total: ${totalScraped}`);
+      logger.debug(`   New companies this round: ${newCompaniesThisRound}, Total: ${totalScraped}`);
 
       if (newCompaniesThisRound === 0) {
         // No new companies found, try scrolling
         const scrolled = await scrollForMore(page);
         if (!scrolled) {
-          console.log('   No more scrolling possible');
+          logger.debug('   No more scrolling possible');
           break;
         }
       }
@@ -358,7 +359,7 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
     await browser.close();
     browser = null;
 
-    console.log(`🎉 Scrape completed! Found ${companies.length} companies`);
+    logger.debug(`🎉 Scrape completed! Found ${companies.length} companies`);
 
     return {
       success: true,
@@ -368,7 +369,7 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
       scrapedAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('❌ Company scrape failed:', error);
+    logger.error('❌ Company scrape failed:', error);
 
     if (browser) {
       await browser.close();

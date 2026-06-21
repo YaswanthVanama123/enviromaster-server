@@ -1,5 +1,6 @@
 import express from 'express';
 import { AdminSettings } from "../../models/admin/index.js";
+import logger from "../../utils/logger.js";
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ router.get('/', async (req, res) => {
     const settings = await AdminSettings.getSingleton();
     return res.json({ success: true, settings });
   } catch (err) {
-    console.error('❌ [ADMIN-SETTINGS] GET failed:', err.message);
+    logger.error('❌ [ADMIN-SETTINGS] GET failed:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -34,10 +35,10 @@ router.patch('/', async (req, res) => {
     }
 
     await settings.save();
-    console.log('✅ [ADMIN-SETTINGS] Updated:', settings.toObject());
+    logger.debug('✅ [ADMIN-SETTINGS] Updated:', settings.toObject());
     return res.json({ success: true, settings });
   } catch (err) {
-    console.error('❌ [ADMIN-SETTINGS] PATCH failed:', err.message);
+    logger.error('❌ [ADMIN-SETTINGS] PATCH failed:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

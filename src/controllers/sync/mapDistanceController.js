@@ -7,6 +7,7 @@ import { getMapDistance, MapDistanceSession } from '../../services/mapDistanceSc
 import { RouteStarCustomer, CompanyMapping } from '../../models/customer/index.js';
 import { MapDistanceRecord, MapDistanceSyncJob, FREQUENCY_MAP, FREQUENCY_REVERSE_MAP, DAY_OF_WEEK_MAP, DAY_OF_WEEK_REVERSE_MAP } from '../../models/sync/index.js';
 import { getDrivingTime, buildAddressString } from '../../services/mapboxService.js';
+import logger from "../../utils/logger.js";
 
 // Account type detection constants
 const ACCOUNT_TYPE_THRESHOLDS = {
@@ -71,7 +72,7 @@ function frequencyToNumber(freqStr) {
     return 2; // Default to Bi-Weekly
   }
 
-  console.log(`[FREQUENCY] Unknown frequency string: "${freqStr}" (normalized: "${normalized}")`);
+  logger.debug(`[FREQUENCY] Unknown frequency string: "${freqStr}" (normalized: "${normalized}")`);
   return 0; // Unknown
 }
 
@@ -109,15 +110,15 @@ export const initializeJobStatus = async () => {
     });
 
     if (interruptedJob) {
-      console.log('[MapDistance] Found interrupted job on startup:', interruptedJob._id);
-      console.log(`[MapDistance] Progress: ${interruptedJob.processedCustomerIds?.length || 0}/${interruptedJob.customerIds?.length || 0}`);
+      logger.debug('[MapDistance] Found interrupted job on startup:', interruptedJob._id);
+      logger.debug(`[MapDistance] Progress: ${interruptedJob.processedCustomerIds?.length || 0}/${interruptedJob.customerIds?.length || 0}`);
 
       resumeInterruptedJob(interruptedJob._id).catch(err => {
-        console.error('[MapDistance] Error resuming job:', err);
+        logger.error('[MapDistance] Error resuming job:', err);
       });
     }
   } catch (error) {
-    console.error('[MapDistance] Error initializing job status:', error);
+    logger.error('[MapDistance] Error initializing job status:', error);
   }
 };
 
@@ -132,7 +133,7 @@ async function resumeInterruptedJob(jobId) {
   let allIds = job.customerIds || [];
 
   if (allIds.length === 0) {
-    console.log('[MapDistance] Legacy job detected - fetching customer list');
+    logger.debug('[MapDistance] Legacy job detected - fetching customer list');
 
     let customers;
     if (job.jobType === 'update_sync') {
@@ -155,7 +156,7 @@ async function resumeInterruptedJob(jobId) {
   }
 
   if (processedIds.length === 0 && job.processedCustomers > 0) {
-    console.log('[MapDistance] Legacy job - inferring processed customers from records');
+    logger.debug('[MapDistance] Legacy job - inferring processed customers from records');
 
     const recordsFromThisJob = await MapDistanceRecord.distinct('customerId', {
       syncJobId: jobId
@@ -170,7 +171,7 @@ async function resumeInterruptedJob(jobId) {
 
   const remainingIds = allIds.filter(id => !processedIds.some(pId => pId.toString() === id.toString()));
 
-  console.log(`[MapDistance] Resume calculation: ${allIds.length} total, ${processedIds.length} processed, ${remainingIds.length} remaining`);
+  logger.debug(`[MapDistance] Resume calculation: ${allIds.length} total, ${processedIds.length} processed, ${remainingIds.length} remaining`);
 
   if (remainingIds.length === 0) {
     await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
@@ -178,7 +179,7 @@ async function resumeInterruptedJob(jobId) {
       completedAt: new Date(),
       currentCustomerName: null
     });
-    console.log('[MapDistance] Job was already complete');
+    logger.debug('[MapDistance] Job was already complete');
     return;
   }
 
@@ -209,10 +210,10 @@ async function resumeInterruptedJob(jobId) {
   });
 
   activeSyncJobId = jobId;
-  console.log(`[MapDistance] Resuming job: ${customers.length} customers remaining`);
+  logger.debug(`[MapDistance] Resuming job: ${customers.length} customers remaining`);
 
   runSyncJob(jobId, customers, true).catch(err => {
-    console.error('[MapDistance] Error in resumed job:', err);
+    logger.error('[MapDistance] Error in resumed job:', err);
   });
 }
 
@@ -245,7 +246,7 @@ export const getRouteStarCustomers = async (req, res) => {
       total: customers.length
     });
   } catch (error) {
-    console.error('Error fetching RouteStar customers:', error);
+    logger.error('Error fetching RouteStar customers:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch customers'
@@ -294,10 +295,10 @@ export const fetchMapDistance = async (req, res) => {
 
     activeSyncJobId = syncJob._id;
 
-    console.log(`[MapDistance] Starting background fetch for: ${customerName}, jobId: ${syncJob._id}`);
+    logger.debug(`[MapDistance] Starting background fetch for: ${customerName}, jobId: ${syncJob._id}`);
 
     runSingleFetchJob(syncJob._id, customerName, customer?._id).catch(err => {
-      console.error('[MapDistance] Background fetch error:', err);
+      logger.error('[MapDistance] Background fetch error:', err);
     });
 
     res.json({
@@ -307,7 +308,7 @@ export const fetchMapDistance = async (req, res) => {
       customerName
     });
   } catch (error) {
-    console.error('Error starting fetch:', error);
+    logger.error('Error starting fetch:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to start fetch'
@@ -319,11 +320,11 @@ export const fetchMapDistance = async (req, res) => {
  * Background job for single customer fetch
  */
 async function runSingleFetchJob(jobId, customerName, customerId) {
-  console.log(`[MapDistance] Running single fetch for: ${customerName}`);
+  logger.debug(`[MapDistance] Running single fetch for: ${customerName}`);
 
   try {
     const result = await getMapDistance(customerName, (progress, message) => {
-      console.log(`[MapDistance] ${progress}% - ${message}`);
+      logger.debug(`[MapDistance] ${progress}% - ${message}`);
     });
 
     if (result.success && result.data && result.data.length > 0) {
@@ -357,7 +358,7 @@ async function runSingleFetchJob(jobId, customerName, customerId) {
         fetchedData: result.data
       });
 
-      console.log(`[MapDistance] Single fetch completed: ${result.data.length} records`);
+      logger.debug(`[MapDistance] Single fetch completed: ${result.data.length} records`);
     } else {
       await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
         status: 'completed',
@@ -369,10 +370,10 @@ async function runSingleFetchJob(jobId, customerName, customerId) {
         fetchedData: []
       });
 
-      console.log(`[MapDistance] Single fetch completed: no data found`);
+      logger.debug(`[MapDistance] Single fetch completed: no data found`);
     }
   } catch (error) {
-    console.error(`[MapDistance] Single fetch error:`, error.message);
+    logger.error(`[MapDistance] Single fetch error:`, error.message);
 
     await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
       status: 'failed',
@@ -434,7 +435,7 @@ export const startSync = async (req, res) => {
     activeSyncJobId = syncJob._id;
 
     runSyncJob(syncJob._id, customers, false).catch(err => {
-      console.error('[MapDistance Sync] Background job error:', err);
+      logger.error('[MapDistance Sync] Background job error:', err);
     });
 
     res.json({
@@ -444,7 +445,7 @@ export const startSync = async (req, res) => {
       totalCustomers: customers.length
     });
   } catch (error) {
-    console.error('Error starting sync:', error);
+    logger.error('Error starting sync:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to start sync'
@@ -456,7 +457,7 @@ export const startSync = async (req, res) => {
  * Background sync job runner
  */
 async function runSyncJob(jobId, customers, isResume = false) {
-  console.log(`[MapDistance Sync] ${isResume ? 'Resuming' : 'Starting'} sync for ${customers.length} customers`);
+  logger.debug(`[MapDistance Sync] ${isResume ? 'Resuming' : 'Starting'} sync for ${customers.length} customers`);
 
   const syncJob = await MapDistanceSyncJob.findById(jobId);
   if (!syncJob) return;
@@ -465,23 +466,23 @@ async function runSyncJob(jobId, customers, isResume = false) {
   activeSyncSession = session;
 
   try {
-    console.log('[MapDistance Sync] Initializing browser session...');
+    logger.debug('[MapDistance Sync] Initializing browser session...');
     await session.initialize((progress, message) => {
-      console.log(`[MapDistance Sync] Init: ${progress}% - ${message}`);
+      logger.debug(`[MapDistance Sync] Init: ${progress}% - ${message}`);
     });
-    console.log('[MapDistance Sync] Browser session ready - starting customer processing');
+    logger.debug('[MapDistance Sync] Browser session ready - starting customer processing');
 
     for (const customer of customers) {
       const currentJob = await MapDistanceSyncJob.findById(jobId);
       if (currentJob.status === 'cancelled') {
-        console.log('[MapDistance Sync] Job was cancelled');
+        logger.debug('[MapDistance Sync] Job was cancelled');
         activeSyncJobId = null;
         await session.close();
         activeSyncSession = null;
         return;
       }
       if (currentJob.status === 'paused') {
-        console.log('[MapDistance Sync] Job was paused');
+        logger.debug('[MapDistance Sync] Job was paused');
         activeSyncJobId = null;
         await session.close();
         activeSyncSession = null;
@@ -495,7 +496,7 @@ async function runSyncJob(jobId, customers, isResume = false) {
         lastActivityAt: new Date()
       });
 
-      console.log(`[MapDistance Sync] Processing ${totalProcessed}/${syncJob.totalCustomers}: ${customer.name}`);
+      logger.debug(`[MapDistance Sync] Processing ${totalProcessed}/${syncJob.totalCustomers}: ${customer.name}`);
 
       try {
         const result = await session.fetchForCustomer(customer.name, (progress, message) => {
@@ -535,7 +536,7 @@ async function runSyncJob(jobId, customers, isResume = false) {
           });
         }
       } catch (error) {
-        console.error(`[MapDistance Sync] Error for ${customer.name}:`, error.message);
+        logger.error(`[MapDistance Sync] Error for ${customer.name}:`, error.message);
 
         await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
           $inc: { failedCustomers: 1 },
@@ -560,9 +561,9 @@ async function runSyncJob(jobId, customers, isResume = false) {
       currentCustomerName: null
     });
 
-    console.log('[MapDistance Sync] Sync completed');
+    logger.debug('[MapDistance Sync] Sync completed');
   } catch (error) {
-    console.error('[MapDistance Sync] Session error:', error.message);
+    logger.error('[MapDistance Sync] Session error:', error.message);
 
     await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
       status: 'failed',
@@ -634,7 +635,7 @@ export const getSyncStatus = async (req, res) => {
       job: runningJob || pausedJob || latestJob
     });
   } catch (error) {
-    console.error('Error getting sync status:', error);
+    logger.error('Error getting sync status:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -674,7 +675,7 @@ export const cancelSync = async (req, res) => {
       message: 'Sync cancelled'
     });
   } catch (error) {
-    console.error('Error cancelling sync:', error);
+    logger.error('Error cancelling sync:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -723,7 +724,7 @@ export const pauseSync = async (req, res) => {
       totalCustomers: runningJob.totalCustomers
     });
   } catch (error) {
-    console.error('Error pausing sync:', error);
+    logger.error('Error pausing sync:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -767,7 +768,7 @@ export const resetStuckJobs = async (req, res) => {
       modifiedCount: result.modifiedCount
     });
   } catch (error) {
-    console.error('Error resetting stuck jobs:', error);
+    logger.error('Error resetting stuck jobs:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -791,7 +792,7 @@ export const getSyncHistory = async (req, res) => {
       data: history
     });
   } catch (error) {
-    console.error('Error getting sync history:', error);
+    logger.error('Error getting sync history:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -839,7 +840,7 @@ export const getStoredRecords = async (req, res) => {
       totalPages: Math.ceil(total / parseInt(limit))
     });
   } catch (error) {
-    console.error('Error getting stored records:', error);
+    logger.error('Error getting stored records:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -870,7 +871,7 @@ export const getCustomerRecords = async (req, res) => {
       total: records.length
     });
   } catch (error) {
-    console.error('Error getting customer records:', error);
+    logger.error('Error getting customer records:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -916,7 +917,7 @@ export const getCustomersWithData = async (req, res) => {
       total: customers.length
     });
   } catch (error) {
-    console.error('Error getting customers with data:', error);
+    logger.error('Error getting customers with data:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to get customers with data'
@@ -981,7 +982,7 @@ export const getStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting stats:', error);
+    logger.error('Error getting stats:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -1042,7 +1043,7 @@ export const startUpdateSync = async (req, res) => {
     activeSyncJobId = syncJob._id;
 
     runSyncJob(syncJob._id, customers, false).catch(err => {
-      console.error('[MapDistance Update Sync] Background job error:', err);
+      logger.error('[MapDistance Update Sync] Background job error:', err);
     });
 
     res.json({
@@ -1052,7 +1053,7 @@ export const startUpdateSync = async (req, res) => {
       totalCustomers: customers.length
     });
   } catch (error) {
-    console.error('Error starting update sync:', error);
+    logger.error('Error starting update sync:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to start update sync'
@@ -1109,7 +1110,7 @@ export const resumeSync = async (req, res) => {
     }
 
     resumeInterruptedJob(job._id).catch(err => {
-      console.error('[MapDistance] Resume error:', err);
+      logger.error('[MapDistance] Resume error:', err);
     });
 
     res.json({
@@ -1119,7 +1120,7 @@ export const resumeSync = async (req, res) => {
       remainingCustomers: remainingIds.length
     });
   } catch (error) {
-    console.error('Error resuming sync:', error);
+    logger.error('Error resuming sync:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to resume sync'
@@ -1150,7 +1151,7 @@ export const deleteAllRecords = async (req, res) => {
       deletedCount: result.deletedCount
     });
   } catch (error) {
-    console.error('Error deleting records:', error);
+    logger.error('Error deleting records:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete records'
@@ -1286,7 +1287,7 @@ export const detectAccountType = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error detecting account type:', error);
+    logger.error('Error detecting account type:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to detect account type'
@@ -1354,7 +1355,7 @@ export const detectAccountTypeWithMapbox = async (req, res) => {
     // Add frequency filter if provided
     if (frequency !== undefined && frequency !== null && frequency !== '') {
       distanceQuery.frequency = parseInt(frequency, 10);
-      console.log(`📊 Filtering by frequency: ${frequency} (${FREQUENCY_MAP[frequency] || 'Unknown'})`);
+      logger.debug(`📊 Filtering by frequency: ${frequency} (${FREQUENCY_MAP[frequency] || 'Unknown'})`);
     }
 
     // Get top 3 lowest distance destinations
@@ -1416,7 +1417,7 @@ export const detectAccountTypeWithMapbox = async (req, res) => {
               shortestDestination = destResult;
             }
           } catch (mapboxError) {
-            console.error(`Mapbox error for ${record.destinationCustomerName}:`, mapboxError.message);
+            logger.error(`Mapbox error for ${record.destinationCustomerName}:`, mapboxError.message);
             destinations.push({
               destination: record.destinationCustomerName,
               address: toAddress,
@@ -1476,7 +1477,7 @@ export const detectAccountTypeWithMapbox = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error detecting account type with Mapbox:', error);
+    logger.error('Error detecting account type with Mapbox:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to detect account type'
@@ -1497,7 +1498,7 @@ export async function runAccountTypeBatch(biginCompanyId, frequencies) {
     return { success: false, error: 'frequencies array is required', results: {} };
   }
 
-  console.log(`[BATCH-DETECT] Detecting account types for ${frequencies.length} frequencies`);
+  logger.debug(`[BATCH-DETECT] Detecting account types for ${frequencies.length} frequencies`);
 
   // 1. Find mapping for Bigin company (once for all frequencies)
   const mapping = await CompanyMapping.findOne({
@@ -1539,7 +1540,7 @@ export async function runAccountTypeBatch(biginCompanyId, frequencies) {
 
   for (const frequency of frequencies) {
     const freqNum = parseInt(frequency, 10);
-    console.log(`  📊 Processing frequency: ${freqNum} (${FREQUENCY_MAP[freqNum] || 'Unknown'})`);
+    logger.debug(`  📊 Processing frequency: ${freqNum} (${FREQUENCY_MAP[freqNum] || 'Unknown'})`);
 
     try {
       const distanceQuery = {
@@ -1580,12 +1581,12 @@ export async function runAccountTypeBatch(biginCompanyId, frequencies) {
       results[freqNum] = { ...result, usedFallback: false };
 
     } catch (freqError) {
-      console.error(`Error processing frequency ${freqNum}:`, freqError.message);
+      logger.error(`Error processing frequency ${freqNum}:`, freqError.message);
       results[freqNum] = { accountType: 'Pit', confidence: 'low', reason: `Error: ${freqError.message}`, drivingTimeMinutes: null, nearestDestination: null, error: freqError.message };
     }
   }
 
-  console.log(`[BATCH-DETECT] Completed - processed ${Object.keys(results).length} frequencies`);
+  logger.debug(`[BATCH-DETECT] Completed - processed ${Object.keys(results).length} frequencies`);
 
   return { success: true, biginCompany: mapping.biginCompanyName, routeStarCustomer: customer.name, fromAddress, results, thresholds: { bread5MaxMinutes: 5, bread15MaxMinutes: 15 } };
 }
@@ -1597,7 +1598,7 @@ export const detectAccountTypeBatch = async (req, res) => {
     const status = !out.success && typeof out.error === 'string' && out.error.includes('is required') ? 400 : 200;
     return res.status(status).json(out);
   } catch (error) {
-    console.error('Error in batch account type detection:', error);
+    logger.error('Error in batch account type detection:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to detect account types' });
   }
 };
@@ -1705,7 +1706,7 @@ export const getCustomerDistances = async (req, res) => {
       total: mappedRecords.length
     });
   } catch (error) {
-    console.error('Error getting customer distances:', error);
+    logger.error('Error getting customer distances:', error);
     res.status(500).json({
       success: false,
       error: error.message

@@ -1,3 +1,4 @@
+import logger from "../../utils/logger.js";
 /**
  * Commission Controller V2
  * Backend API handlers for commission calculations
@@ -283,7 +284,7 @@ export const calculateCommission = async (req, res) => {
     const result = calculateCommissionV2(input);
     res.json(result);
   } catch (error) {
-    console.error('Commission calculation error:', error);
+    logger.error('Commission calculation error:', error);
     res.status(500).json({ error: 'Commission calculation failed', message: error.message });
   }
 };
@@ -310,7 +311,7 @@ export const detectAccountTypeEndpoint = async (req, res) => {
       reason: getAccountTypeReason(accountType, perVisitRevenue, drivingTimeMinutes, isGreenline),
     });
   } catch (error) {
-    console.error('Account type detection error:', error);
+    logger.error('Account type detection error:', error);
     res.status(500).json({ error: 'Account type detection failed', message: error.message });
   }
 };

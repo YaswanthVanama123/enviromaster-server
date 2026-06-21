@@ -8,6 +8,7 @@ import { compileCustomerHeader } from "../../services/pdfService.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { ZohoMapping } from "../../models/sync/index.js";
 import { recalcCommissionForAgreementById } from "../../services/commissionAutomation.js";
+import logger from "../../utils/logger.js";
 
 export async function compileAndStoreCustomerHeader(req, res) {
   try {
@@ -33,8 +34,8 @@ export async function compileAndStoreCustomerHeader(req, res) {
     };
 
     if (!isDraft) {
-      console.log("📄 Non-draft mode: Agreement will be created, PDF will go to VersionPdf collection");
-      console.log("💾 No immediate PDF compilation - PDF will be stored in VersionPdf collection");
+      logger.debug("📄 Non-draft mode: Agreement will be created, PDF will go to VersionPdf collection");
+      logger.debug("💾 No immediate PDF compilation - PDF will be stored in VersionPdf collection");
     }
 
     const doc = await CustomerHeaderDoc.create({
@@ -52,7 +53,7 @@ export async function compileAndStoreCustomerHeader(req, res) {
       zoho: zohoData,
     });
 
-    console.log(`✅ Agreement document created: ${doc._id} (PDF will be stored in VersionPdf collection)`);
+    logger.debug(`✅ Agreement document created: ${doc._id} (PDF will be stored in VersionPdf collection)`);
 
     res.setHeader("X-CustomerHeaderDoc-Id", doc._id.toString());
     return res.status(201).json({
@@ -63,7 +64,7 @@ export async function compileAndStoreCustomerHeader(req, res) {
       message: isDraft ? "Draft saved successfully" : "Agreement created successfully - PDF will be generated in version system"
     });
   } catch (err) {
-    console.error("compileAndStoreCustomerHeader error:", err);
+    logger.error("compileAndStoreCustomerHeader error:", err);
 
     const isMongoConnectionError = mongoose.connection.readyState === 0 ||
                                    err?.message?.includes('MongoDB') ||
@@ -72,7 +73,7 @@ export async function compileAndStoreCustomerHeader(req, res) {
                                    err?.name === 'MongooseError';
 
     if (isMongoConnectionError) {
-      console.log("⚠️ [TESTING MODE] MongoDB not connected - generating mock response for frontend testing");
+      logger.debug("⚠️ [TESTING MODE] MongoDB not connected - generating mock response for frontend testing");
 
       const mockDocId = new mongoose.Types.ObjectId().toString();
       res.setHeader("X-CustomerHeaderDoc-Id", mockDocId);
@@ -130,10 +131,10 @@ export async function getCustomerHeaders(req, res) {
 
     res.json({ total, page, limit, items });
   } catch (err) {
-    console.error("getCustomerHeaders error:", err);
+    logger.error("getCustomerHeaders error:", err);
 
     if (err.message.includes('buffering timed out')) {
-      console.log('⚠️ Database timeout, returning empty list for PDF testing');
+      logger.debug('⚠️ Database timeout, returning empty list for PDF testing');
       return res.json({ total: 0, page: 1, limit: 20, items: [] });
     }
 
@@ -174,10 +175,10 @@ export async function getCustomerHeaderById(req, res) {
 
     res.json(doc);
   } catch (err) {
-    console.error("getCustomerHeaderById error:", err);
+    logger.error("getCustomerHeaderById error:", err);
 
     if (err.message.includes('buffering timed out')) {
-      console.log('⚠️ Database timeout, returning mock data for PDF testing');
+      logger.debug('⚠️ Database timeout, returning mock data for PDF testing');
       return res.json({
         _id: req.params.id,
         payload: {
@@ -267,22 +268,22 @@ export async function getCustomerHeaderForEdit(req, res) {
       recalcCommissionForAgreementById(String(doc._id))
         .then((r) => {
           if (!r?.skipped) {
-            console.log(`[COMMISSION-AUTO] edit-open backfill froze isNewLocation for agreement ${doc._id}`);
+            logger.debug(`[COMMISSION-AUTO] edit-open backfill froze isNewLocation for agreement ${doc._id}`);
           }
         })
         .catch((err) => {
-          console.error(`[COMMISSION-AUTO] edit-open backfill failed for ${doc._id}:`, err?.message);
+          logger.error(`[COMMISSION-AUTO] edit-open backfill failed for ${doc._id}:`, err?.message);
         });
     }
 
     // Debug: Log if accountTypeCache exists
     if (doc.payload?.accountTypeCache) {
-      console.log('[ACCOUNT-TYPE-LOAD] Returning saved accountTypeCache with keys:', Object.keys(doc.payload.accountTypeCache));
+      logger.debug('[ACCOUNT-TYPE-LOAD] Returning saved accountTypeCache with keys:', Object.keys(doc.payload.accountTypeCache));
     } else {
-      console.log('[ACCOUNT-TYPE-LOAD] No accountTypeCache in document');
+      logger.debug('[ACCOUNT-TYPE-LOAD] No accountTypeCache in document');
     }
   } catch (err) {
-    console.error("getCustomerHeaderForEdit error:", err);
+    logger.error("getCustomerHeaderForEdit error:", err);
     res.status(500).json({ error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -311,7 +312,7 @@ export async function saveAccountTypeCache(req, res) {
       return res.status(404).json({ error: "not_found", detail: "Document not found" });
     }
 
-    console.log('[ACCOUNT-TYPE-SAVE] Saved accountTypeCache to agreement:', id, 'keys:', accountTypeCache ? Object.keys(accountTypeCache) : 'null');
+    logger.debug('[ACCOUNT-TYPE-SAVE] Saved accountTypeCache to agreement:', id, 'keys:', accountTypeCache ? Object.keys(accountTypeCache) : 'null');
 
     res.json({ success: true });
 
@@ -319,10 +320,10 @@ export async function saveAccountTypeCache(req, res) {
     // stored with the detected account types (the connect recalc may have run
     // before detection finished). Self-gates: skips unless RouteStar-mapped.
     recalcCommissionForAgreementById(String(id)).catch((err) =>
-      console.error(`[COMMISSION-AUTO] post-account-type recalc failed for ${id}:`, err?.message),
+      logger.error(`[COMMISSION-AUTO] post-account-type recalc failed for ${id}:`, err?.message),
     );
   } catch (err) {
-    console.error("saveAccountTypeCache error:", err);
+    logger.error("saveAccountTypeCache error:", err);
     res.status(500).json({ error: "server_error", detail: err?.message || String(err) });
   }
 }
@@ -357,7 +358,7 @@ export async function updateCustomerHeader(req, res) {
     if (body.commission !== undefined) {
       doc.payload.commission = body.commission;
       doc.markModified('payload.commission');
-      console.log('[COMMISSION-SAVE] Saving commission data:', {
+      logger.debug('[COMMISSION-SAVE] Saving commission data:', {
         weeklyCommission: body.commission?.weeklyCommission,
         annualCommission: body.commission?.annualCommission,
         contractCommission: body.commission?.contractCommission,
@@ -368,7 +369,7 @@ export async function updateCustomerHeader(req, res) {
     // Save account type cache for commission calculations
     if (body.accountTypeCache !== undefined) {
       doc.payload.accountTypeCache = body.accountTypeCache;
-      console.log('[ACCOUNT-TYPE-SAVE] Saving accountTypeCache with keys:', body.accountTypeCache ? Object.keys(body.accountTypeCache) : 'null');
+      logger.debug('[ACCOUNT-TYPE-SAVE] Saving accountTypeCache with keys:', body.accountTypeCache ? Object.keys(body.accountTypeCache) : 'null');
     }
     doc.status = newStatus;
 
@@ -388,7 +389,7 @@ export async function updateCustomerHeader(req, res) {
     let filename = "customer-header.pdf";
 
     if (shouldCompilePdf) {
-      console.log(`Compiling PDF for document ${id}...`);
+      logger.debug(`Compiling PDF for document ${id}...`);
 
       const productsData = body.products || doc.payload.products;
 
@@ -415,22 +416,22 @@ export async function updateCustomerHeader(req, res) {
         externalUrl: doc.pdf_meta?.externalUrl || null,
       };
 
-      console.log(`✅ PDF updated in MongoDB: ${doc._id} (${buffer.length} bytes)`);
+      logger.debug(`✅ PDF updated in MongoDB: ${doc._id} (${buffer.length} bytes)`);
     }
 
     await doc.save();
 
-    console.log(`Document ${id} updated, status: ${doc.status}, compiled: ${shouldCompilePdf}`);
+    logger.debug(`Document ${id} updated, status: ${doc.status}, compiled: ${shouldCompilePdf}`);
 
     // Recompute & store commission (incl. Pit far redline/greenline split) via the
     // authoritative engine. Self-gates: skips if the agreement isn't connected to
     // Bigin + RouteStar-mapped, so unmapped drafts add nothing to the prior.
     recalcCommissionForAgreementById(String(doc._id)).catch((err) =>
-      console.error(`[COMMISSION-AUTO] post-save recalc failed for ${doc._id}:`, err?.message),
+      logger.error(`[COMMISSION-AUTO] post-save recalc failed for ${doc._id}:`, err?.message),
     );
 
     if (buffer) {
-      console.log("✅ [UPDATE SUCCESS] Returning PDF response");
+      logger.debug("✅ [UPDATE SUCCESS] Returning PDF response");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       return res.send(buffer);
@@ -445,9 +446,9 @@ export async function updateCustomerHeader(req, res) {
       });
     }
   } catch (err) {
-    console.error("updateCustomerHeader error:", err);
+    logger.error("updateCustomerHeader error:", err);
     if (err.detail) {
-      console.error("📄 LaTeX Compilation Error Details:", err.detail);
+      logger.error("📄 LaTeX Compilation Error Details:", err.detail);
     }
     res.status(500).json({
       success: false,
@@ -493,7 +494,7 @@ export async function updateCustomerHeaderStatus(req, res) {
       },
     });
   } catch (err) {
-    console.error("updateCustomerHeaderStatus error:", err);
+    logger.error("updateCustomerHeaderStatus error:", err);
     res.status(500).json({
       success: false,
       error: "Failed to update status",

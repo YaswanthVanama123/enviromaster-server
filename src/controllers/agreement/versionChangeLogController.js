@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import { VersionChangeLog } from "../../models/logging/index.js";
+import logger from "../../utils/logger.js";
 
 export async function logVersionChanges(req, res) {
   try {
@@ -43,7 +44,7 @@ export async function logVersionChanges(req, res) {
       log: { id: versionLog._id, versionId: versionLog.versionId, versionNumber: versionLog.versionNumber, totalChanges: versionLog.totalChanges, totalPriceImpact: versionLog.totalPriceImpact, hasSignificantChanges: versionLog.hasSignificantChanges, reviewStatus: versionLog.reviewStatus, saveAction: versionLog.saveAction }
     });
   } catch (err) {
-    console.error("logVersionChanges error:", err);
+    logger.error("logVersionChanges error:", err);
     res.status(500).json({ success: false, error: "Failed to log version changes", detail: err?.message });
   }
 }
@@ -66,7 +67,7 @@ export async function getVersionChangeLogs(req, res) {
       statistics: stats.length > 0 ? stats[0] : { totalVersions: 0, totalChanges: 0, totalPriceImpact: 0, versionsWithSignificantChanges: 0, pendingApprovals: 0 }
     });
   } catch (err) {
-    console.error("getVersionChangeLogs error:", err);
+    logger.error("getVersionChangeLogs error:", err);
     res.status(500).json({ success: false, error: "Failed to retrieve logs", detail: err?.message });
   }
 }
@@ -85,7 +86,7 @@ export async function getVersionChangeLog(req, res) {
 
     res.json({ success: true, log });
   } catch (err) {
-    console.error("getVersionChangeLog error:", err);
+    logger.error("getVersionChangeLog error:", err);
     res.status(500).json({ success: false, error: "Failed to retrieve log", detail: err?.message });
   }
 }
@@ -116,7 +117,7 @@ export async function reviewVersionChanges(req, res) {
 
     res.json({ success: true, message: `Version changes ${reviewStatus} successfully`, log: { id: log._id, versionId: log.versionId, versionNumber: log.versionNumber, reviewStatus: log.reviewStatus, reviewedBy: log.reviewedBy, reviewedAt: log.reviewedAt } });
   } catch (err) {
-    console.error("reviewVersionChanges error:", err);
+    logger.error("reviewVersionChanges error:", err);
     res.status(500).json({ success: false, error: "Failed to review", detail: err?.message });
   }
 }
@@ -134,7 +135,7 @@ export async function getPendingVersionChanges(req, res) {
 
     res.json({ success: true, total, page: Number(page), limit: Number(limit), pendingChanges: logs });
   } catch (err) {
-    console.error("getPendingVersionChanges error:", err);
+    logger.error("getPendingVersionChanges error:", err);
     res.status(500).json({ success: false, error: "Failed to retrieve pending changes", detail: err?.message });
   }
 }

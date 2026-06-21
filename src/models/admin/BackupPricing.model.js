@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import zlib from 'zlib';
+import logger from "../../utils/logger.js";
 
 const BackupPricingSchema = new mongoose.Schema({
   changeDayId: {
@@ -214,7 +215,7 @@ BackupPricingSchema.statics.hasBackupForToday = async function() {
 
 BackupPricingSchema.statics.getLastNChangeDays = async function(n = 10) {
   const startTime = Date.now();
-  console.log(`[BACKUP-MODEL] Fetching last ${n} change days (optimized)...`);
+  logger.debug(`[BACKUP-MODEL] Fetching last ${n} change days (optimized)...`);
 
   const result = await this.aggregate([
     { $sort: { changeDay: -1, createdAt: -1 } },
@@ -244,7 +245,7 @@ BackupPricingSchema.statics.getLastNChangeDays = async function(n = 10) {
   ]);
 
   const queryTime = Date.now() - startTime;
-  console.log(`[BACKUP-MODEL] Fetched ${result.length} backups in ${queryTime}ms (excluded compressedSnapshot)`);
+  logger.debug(`[BACKUP-MODEL] Fetched ${result.length} backups in ${queryTime}ms (excluded compressedSnapshot)`);
 
   return result.map(backup => ({
     changeDay: backup.changeDay,
