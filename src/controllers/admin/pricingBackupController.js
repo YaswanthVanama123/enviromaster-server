@@ -318,8 +318,8 @@ class PricingBackupController {
         .lean()
         .exec();
 
-      const totalBackups = PricingBackup.countDocuments({ isDeleted: { $ne: true } });
-      const completeBackups = PricingBackup.countDocuments({
+      const totalBackups = await PricingBackup.countDocuments({ isDeleted: { $ne: true } });
+      const completeBackups = await PricingBackup.countDocuments({
         isDeleted: { $ne: true },
         isComplete: true,
       });
