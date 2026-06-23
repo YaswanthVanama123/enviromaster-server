@@ -1,6 +1,14 @@
 import PricingBackupService from "../../services/pricingBackupService.js";
 import { BackupPricing as PricingBackup } from "../../models/admin/index.js";
 import logger from "../../utils/logger.js";
+import mongoose from "mongoose";
+
+function toAdminUserId(...candidates) {
+  for (const c of candidates) {
+    if (c && mongoose.Types.ObjectId.isValid(c)) return c;
+  }
+  return null;
+}
 
 class PricingBackupController {
   static async createManualBackup(req, res) {
@@ -8,7 +16,7 @@ class PricingBackupController {
       const { reason, createdBy, changeDescription, forceReplace } = req.body;
 
       const result = await PricingBackupService.createManualBackup({
-        changedBy: createdBy || req.user?._id,
+        changedBy: toAdminUserId(req.body.createdBy, req.admin?.id, req.user?.id),
         changeDescription: changeDescription || reason || "Manual backup",
         forceReplace: forceReplace === true
       });
@@ -105,7 +113,7 @@ class PricingBackupController {
   static async restoreFromBackup(req, res) {
     try {
       const { changeDayId, restorationNotes } = req.body;
-      const restoredBy = req.user?._id || req.body.restoredBy || "admin";
+      const restoredBy = toAdminUserId(req.admin?.id, req.user?.id, req.body.restoredBy);
 
       if (!changeDayId) {
         return res.status(400).json({

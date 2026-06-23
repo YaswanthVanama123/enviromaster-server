@@ -1107,6 +1107,7 @@ export const getQuotaHistory = async (req, res) => {
 export const getCurrentQuotaLevel = async (req, res) => {
   try {
     const { salesPersonId } = req.params;
+    const { excludeAgreementId } = req.query;
 
     const employee = await Employee.findOne(buildEmployeeQuery(salesPersonId));
 
@@ -1123,14 +1124,16 @@ export const getCurrentQuotaLevel = async (req, res) => {
     const levelRules = await CommissionRules.findOne({ isActive: true });
     const quotaTarget = levelRules?.quotaTarget || employee.quota?.monthlyTarget || 50000;
 
-    // Query SavedPDFs for the current period
-    const savedPdfs = await CustomerHeaderDoc.find({
+    const periodFilter = {
       createdBy: employee.username,
       isDeleted: { $ne: true },
       createdAt: { $gte: start, $lte: end },
-      // Only Bigin-connected agreements count toward quota (drafts excluded).
       'payload.commission': { $ne: null },
-    })
+    };
+    if (excludeAgreementId && mongoose.Types.ObjectId.isValid(excludeAgreementId)) {
+      periodFilter._id = { $ne: excludeAgreementId };
+    }
+    const savedPdfs = await CustomerHeaderDoc.find(periodFilter)
       .select({
         'payload.summary.contractMonths': 1,
         'payload.summary.serviceAgreementTotal': 1,
