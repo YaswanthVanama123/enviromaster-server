@@ -207,6 +207,35 @@ const CommissionBreakdownSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const RulesSnapshotSchema = new mongoose.Schema(
+  {
+    quotaRates: {
+      below: { type: Number },
+      above: { type: Number },
+      double: { type: Number },
+    },
+    agreementMultipliers: { type: mongoose.Schema.Types.Mixed },
+    insideSalesDeduction: { type: Number },
+    renewalBonusRate: { type: Number },
+    renewalMinYears: { type: Number },
+    anchorMinPerVisit: { type: Number },
+    anchorMinGreenline: { type: Number },
+    pitPerVisitThreshold: { type: Number },
+    anchorPerVisitThreshold: { type: Number },
+    anchorBonusMultiplier: { type: Number },
+    perVisitPenalties: { type: mongoose.Schema.Types.Mixed },
+    pricingTiers: { type: mongoose.Schema.Types.Mixed },
+    frequencyVisitsPerYear: { type: mongoose.Schema.Types.Mixed },
+    quotaTierCutoffs: {
+      aboveQuota: { type: Number },
+      doubleQuota: { type: Number },
+    },
+    quotaTarget: { type: Number },
+    weeksPerAnnualCommission: { type: Number },
+  },
+  { _id: false, strict: false }
+);
+
 const CommissionSchema = new mongoose.Schema(
   {
     input: { type: CommissionInputSchema, default: () => ({}) },
@@ -215,9 +244,14 @@ const CommissionSchema = new mongoose.Schema(
     weeklyCommission: { type: Number, default: 0 },
     annualCommission: { type: Number, default: 0 },
     contractCommission: { type: Number, default: 0 },
-    rulesSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    rulesSnapshot: { type: RulesSnapshotSchema, default: null },
     isNewLocation: { type: Boolean, default: true },
     priorQuotaCredit: { type: Number, default: null },
+    farAnnualRedline: { type: Number, default: null },
+    farAnnualGreenline: { type: Number, default: null },
+    priorFarRedline: { type: Number, default: null },
+    priorFarGreenline: { type: Number, default: null },
+    serviceBreakdown: { type: mongoose.Schema.Types.Mixed, default: undefined },
   },
   { _id: false, strict: false }
 );

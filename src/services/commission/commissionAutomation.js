@@ -2,11 +2,11 @@ import {
   CustomerHeaderDoc,
   ZohoMapping,
   CommissionRules,
-  Employee,
 } from "#models";
 import { CompanyMapping, BiginCompany } from "#models/customer/index.js";
 import { refreshLocationTypeForCompany } from "#services/sync/locationTypeService.js";
 import { runAccountTypeBatch } from "../../controllers/sync/mapDistanceController.js";
+import { getWeeklyQuotaBoundaries } from "../../controllers/commission/quotaController.js";
 import logger from "../../utils/logger.js";
 import {
   computeGlobalCommission,
@@ -98,31 +98,48 @@ async function getActiveResolvedRules() {
   return resolveCommissionRules(dbRules || null);
 }
 
-async function getQuotaContext(salesPersonUsername, excludeAgreementId) {
-  let quotaTarget = DEFAULT_QUOTA_TARGET;
+async function getWeeklyPriorQuotaCredit(salesPersonUsername, excludeAgreementId) {
+  if (!salesPersonUsername) return 0;
+
+  const { start, end } = await getWeeklyQuotaBoundaries(new Date());
+
+  const others = await CustomerHeaderDoc.find({
+    createdBy: salesPersonUsername,
+    isDeleted: { $ne: true },
+    createdAt: { $gte: start, $lte: end },
+    "payload.commission": { $ne: null },
+    _id: { $ne: excludeAgreementId },
+  })
+    .select("payload.summary")
+    .lean();
+
   let priorQuotaCredit = 0;
+  for (const other of others) {
+    priorQuotaCredit += quotaCreditFromPayload(other.payload);
+  }
+  return priorQuotaCredit;
+}
 
-  if (salesPersonUsername) {
-    const employee = await Employee.findOne({ username: salesPersonUsername }).lean();
-    quotaTarget = employee?.quota?.monthlyTarget || DEFAULT_QUOTA_TARGET;
+async function resolveLockedQuotaContext(doc, rules) {
+  const payload =
+    doc.payload && typeof doc.payload.toObject === "function"
+      ? doc.payload.toObject()
+      : doc.payload || {};
 
-    const others = await CustomerHeaderDoc.find({
-      createdBy: salesPersonUsername,
-      isDeleted: { $ne: true },
-      _id: { $ne: excludeAgreementId },
-    })
-      .select("payload.summary")
-      .lean();
-
-    for (const other of others) {
-      priorQuotaCredit += quotaCreditFromPayload(other.payload);
-    }
+  let priorQuotaCredit;
+  const lockedPriorQuotaCredit = payload.commission?.priorQuotaCredit;
+  if (typeof lockedPriorQuotaCredit === "number") {
+    priorQuotaCredit = lockedPriorQuotaCredit;
+  } else {
+    priorQuotaCredit = await getWeeklyPriorQuotaCredit(doc.createdBy, doc._id);
   }
 
-  const percentage = quotaTarget > 0 ? (priorQuotaCredit / quotaTarget) * 100 : 0;
-  const quotaLevel = calculateQuotaLevel(percentage);
+  let quotaTarget = Number(rules?.quotaTarget) || 0;
+  if (quotaTarget <= 0) quotaTarget = DEFAULT_QUOTA_TARGET;
+  const quotaPercentage = quotaTarget > 0 ? (priorQuotaCredit / quotaTarget) * 100 : 0;
+  const quotaLevel = calculateQuotaLevel(quotaPercentage);
 
-  return { priorQuotaCredit, quotaLevel, quotaTarget };
+  return { priorQuotaCredit, quotaLevel };
 }
 
 function buildCommissionObject(global, opts) {
@@ -188,10 +205,7 @@ export async function computeCommissionForDoc(doc, deps = {}) {
     deps.activeRules ||
     (await getActiveResolvedRules());
 
-  const { priorQuotaCredit, quotaLevel } = await getQuotaContext(
-    doc.createdBy,
-    doc._id,
-  );
+  const { priorQuotaCredit, quotaLevel } = await resolveLockedQuotaContext(doc, rules);
   const baseRate = QUOTA_COMMISSION_RATES[quotaLevel];
 
   const global = computeGlobalCommission(

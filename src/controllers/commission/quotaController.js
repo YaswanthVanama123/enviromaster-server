@@ -144,7 +144,7 @@ async function getPayrollPeriodBoundaries(targetDate = new Date()) {
 
 // Quota is WEEKLY and resets every week (2 weekly quota periods per biweekly
 // payroll). The week is anchored to the payroll cycle day-of-week.
-async function getWeeklyQuotaBoundaries(targetDate = new Date()) {
+export async function getWeeklyQuotaBoundaries(targetDate = new Date()) {
   const settings = await AdminSettings.getSingleton();
   const { cycleDayOfWeek } = settings.payrollSettings || {};
   const now = new Date(targetDate);
