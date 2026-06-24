@@ -125,10 +125,10 @@ function resolveCommissionRules(partial) {
       "one-time": p.frequencyVisitsPerYear?.["one-time"] ?? FREQUENCY_VISITS_PER_YEAR2["one-time"]
     },
     quotaTierCutoffs: {
-      aboveQuota: p.quotaTierCutoffs?.aboveQuota ?? DEFAULT_QUOTA_TIER_CUTOFFS.aboveQuota,
-      doubleQuota: p.quotaTierCutoffs?.doubleQuota ?? DEFAULT_QUOTA_TIER_CUTOFFS.doubleQuota
+      aboveQuota: p.quotaTierCutoffs?.aboveQuota && p.quotaTierCutoffs.aboveQuota > 0 ? p.quotaTierCutoffs.aboveQuota : DEFAULT_QUOTA_TIER_CUTOFFS.aboveQuota,
+      doubleQuota: p.quotaTierCutoffs?.doubleQuota && p.quotaTierCutoffs.doubleQuota > 0 ? p.quotaTierCutoffs.doubleQuota : DEFAULT_QUOTA_TIER_CUTOFFS.doubleQuota
     },
-    quotaTarget: p.quotaTarget ?? DEFAULT_QUOTA_TARGET,
+    quotaTarget: p.quotaTarget && p.quotaTarget > 0 ? p.quotaTarget : DEFAULT_QUOTA_TARGET,
     weeksPerAnnualCommission: p.weeksPerAnnualCommission ?? 52
   };
 }
@@ -199,6 +199,27 @@ function getFrequencyNumber(serviceData) {
     }
   }
   return null;
+}
+function expandServiceAreas(services) {
+  const out = {};
+  Object.entries(services || {}).forEach(([name, data]) => {
+    const areas = data && Array.isArray(data.areas) ? data.areas : null;
+    if (areas && areas.length > 0) {
+      areas.forEach((area) => {
+        if (!area || area.isActive === false) return;
+        out[`${name}__${area.key}`] = {
+          ...data,
+          ...area,
+          areas: void 0,
+          isActive: true,
+          serviceName: `${name}:${area.key}`
+        };
+      });
+    } else {
+      out[name] = data;
+    }
+  });
+  return out;
 }
 
 // src/shared/commission-engine/computeGlobalCommission.ts
@@ -323,7 +344,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   const agreementTerm = getAgreementTerm(globalContractMonths);
   const agreementMultiplier = rules.agreementMultipliers[agreementTerm];
   const rows = [];
-  Object.entries(servicesState).forEach(([serviceName, serviceData]) => {
+  Object.entries(expandServiceAreas(servicesState)).forEach(([serviceName, serviceData]) => {
     if (!serviceData?.isActive) return;
     const freqNum = getFrequencyNumber(serviceData);
     if (freqNum === null || freqNum === 0) return;
@@ -367,6 +388,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
         anchorBonus: 0,
         commissionableAnnual: 0,
         annualCommission: 0,
+        commissionTiers: [],
         farTiers: null
       });
     }
@@ -462,25 +484,23 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   let totalCommissionableRevenue = 0;
   const services = [];
   const groupsList = [];
-  const baseQuotaRate = progressiveQuotaCommissionRate(
-    priorQuotaCredit,
-    totalQuotaCredit,
-    rules.quotaTarget,
-    rules.quotaRates,
-    commissionRate
-  );
-  const quotaTierBreakdown = rules.quotaTarget > 0 && totalQuotaCredit > 0 ? computeQuotaTierPortions(priorQuotaCredit, totalQuotaCredit, rules.quotaTarget, rules.quotaRates) : [];
-  const commissionTierBreakdown = rules.quotaTarget > 0 && totalCommissionableAnnual > 0 ? computeCommissionTiers(
-    priorQuotaCredit,
-    totalCommissionableAnnual,
-    rules.quotaTarget,
-    rules.quotaRates,
-    agreementMultiplier
-  ) : [];
-  const tieredCommission = commissionTierBreakdown.reduce((sum, t) => sum + t.commission, 0);
-  const effectiveCommissionRate = commissionTierBreakdown.length > 0 && totalCommissionableAnnual > 0 ? tieredCommission / totalCommissionableAnnual * 100 : baseQuotaRate * (agreementMultiplier / 100);
+  const mult = agreementMultiplier / 100;
+  const tierAggBase = { below: 0, above: 0, double: 0 };
+  const tierAggCommission = { below: 0, above: 0, double: 0 };
+  const quotaAggCredit = { below: 0, above: 0, double: 0 };
   groups.forEach((g) => {
-    g.annualCommission = g.commissionableAnnual * (effectiveCommissionRate / 100);
+    const groupCommissionTiers = rules.quotaTarget > 0 && g.commissionableAnnual > 0 ? computeCommissionTiers(priorQuotaCredit, g.commissionableAnnual, rules.quotaTarget, rules.quotaRates, agreementMultiplier) : [];
+    g.commissionTiers = groupCommissionTiers;
+    g.annualCommission = groupCommissionTiers.length ? groupCommissionTiers.reduce((sum, t) => sum + t.commission, 0) : g.commissionableAnnual * (commissionRate * mult / 100);
+    const groupQuotaCredit = g.annualCurrent * g.pricingMultiplier;
+    const groupQuotaPortions = rules.quotaTarget > 0 && groupQuotaCredit > 0 ? computeQuotaTierPortions(priorQuotaCredit, groupQuotaCredit, rules.quotaTarget, rules.quotaRates) : [];
+    groupCommissionTiers.forEach((t) => {
+      tierAggBase[t.level] += t.base;
+      tierAggCommission[t.level] += t.commission;
+    });
+    groupQuotaPortions.forEach((t) => {
+      quotaAggCredit[t.level] += t.quotaCredit;
+    });
     const groupVisits = visitsPerYearOf(g.freqStr);
     groupsList.push({
       groupKey: `${g.accountType || "none"}|${g.freqStr}`,
@@ -499,6 +519,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
       perVisitCommission: groupVisits > 0 ? g.annualCommission / groupVisits : 0,
       weeklyCommission: g.annualCommission / rules.weeksPerAnnualCommission,
       annualCommission: g.annualCommission,
+      commissionTiers: groupCommissionTiers,
       farTiers: g.farTiers
     });
     g.rows.forEach((row) => {
@@ -509,6 +530,11 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
       const rowAnchorBonus = g.anchorBonus * share;
       const rowWeekly = rowAnnualCommission / rules.weeksPerAnnualCommission;
       const rowPerVisit = groupVisits > 0 ? rowAnnualCommission / groupVisits : 0;
+      const rowCommissionTiers = groupCommissionTiers.map((t) => ({
+        ...t,
+        base: t.base * share,
+        commission: t.commission * share
+      }));
       totalAnnualCommission += rowAnnualCommission;
       totalWeeklyCommission += rowWeekly;
       totalPerVisitCommission += rowPerVisit;
@@ -536,6 +562,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
         perVisitCommission: rowPerVisit,
         weeklyCommission: rowWeekly,
         annualCommission: rowAnnualCommission,
+        commissionTiers: rowCommissionTiers,
         farTiers: g.farTiers,
         formatted: {
           perVisitRevenue: formatCurrency(row.annualCurrent),
@@ -552,6 +579,27 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
       });
     });
   });
+  const tierMeta = [
+    { level: "below", label: "Below Quota", rate: rules.quotaRates.below },
+    { level: "above", label: "Above Quota", rate: rules.quotaRates.above },
+    { level: "double", label: "Double Quota", rate: rules.quotaRates.double }
+  ];
+  const commissionTierBreakdown = tierMeta.map((m) => ({
+    level: m.level,
+    label: m.label,
+    rate: m.rate,
+    effectiveRate: m.rate * mult,
+    base: tierAggBase[m.level],
+    commission: tierAggCommission[m.level]
+  }));
+  const quotaTierBreakdown = tierMeta.map((m) => ({
+    level: m.level,
+    label: m.label,
+    rate: m.rate,
+    quotaCredit: quotaAggCredit[m.level],
+    commission: quotaAggCredit[m.level] * (m.rate / 100)
+  }));
+  const effectiveCommissionRate = totalCommissionableRevenue > 0 ? totalAnnualCommission / totalCommissionableRevenue * 100 : 0;
   return {
     totalPerVisitCommission,
     totalWeeklyCommission,

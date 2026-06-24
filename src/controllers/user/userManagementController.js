@@ -386,9 +386,11 @@ export async function resetUserPassword(req, res) {
       return res.status(404).json({ error: "Not found", detail: `${type} not found` });
     }
 
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    user.passwordChangedAt = new Date();
-    await user.save();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await Model.updateOne(
+      { _id: user._id },
+      { $set: { passwordHash, passwordChangedAt: new Date() } }
+    );
 
     res.json({
       success: true,

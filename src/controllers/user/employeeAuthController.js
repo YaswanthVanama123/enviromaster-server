@@ -5,7 +5,8 @@ import logger from "../../utils/logger.js";
 
 export async function employeeLogin(req, res) {
   try {
-    const { username, password } = req.body || {};
+    const username = String(req.body?.username || "").trim();
+    const { password } = req.body || {};
 
     if (!username || !password) {
       return res
@@ -14,23 +15,29 @@ export async function employeeLogin(req, res) {
     }
 
     const employee = await Employee.findOne({ username }).exec();
-    if (!employee || !employee.isActive) {
+    if (!employee) {
       return res
         .status(401)
-        .json({ error: "Unauthorized", detail: "Invalid credentials" });
+        .json({ error: "Unauthorized", detail: "Username not found" });
+    }
+    if (!employee.isActive) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden", detail: "Account is deactivated. Contact your administrator." });
     }
 
     const ok = await bcrypt.compare(password, employee.passwordHash);
     if (!ok) {
       return res
         .status(401)
-        .json({ error: "Unauthorized", detail: "Invalid credentials" });
+        .json({ error: "Unauthorized", detail: "Incorrect password" });
     }
 
     const token = signToken(employee, 'employee');
 
-    employee.lastLoginAt = new Date();
-    await employee.save();
+    const lastLoginAt = new Date();
+    await Employee.updateOne({ _id: employee._id }, { $set: { lastLoginAt } });
+    employee.lastLoginAt = lastLoginAt;
 
     res.json({
       token,
@@ -127,7 +134,10 @@ export async function changeEmployeePassword(req, res) {
 
     employee.passwordHash = await bcrypt.hash(newPassword, 10);
     employee.passwordChangedAt = new Date();
-    await employee.save();
+    await Employee.updateOne(
+      { _id: employee._id },
+      { $set: { passwordHash: employee.passwordHash, passwordChangedAt: employee.passwordChangedAt } }
+    );
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (err) {

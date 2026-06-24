@@ -39,6 +39,8 @@
     "modelmigration:apply": "node scripts/migrate-string-dates-to-date.mjs --apply",
     "archivemigration": "node scripts/migrate-archive-array-overflow.mjs",
     "archivemigration:apply": "node scripts/migrate-archive-array-overflow.mjs --apply",
+    "lockrules": "node scripts/lock-commission-rules.mjs",
+    "lockrules:apply": "node scripts/lock-commission-rules.mjs --apply",
     "syncindexes": "node scripts/sync-indexes.mjs",
     "syncindexes:apply": "node scripts/sync-indexes.mjs --apply"
   },

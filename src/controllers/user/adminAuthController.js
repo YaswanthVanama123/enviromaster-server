@@ -7,7 +7,8 @@ import logger from "../../utils/logger.js";
 
 export async function adminLogin(req, res) {
   try {
-    const { username, password } = req.body || {};
+    const username = String(req.body?.username || "").trim();
+    const { password } = req.body || {};
 
     if (!username || !password) {
       return res
@@ -16,23 +17,29 @@ export async function adminLogin(req, res) {
     }
 
     const admin = await AdminUser.findOne({ username }).exec();
-    if (!admin || !admin.isActive) {
+    if (!admin) {
       return res
         .status(401)
-        .json({ error: "Unauthorized", detail: "Invalid credentials" });
+        .json({ error: "Unauthorized", detail: "Username not found" });
+    }
+    if (!admin.isActive) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden", detail: "Account is deactivated. Contact your administrator." });
     }
 
     const ok = await bcrypt.compare(password, admin.passwordHash);
     if (!ok) {
       return res
         .status(401)
-        .json({ error: "Unauthorized", detail: "Invalid credentials" });
+        .json({ error: "Unauthorized", detail: "Incorrect password" });
     }
 
     const token = signAdminToken(admin);
 
-    admin.lastLoginAt = new Date();
-    await admin.save();
+    const lastLoginAt = new Date();
+    await AdminUser.updateOne({ _id: admin._id }, { $set: { lastLoginAt } });
+    admin.lastLoginAt = lastLoginAt;
 
     res.json({
       token,
@@ -86,7 +93,10 @@ export async function changeAdminPassword(req, res) {
 
     admin.passwordHash = await bcrypt.hash(newPassword, 10);
     admin.passwordChangedAt = new Date();
-    await admin.save();
+    await AdminUser.updateOne(
+      { _id: admin._id },
+      { $set: { passwordHash: admin.passwordHash, passwordChangedAt: admin.passwordChangedAt } }
+    );
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (err) {
@@ -667,7 +677,10 @@ export async function resetAdminPassword(req, res) {
 
     admin.passwordHash = passwordHash;
     admin.passwordChangedAt = new Date();
-    await admin.save();
+    await AdminUser.updateOne(
+      { _id: admin._id },
+      { $set: { passwordHash, passwordChangedAt: admin.passwordChangedAt } }
+    );
 
     logger.debug(`[ADMIN-AUTH] Password reset by developer: ${developerName}`);
 
