@@ -303,7 +303,10 @@ export async function getEmployeesPayroll(req, res) {
     const now = new Date();
     const period = { start: periodStart, end: periodEnd };
 
-    const snapshot = await getOrCreateSnapshot(period, cycleType, now);
+    // An OPEN (current/future) period always reflects the live set of agreements
+    // locked to it — completing more agreements must show up immediately. Only a
+    // CLOSED (already ended) period is frozen into a snapshot.
+    const snapshot = period.end < now ? await getOrCreateSnapshot(period, cycleType, now) : null;
 
     let resolvedTotals;
     let resolvedEmployees;

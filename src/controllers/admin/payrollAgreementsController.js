@@ -8,7 +8,7 @@
  */
 
 import mongoose from "mongoose";
-import { AdminSettings } from "../../models/admin/index.js";
+import { AdminSettings, PayrollSnapshot } from "../../models/admin/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import {
   calculatePayrollPeriods,
@@ -149,6 +149,10 @@ export async function markAgreementCompleted(req, res) {
     };
 
     await CustomerHeaderDoc.updateOne({ _id: id }, { $set: { payrollLock } });
+
+    // Drop any snapshot already frozen for this period so it is recomputed fresh
+    // (with this newly-completed agreement included) when the period closes.
+    await PayrollSnapshot.deleteOne({ periodStart, periodEnd }).catch(() => {});
 
     res.json({
       success: true,
