@@ -163,6 +163,9 @@ export async function getSavedFilesGrouped(req, res) {
         $options: 'i'
       };
     }
+    if (req.query.commissionOnly === 'true') {
+      matchFilter['payload.commission.annualCommission'] = { $gt: 0 };
+    }
 
     const isTrashMode = req.query.isDeleted === 'true';
     const includeDrafts = req.query.includeDrafts === 'true';
@@ -199,6 +202,9 @@ export async function getSavedFilesGrouped(req, res) {
                 crmDealId: '$zoho.crm.dealId',
                 addedToPayroll: '$payrollLock.addedToPayroll',
                 payrollPeriodLabel: '$payrollLock.periodLabel',
+                annualCommission: '$payload.commission.annualCommission',
+                weeklyCommission: '$payload.commission.weeklyCommission',
+                monthlyValue: '$payload.summary.serviceAgreementTotal',
                 attachedFiles: 1
               }
             },
@@ -364,6 +370,9 @@ export async function getSavedFilesGrouped(req, res) {
         agreementStatus: agreement.status || 'draft',
         addedToPayroll: !!agreement.addedToPayroll,
         payrollPeriodLabel: agreement.payrollPeriodLabel || null,
+        annualCommission: agreement.annualCommission || 0,
+        weeklyCommission: agreement.weeklyCommission || 0,
+        monthlyValue: agreement.monthlyValue || 0,
         hasUploads: allFiles.some(f => f.zohoInfo.biginDealId || f.zohoInfo.crmDealId) ||
                     !!(agreement.biginDealId || agreement.crmDealId),
         startDate: agreement.startDate || null, contractMonths: agreement.contractMonths || null,

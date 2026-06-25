@@ -73,6 +73,12 @@ const BiginCompanySchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // RouteStar account number (custom field synced from Bigin)
+    routeStarAccountNumber: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     // Owner
     owner: {
       type: String,

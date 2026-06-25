@@ -248,6 +248,10 @@ async function saveCompaniesToDatabase(companies, sessionId) {
         country: company.country?.trim() || null,
         industry: company.industry?.trim() || null,
         owner: company.owner?.trim() || null,
+        routeStarAccountNumber:
+          (company.routeStarAccountNumber ?? company.RouteStarAccountNumber ?? "")
+            ?.toString()
+            .trim() || null,
         description: company.description?.trim() || null,
         rawData: company,
         lastSyncedAt: new Date(),

@@ -205,6 +205,10 @@ async function getCompanyDetails(page, biginId) {
         zipCode: getFieldValue('zip') || getFieldValue('postal'),
         country: getFieldValue('country'),
         accountType: getFieldValue('account type') || getFieldValue('type'),
+        routeStarAccountNumber:
+          getFieldValue('routestaraccountnumber') ||
+          getFieldValue('routestar account number') ||
+          getFieldValue('route star account number') || null,
         description: getFieldValue('description'),
         pipeline: getFieldValue('pipeline'),
         stage: getFieldValue('stage'),

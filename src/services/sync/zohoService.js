@@ -1647,7 +1647,8 @@ export async function getAllBiginCompanies() {
     'Billing_Country',
     'Industry',
     'Owner',
-    'Description'
+    'Description',
+    'RouteStarAccountNumber'
   ].join(',');
 
   const allCompanies = [];
@@ -1684,7 +1685,9 @@ export async function getAllBiginCompanies() {
       industry: company.Industry || '',
       // Owner can be object {name, id} or string
       owner: typeof company.Owner === 'object' ? (company.Owner?.name || '') : (company.Owner || ''),
-      description: company.Description || ''
+      description: company.Description || '',
+      routeStarAccountNumber:
+        company.RouteStarAccountNumber != null ? String(company.RouteStarAccountNumber) : ''
     })));
 
     const info = result.data?.info || {};
