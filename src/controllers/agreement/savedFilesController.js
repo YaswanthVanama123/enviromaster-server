@@ -197,6 +197,8 @@ export async function getSavedFilesGrouped(req, res) {
                 contractMonths: '$payload.summary.contractMonths',
                 biginDealId: '$zoho.bigin.dealId',
                 crmDealId: '$zoho.crm.dealId',
+                addedToPayroll: '$payrollLock.addedToPayroll',
+                payrollPeriodLabel: '$payrollLock.periodLabel',
                 attachedFiles: 1
               }
             },
@@ -360,6 +362,8 @@ export async function getSavedFilesGrouped(req, res) {
         deletedAt: agreement.deletedAt, deletedBy: agreement.deletedBy,
         createdBy: agreement.createdBy || null, updatedBy: agreement.updatedBy || null,
         agreementStatus: agreement.status || 'draft',
+        addedToPayroll: !!agreement.addedToPayroll,
+        payrollPeriodLabel: agreement.payrollPeriodLabel || null,
         hasUploads: allFiles.some(f => f.zohoInfo.biginDealId || f.zohoInfo.crmDealId) ||
                     !!(agreement.biginDealId || agreement.crmDealId),
         startDate: agreement.startDate || null, contractMonths: agreement.contractMonths || null,

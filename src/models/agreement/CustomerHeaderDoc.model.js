@@ -379,6 +379,19 @@ const CustomerHeaderDocSchema = new mongoose.Schema(
       crm: { type: ZohoRefSchema, default: () => ({}) },
     },
 
+    payrollLock: {
+      addedToPayroll: { type: Boolean, default: false },
+      addedAt: { type: Date, default: null },
+      addedBy: { type: String, default: null },
+      employeeUsername: { type: String, default: null },
+      periodStart: { type: Date, default: null },
+      periodEnd: { type: Date, default: null },
+      periodLabel: { type: String, default: null },
+      lockedAnnualCommission: { type: Number, default: null },
+      lockedWeeklyCommission: { type: Number, default: null },
+      lockedMonthlyValue: { type: Number, default: null },
+    },
+
     isNewLocation: { type: Boolean, default: null },
     locationTypeCheckedAt: { type: Date, default: null },
 
@@ -398,6 +411,7 @@ CustomerHeaderDocSchema.index({ isDeleted: 1, createdAt: -1 });
 CustomerHeaderDocSchema.index({ "payload.headerTitle": "text" });
 CustomerHeaderDocSchema.index({ status: 1, createdAt: -1 });
 CustomerHeaderDocSchema.index({ createdBy: 1, isDeleted: 1, createdAt: -1 });
+CustomerHeaderDocSchema.index({ "payrollLock.addedToPayroll": 1, "payrollLock.periodStart": 1, "payrollLock.periodEnd": 1 });
 
 const CustomerHeaderDoc =
   mongoose.models.CustomerHeaderDoc ||

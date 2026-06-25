@@ -6,6 +6,10 @@ import {
   getPayrollHistory,
   downloadPayrollPdf
 } from "../../controllers/admin/payrollController.js";
+import {
+  getPayrollEligibleAgreements,
+  markAgreementCompleted
+} from "../../controllers/admin/payrollAgreementsController.js";
 
 const router = express.Router();
 
@@ -20,5 +24,11 @@ router.get('/history', requireAdminAuth, getPayrollHistory);
 
 // Download a combined payroll PDF for a period (and record it in history)
 router.get('/download-pdf', requireAdminAuth, downloadPayrollPdf);
+
+// Agreements eligible for payroll (Bigin-connected + commission calculated)
+router.get('/agreements', requireAdminAuth, getPayrollEligibleAgreements);
+
+// Mark one agreement "Completed" — lock its commission into the current period
+router.post('/agreements/:id/complete', requireAdminAuth, markAgreementCompleted);
 
 export default router;

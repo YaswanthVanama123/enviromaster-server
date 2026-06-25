@@ -11,7 +11,7 @@ import logger from "../../utils/logger.js";
 /**
  * Calculate the current and previous payroll periods based on settings
  */
-function calculatePayrollPeriods(payrollSettings) {
+export function calculatePayrollPeriods(payrollSettings) {
   const now = new Date();
   const { startDate, cycleType, cycleDayOfWeek } = payrollSettings || {};
 
@@ -113,7 +113,7 @@ export async function getPayrollPeriods(req, res) {
   }
 }
 
-function formatPeriodLabel(start, end) {
+export function formatPeriodLabel(start, end) {
   const options = { month: 'short', day: 'numeric' };
   const startStr = start.toLocaleDateString('en-US', options);
   const endStr = end.toLocaleDateString('en-US', { ...options, year: 'numeric' });
@@ -172,16 +172,16 @@ async function computeEmployeesForPeriod(periodStart, periodEnd) {
   const agreements = await CustomerHeaderDoc.find({
     isDeleted: { $ne: true },
     createdBy: { $nin: [null, ""], $exists: true },
-    createdAt: { $gte: periodStart, $lte: periodEnd }
+    "payrollLock.addedToPayroll": true,
+    "payrollLock.periodStart": { $gte: periodStart, $lte: periodEnd }
   })
     .select({
       _id: 1,
       'payload.headerTitle': 1,
-      'payload.summary': 1,
-      'payload.commission': 1,
       status: 1,
       createdBy: 1,
-      createdAt: 1
+      createdAt: 1,
+      payrollLock: 1
     })
     .sort({ createdAt: -1 })
     .lean()
@@ -190,7 +190,7 @@ async function computeEmployeesForPeriod(periodStart, periodEnd) {
   const employeeMap = new Map();
 
   agreements.forEach(a => {
-    const username = a.createdBy;
+    const username = a.payrollLock?.employeeUsername || a.createdBy;
     if (!username) return;
 
     if (!employeeMap.has(username)) {
@@ -198,9 +198,10 @@ async function computeEmployeesForPeriod(periodStart, periodEnd) {
     }
 
     const emp = employeeMap.get(username);
-    const summary = a.payload?.summary || {};
-    const savedCommission = a.payload?.commission || {};
-    const { annualCommission, weeklyCommission, monthlyValue } = calculateCommission(summary, savedCommission);
+    const lock = a.payrollLock || {};
+    const monthlyValue = lock.lockedMonthlyValue || 0;
+    const annualCommission = lock.lockedAnnualCommission || 0;
+    const weeklyCommission = lock.lockedWeeklyCommission || 0;
 
     emp.totalAgreements++;
     emp.totalMonthlyRevenue += monthlyValue;
