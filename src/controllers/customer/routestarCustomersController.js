@@ -145,7 +145,12 @@ export const startSync = async (req, res) => {
     });
 
     // Run scraper in background (don't await)
-    runSyncInBackground();
+    runSyncInBackground().catch((bgErr) => {
+      logger.error("Background RouteStar sync crashed:", bgErr);
+      syncStatus.isRunning = false;
+      syncStatus.lastSyncResult = "failed";
+      syncStatus.message = bgErr?.message || "Sync failed";
+    });
   } catch (error) {
     logger.error("Error starting sync:", error);
     syncStatus.isRunning = false;
@@ -169,27 +174,27 @@ async function runSyncInBackground() {
       syncStatus.message = message;
     };
 
+    // Stream each scraped page straight to MongoDB so RAM stays ~constant.
+    const onBatch = (batch) => saveCustomersToDatabase(batch);
+
     // Run the scraper
-    const result = await scrapeRouteStarCustomers(onProgress);
+    const result = await scrapeRouteStarCustomers(onProgress, onBatch);
 
     if (!result.success) {
       throw new Error(result.error || "Scrape failed");
     }
 
-    // Save customers to database
-    syncStatus.message = `Saving ${result.customers.length} customers...`;
-    syncStatus.progress = 50;
-
-    await saveCustomersToDatabase(result.customers);
+    const totalScraped = result.totalCount || 0;
+    const savedCount = result.savedCount ?? 0;
 
     // Update final status
     syncStatus.isRunning = false;
     syncStatus.lastSyncAt = new Date();
-    syncStatus.lastSyncResult = "success";
+    syncStatus.lastSyncResult = syncStatus.lastSyncResult === "partial" ? "partial" : "success";
     syncStatus.progress = 100;
-    syncStatus.message = `Synced ${result.customers.length} customers`;
+    syncStatus.message = `Synced ${totalScraped} customers, saved/updated ${savedCount}`;
 
-    logger.debug(`✅ Sync completed: ${result.customers.length} customers`);
+    logger.debug(`✅ Sync completed: ${totalScraped} customers, saved ${savedCount}`);
   } catch (error) {
     logger.error("❌ Sync failed:", error);
     syncStatus.isRunning = false;
@@ -270,6 +275,8 @@ async function saveCustomersToDatabase(customers) {
   if (errors > 0) {
     syncStatus.lastSyncResult = "partial";
   }
+
+  return saved + updated;
 }
 
 /**

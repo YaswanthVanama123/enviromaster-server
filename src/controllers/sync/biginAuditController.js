@@ -201,7 +201,13 @@ export const startScrape = async (req, res) => {
       },
     });
 
-    runScrapeInBackground(sessionId);
+    runScrapeInBackground(sessionId).catch((bgErr) => {
+      logger.error("Background audit scrape crashed:", bgErr);
+      scrapeStatus.isRunning = false;
+      scrapeStatus.lastScrapeResult = "failed";
+      scrapeStatus.message = bgErr?.message || "Scrape failed";
+      scrapeStatus.currentSessionId = null;
+    });
   } catch (error) {
     logger.error("Error starting scrape:", error);
     scrapeStatus.isRunning = false;
@@ -229,22 +235,24 @@ async function runScrapeInBackground(sessionId) {
       ).catch(() => {});
     };
 
-    const result = await scrapeBiginAuditLogs(onProgress);
+    // Stream each scraped page/batch straight to MongoDB so RAM stays
+    // ~constant regardless of how many logs are pulled.
+    const onBatch = (batch) => saveAuditLogsToDatabase(batch, sessionId);
+
+    const result = await scrapeBiginAuditLogs(onProgress, onBatch);
 
     if (!result.success) {
       throw new Error(result.error || "Scrape failed");
     }
 
-    scrapeStatus.message = `Saving ${result.auditLogs.length} audit logs...`;
-    scrapeStatus.progress = 80;
-
-    const savedCount = await saveAuditLogsToDatabase(result.auditLogs, sessionId);
+    const totalScraped = result.totalCount || 0;
+    const savedCount = result.savedCount ?? 0;
 
     scrapeStatus.isRunning = false;
     scrapeStatus.lastScrapeAt = new Date();
     scrapeStatus.lastScrapeResult = "success";
     scrapeStatus.progress = 100;
-    scrapeStatus.message = `Scraped ${result.auditLogs.length} logs, saved ${savedCount}`;
+    scrapeStatus.message = `Scraped ${totalScraped} logs, saved ${savedCount}`;
     scrapeStatus.currentSessionId = null;
 
     await BiginScrapeSession.updateOne(
@@ -253,13 +261,13 @@ async function runScrapeInBackground(sessionId) {
         status: "completed",
         progress: 100,
         progressMessage: scrapeStatus.message,
-        logsScraped: result.auditLogs.length,
+        logsScraped: totalScraped,
         logsStored: savedCount,
         completedAt: new Date(),
       }
     );
 
-    logger.debug(`✅ Scrape completed: ${result.auditLogs.length} logs`);
+    logger.debug(`✅ Scrape completed: ${totalScraped} logs`);
   } catch (error) {
     logger.error("❌ Scrape failed:", error);
     scrapeStatus.isRunning = false;

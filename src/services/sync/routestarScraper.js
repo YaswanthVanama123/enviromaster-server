@@ -282,20 +282,39 @@ async function scrapeCurrentPage(page) {
 /**
  * Scrape all customers with pagination support
  */
-async function scrapeAllCustomers(page, onProgress) {
+async function scrapeAllCustomers(page, onProgress, onBatch) {
   logger.debug('🔍 Starting to scrape all customers (20 per page)...');
 
-  let allCustomers = [];
+  const seen = new Set();
+  const allCustomers = onBatch ? null : [];
+  let totalScraped = 0;
+  let totalSaved = 0;
   let currentPage = 1;
   let consecutiveEmptyPages = 0;
+
+  // Dedup by routeStarId, then stream each page's fresh rows to the caller
+  // (which saves them) so we never hold the whole customer list in RAM.
+  const flushPage = async (pageCustomers) => {
+    const fresh = [];
+    for (const customer of pageCustomers) {
+      const key = customer.routeStarId;
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      fresh.push(customer);
+    }
+    if (fresh.length === 0) return;
+    totalScraped += fresh.length;
+    if (onBatch) totalSaved += (await onBatch(fresh)) || 0;
+    else allCustomers.push(...fresh);
+  };
 
   // Scrape first page
   logger.debug(`📄 Scraping page 1...`);
   onProgress?.(50, `Scraping page 1...`);
 
   const firstPageCustomers = await scrapeCurrentPage(page);
-  allCustomers = [...firstPageCustomers];
   logger.debug(`   Found ${firstPageCustomers.length} customers on page 1`);
+  await flushPage(firstPageCustomers);
 
   // Keep navigating to next pages
   while (consecutiveEmptyPages < 2) {
@@ -389,7 +408,7 @@ async function scrapeAllCustomers(page, onProgress) {
       logger.debug(`   ⚠️ No customers found on page ${currentPage}`);
     } else {
       consecutiveEmptyPages = 0;
-      allCustomers = [...allCustomers, ...pageCustomers];
+      await flushPage(pageCustomers);
     }
 
     // Safety check - if we've scraped more than 50 pages, something is wrong
@@ -399,22 +418,14 @@ async function scrapeAllCustomers(page, onProgress) {
     }
   }
 
-  // Remove duplicates based on routeStarId
-  const uniqueCustomers = allCustomers.reduce((acc, customer) => {
-    if (!acc.find(c => c.routeStarId === customer.routeStarId)) {
-      acc.push(customer);
-    }
-    return acc;
-  }, []);
-
-  logger.debug(`✅ Total unique customers scraped: ${uniqueCustomers.length}`);
-  return uniqueCustomers;
+  logger.debug(`✅ Total unique customers scraped: ${totalScraped}`);
+  return onBatch ? { totalScraped, totalSaved } : allCustomers;
 }
 
 /**
  * Main scrape function - called from controller
  */
-export async function scrapeRouteStarCustomers(onProgress) {
+export async function scrapeRouteStarCustomers(onProgress, onBatch) {
   let browser = null;
 
   try {
@@ -448,11 +459,23 @@ export async function scrapeRouteStarCustomers(onProgress) {
     onProgress?.(30, 'Loading customers page...');
     await navigateToCustomers(page);
 
-    // Scrape all customers with pagination
-    const customers = await scrapeAllCustomers(page, onProgress);
+    // Scrape all customers with pagination (streams each page to onBatch)
+    const scraped = await scrapeAllCustomers(page, onProgress, onBatch);
 
     await browser.close();
 
+    if (onBatch) {
+      logger.debug('🎉 Scrape completed successfully!');
+      return {
+        success: true,
+        customers: [],
+        totalCount: scraped.totalScraped || 0,
+        savedCount: scraped.totalSaved || 0,
+        scrapedAt: new Date().toISOString(),
+      };
+    }
+
+    const customers = scraped;
     if (customers.length === 0) {
       logger.debug('⚠️ No customers found - table may be empty or structure changed');
     }

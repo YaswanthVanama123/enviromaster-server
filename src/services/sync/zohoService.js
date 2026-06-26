@@ -1630,7 +1630,7 @@ export async function getBiginCompanies(page = 1, perPage = 50) {
   return result;
 }
 
-export async function getAllBiginCompanies() {
+export async function getAllBiginCompanies(onPage) {
   logger.debug(`📋 Fetching ALL Bigin companies (all pages)...`);
 
   const fields = [
@@ -1652,6 +1652,7 @@ export async function getAllBiginCompanies() {
   ].join(',');
 
   const allCompanies = [];
+  let totalFetched = 0;
   let page = 1;
   const perPage = 200;
 
@@ -1660,7 +1661,7 @@ export async function getAllBiginCompanies() {
     const result = await makeBiginRequest('GET', endpoint);
 
     if (!result.success) {
-      if (allCompanies.length > 0) break;
+      if (totalFetched > 0) break;
       return result;
     }
 
@@ -1671,7 +1672,7 @@ export async function getAllBiginCompanies() {
       logger.debug('📋 Sample company data:', JSON.stringify(batch[0], null, 2));
     }
 
-    allCompanies.push(...batch.map(company => ({
+    const mapped = batch.map(company => ({
       id: company.id,
       name: company.Account_Name || company.Company_Name || 'Unnamed Company',
       phone: company.Phone || '',
@@ -1688,18 +1689,29 @@ export async function getAllBiginCompanies() {
       description: company.Description || '',
       routeStarAccountNumber:
         company.RouteStarAccountNumber != null ? String(company.RouteStarAccountNumber) : ''
-    })));
+    }));
+
+    totalFetched += mapped.length;
+
+    // Stream each page straight to the caller (which saves it to MongoDB) so
+    // we never hold all companies in RAM at once. Falls back to accumulating
+    // when no per-page handler is supplied.
+    if (onPage) {
+      await onPage(mapped, page);
+    } else {
+      allCompanies.push(...mapped);
+    }
 
     const info = result.data?.info || {};
     const moreRecords = info.more_records ?? (batch.length === perPage);
-    logger.debug(`📄 Page ${page}: fetched ${batch.length} companies (total so far: ${allCompanies.length}, more: ${moreRecords})`);
+    logger.debug(`📄 Page ${page}: fetched ${batch.length} companies (total so far: ${totalFetched}, more: ${moreRecords})`);
 
     if (!moreRecords || batch.length < perPage) break;
     page++;
   }
 
-  logger.debug(`✅ Fetched all ${allCompanies.length} companies`);
-  return { success: true, companies: allCompanies };
+  logger.debug(`✅ Fetched all ${totalFetched} companies`);
+  return { success: true, companies: allCompanies, totalFetched };
 }
 
 export async function searchBiginCompanies(searchTerm) {

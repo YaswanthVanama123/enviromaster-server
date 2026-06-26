@@ -8,6 +8,16 @@ dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 
+// Global safety net: a background job (e.g. the Bigin Playwright scrapers) can
+// throw or reject outside a request handler. Without these, Node's default
+// behaviour terminates the process. Log and keep the server alive instead.
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection (kept server alive):', reason);
+});
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception (kept server alive):', err);
+});
+
 (async () => {
   try {
     const dbConnected = await connectDB();

@@ -166,7 +166,13 @@ export const startFetch = async (req, res) => {
     });
 
     // Run fetch in background (don't await)
-    runFetchInBackground(sessionId);
+    runFetchInBackground(sessionId).catch((bgErr) => {
+      logger.error("Background company fetch crashed:", bgErr);
+      fetchStatus.isRunning = false;
+      fetchStatus.lastFetchResult = "failed";
+      fetchStatus.message = bgErr?.message || "Fetch failed";
+      fetchStatus.currentSessionId = null;
+    });
   } catch (error) {
     logger.error("Error starting fetch:", error);
     fetchStatus.isRunning = false;
@@ -187,31 +193,34 @@ async function runFetchInBackground(sessionId) {
     fetchStatus.progress = 10;
     fetchStatus.message = "Connecting to Bigin API...";
 
-    // Use the existing zohoService function to get all companies
-    const result = await getAllBiginCompanies();
+    // Stream each fetched page straight to MongoDB so we never hold all
+    // companies in RAM at once — memory stays ~constant for any catalog size.
+    let savedCount = 0;
+    let fetchedCount = 0;
+    const onPage = async (pageCompanies, page) => {
+      fetchedCount += pageCompanies.length;
+      savedCount += await saveCompaniesToDatabase(pageCompanies, sessionId);
+      fetchStatus.progress = Math.min(20 + page * 5, 95);
+      fetchStatus.message = `Fetched ${fetchedCount} companies, saved/updated ${savedCount}...`;
+    };
+
+    const result = await getAllBiginCompanies(onPage);
 
     if (!result.success) {
       throw new Error(result.error || "Failed to fetch companies from Bigin API");
     }
 
-    const companies = result.companies || [];
-    logger.debug(`📋 Fetched ${companies.length} companies from Bigin API`);
-
-    fetchStatus.progress = 50;
-    fetchStatus.message = `Saving ${companies.length} companies to database...`;
-
-    // Save companies to database
-    const savedCount = await saveCompaniesToDatabase(companies, sessionId);
+    fetchedCount = result.totalFetched ?? fetchedCount;
 
     // Update final status
     fetchStatus.isRunning = false;
     fetchStatus.lastFetchAt = new Date();
     fetchStatus.lastFetchResult = "success";
     fetchStatus.progress = 100;
-    fetchStatus.message = `Fetched ${companies.length} companies, saved/updated ${savedCount}`;
+    fetchStatus.message = `Fetched ${fetchedCount} companies, saved/updated ${savedCount}`;
     fetchStatus.currentSessionId = null;
 
-    logger.debug(`✅ Fetch completed: ${companies.length} companies from API, ${savedCount} saved/updated`);
+    logger.debug(`✅ Fetch completed: ${fetchedCount} companies from API, ${savedCount} saved/updated`);
   } catch (error) {
     logger.error("❌ Fetch failed:", error);
     fetchStatus.isRunning = false;

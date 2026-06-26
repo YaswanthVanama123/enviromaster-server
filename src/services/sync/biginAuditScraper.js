@@ -738,12 +738,13 @@ async function clickViewMore(page) {
  * Main function to scrape Bigin audit logs
  * Stops when it reaches logs that already exist in our database
  */
-export async function scrapeBiginAuditLogs(onProgress) {
+export async function scrapeBiginAuditLogs(onProgress, onBatch) {
   let browser = null;
   let page = null;
   const newLogs = [];
   let reachedExisting = false;
   let totalScraped = 0;
+  let totalSaved = 0;
   let viewMoreClicks = 0;
   const MAX_VIEW_MORE_CLICKS = 50; // Safety limit
 
@@ -836,6 +837,13 @@ export async function scrapeBiginAuditLogs(onProgress) {
         totalScraped++;
       }
 
+      // Stream this iteration's new logs straight to MongoDB and free the
+      // memory, so RAM stays ~constant no matter how many logs are scraped.
+      if (onBatch && newLogs.length > 0) {
+        totalSaved += (await onBatch(newLogs)) || 0;
+        newLogs.length = 0;
+      }
+
       if (reachedExisting) break;
 
       // Click "View More" to load more logs
@@ -855,12 +863,13 @@ export async function scrapeBiginAuditLogs(onProgress) {
     await browser.close();
     browser = null;
 
-    logger.debug(`🎉 Scrape completed! Found ${newLogs.length} new audit logs`);
+    logger.debug(`🎉 Scrape completed! Found ${totalScraped} new audit logs`);
 
     return {
       success: true,
-      auditLogs: newLogs,
-      totalCount: newLogs.length,
+      auditLogs: onBatch ? [] : newLogs,
+      totalCount: totalScraped,
+      savedCount: onBatch ? totalSaved : undefined,
       reachedExisting,
       viewMoreClicks,
       scrapedAt: new Date().toISOString(),

@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import { ZohoMapping } from "../../models/sync/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
+import { AdminSettings } from "../../models/admin/index.js";
 import logger from "../../utils/logger.js";
 import {
   getAllBiginCompanies,
@@ -455,7 +456,11 @@ export async function cleanupFailed(req, res) {
 export async function createTaskForAgreement(req, res) {
   try {
     const { agreementId } = req.params;
-    const { subject, dueDate, priority, description, assignTo } = req.body;
+    const {
+      subject, dueDate, priority, status, description,
+      ownerId, assignTo, seModule,
+      reminder, reminderWhen, reminderTime,
+    } = req.body;
 
     logger.debug(`📝 Creating task for agreement: ${agreementId}`);
 
@@ -467,13 +472,17 @@ export async function createTaskForAgreement(req, res) {
       });
     }
 
-    const result = await createBiginTask({
-      dealId: mapping.zohoDeal.id,
+    const result = await createBiginTask(mapping.zohoDeal.id, {
       subject: subject || "Follow up on agreement",
+      status: status || "Not Started",
+      priority: priority || "Medium",
+      seModule: seModule || "Deals",
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      priority: priority || "Normal",
       description: description || "",
-      assignTo: assignTo || null,
+      ownerId: ownerId || assignTo || null,
+      reminder: !!reminder,
+      reminderWhen,
+      reminderTime,
     });
 
     if (result.success) {
@@ -502,17 +511,25 @@ export async function createTaskForAgreement(req, res) {
 export async function createTaskForCompany(req, res) {
   try {
     const { companyId } = req.params;
-    const { subject, dueDate, priority, description, assignTo } = req.body;
+    const {
+      subject, dueDate, priority, status, description,
+      ownerId, assignTo, seModule,
+      reminder, reminderWhen, reminderTime,
+    } = req.body;
 
     logger.debug(`📝 Creating task for company: ${companyId}`);
 
-    const result = await createBiginTask({
-      companyId,
+    const result = await createBiginTask(companyId, {
       subject: subject || "Follow up",
+      status: status || "Not Started",
+      priority: priority || "Medium",
+      seModule: seModule || "Accounts",
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      priority: priority || "Normal",
       description: description || "",
-      assignTo: assignTo || null,
+      ownerId: ownerId || assignTo || null,
+      reminder: !!reminder,
+      reminderWhen,
+      reminderTime,
     });
 
     if (result.success) {
@@ -541,9 +558,16 @@ export async function createTaskForCompany(req, res) {
 export async function createAutoApprovalTask(req, res) {
   try {
     const { agreementId } = req.params;
-    const { assignTo } = req.body;
+    const { agreementTitle } = req.body;
 
     logger.debug(`📝 Creating auto-approval task for agreement: ${agreementId}`);
+
+    // Pull the workflow config: which Bigin user owns the task + subject template.
+    const settings = await AdminSettings.getSingleton();
+    const ownerId = settings?.defaultApprovalTaskOwner?.id || null;
+    const subjectTemplate =
+      settings?.approvalTaskSubject || 'Agreement "{{agreementTitle}}" needs your approval';
+    const subject = subjectTemplate.replace(/\{\{\s*agreementTitle\s*\}\}/g, agreementTitle || "Agreement");
 
     const mapping = await ZohoMapping.findByAgreementId(agreementId);
     if (!mapping) {
@@ -553,13 +577,14 @@ export async function createAutoApprovalTask(req, res) {
       });
     }
 
-    const result = await createBiginTask({
-      dealId: mapping.zohoDeal.id,
-      subject: "Review and approve agreement",
-      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    const result = await createBiginTask(mapping.zohoDeal.id, {
+      subject,
+      status: "Not Started",
       priority: "High",
+      seModule: "Deals",
+      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       description: "Please review and approve the uploaded agreement documents.",
-      assignTo: assignTo || null,
+      ownerId,
     });
 
     if (result.success) {
