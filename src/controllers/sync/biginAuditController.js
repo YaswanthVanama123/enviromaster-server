@@ -10,6 +10,24 @@ import { scrapeBiginAuditLogs } from "../../services/biginAuditScraper.js";
 import { v4 as uuidv4 } from "uuid";
 import { parse } from "csv-parse/sync";
 import logger from "../../utils/logger.js";
+import { acquireBrowserGate } from "../../utils/browserGate.js";
+
+const AUTOMATION_LABEL = "Bigin audit log scrape";
+
+const TARGET_AUDIT_USER = (process.env.AUDIT_TARGET_USER || "Lisa Rothwell").trim();
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+function isOlderThanOneYear(timestamp) {
+  return timestamp instanceof Date && timestamp.getTime() < Date.now() - ONE_YEAR_MS;
+}
+
+function normalizeUserName(name) {
+  return (name || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function isTargetAuditUser(name) {
+  return normalizeUserName(name) === normalizeUserName(TARGET_AUDIT_USER);
+}
 
 // Track scrape status in memory
 let scrapeStatus = {
@@ -222,7 +240,18 @@ export const startScrape = async (req, res) => {
  * Run the scrape process in background
  */
 async function runScrapeInBackground(sessionId) {
+  let releaseGate;
   try {
+    releaseGate = await acquireBrowserGate(AUTOMATION_LABEL, {
+      onQueued: (activeLabel) => {
+        scrapeStatus.message = `Waiting for "${activeLabel}" to finish before starting...`;
+        BiginScrapeSession.updateOne(
+          { sessionId },
+          { progressMessage: scrapeStatus.message }
+        ).catch(() => {});
+      },
+    });
+
     logger.debug("🚀 Starting Bigin audit log scrape...");
 
     const onProgress = (progress, message) => {
@@ -285,6 +314,8 @@ async function runScrapeInBackground(sessionId) {
         completedAt: new Date(),
       }
     ).catch(() => {});
+  } finally {
+    releaseGate?.();
   }
 }
 
@@ -303,7 +334,7 @@ async function saveAuditLogsToDatabase(auditLogs, sessionId) {
     try {
       const userName = (log.user || "Unknown").trim();
 
-      if (userName !== "Lisa Rothwell") {
+      if (!isTargetAuditUser(userName)) {
         skippedNonLisa++;
         continue;
       }
@@ -316,6 +347,11 @@ async function saveAuditLogsToDatabase(auditLogs, sessionId) {
         timestamp = !isNaN(parsed.getTime()) ? parsed : new Date();
       } else {
         timestamp = new Date();
+      }
+
+      if (isOlderThanOneYear(timestamp)) {
+        skipped++;
+        continue;
       }
 
       const logData = {
@@ -577,7 +613,7 @@ export const uploadCsv = async (req, res) => {
         }
 
         const userName = doneBy.trim();
-        if (userName !== "Lisa Rothwell") {
+        if (!isTargetAuditUser(userName)) {
           skippedNonLisa++;
           continue;
         }
@@ -588,6 +624,11 @@ export const uploadCsv = async (req, res) => {
           if (parsed && !isNaN(parsed.getTime())) {
             timestamp = parsed;
           }
+        }
+
+        if (isOlderThanOneYear(timestamp)) {
+          skipped++;
+          continue;
         }
 
         let details = "";

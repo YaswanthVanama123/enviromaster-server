@@ -47,10 +47,11 @@ const BiginAuditLogSchema = new mongoose.Schema(
 );
 
 // Indexes
+const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
 BiginAuditLogSchema.index({ timestamp: -1, user: 1 });
 BiginAuditLogSchema.index({ module: 1, action: 1 });
 BiginAuditLogSchema.index({ scrapedAt: -1 });
-BiginAuditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 31536000 });
+BiginAuditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: ONE_YEAR_SECONDS });
 
 const BiginAuditLog = mongoose.model("BiginAuditLog", BiginAuditLogSchema);
 

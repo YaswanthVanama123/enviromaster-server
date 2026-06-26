@@ -3,9 +3,9 @@
  * Scrapes company data from Zoho Bigin using Playwright
  */
 
-import { chromium } from 'playwright-core';
 import { BiginCompany } from "#models/customer/index.js";
 import logger from "../../utils/logger.js";
+import { launchHardenedBrowser, closeBrowserQuietly } from "../../utils/playwrightBrowser.js";
 
 const BIGIN_COMPANIES_URL = 'https://bigin.zoho.in/bigin/Home#/tab/Accounts/list';
 const BIGIN_SIGNIN_URL = 'https://accounts.zoho.in/signin?servicename=ZohoBigin&signupurl=https://www.bigin.com/signup.html';
@@ -286,17 +286,7 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
     logger.debug('🚀 Starting Zoho Bigin company scrape...');
     onProgress?.(5, 'Launching browser...');
 
-    browser = await chromium.launch({
-      headless: true,
-      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=1920,1080'
-      ],
-    });
+    browser = await launchHardenedBrowser(['--window-size=1920,1080']);
 
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
@@ -360,7 +350,7 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
       onProgress?.(progress, `Loaded ${totalScraped} companies... (scroll ${scrollAttempts})`);
     }
 
-    await browser.close();
+    await closeBrowserQuietly(browser);
     browser = null;
 
     logger.debug(`🎉 Scrape completed! Found ${companies.length} companies`);
@@ -375,10 +365,6 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
   } catch (error) {
     logger.error('❌ Company scrape failed:', error);
 
-    if (browser) {
-      await browser.close();
-    }
-
     return {
       success: false,
       companies: [],
@@ -386,6 +372,9 @@ export async function scrapeBiginCompanies(onProgress, options = {}) {
       error: error.message || 'Unknown error',
       scrapedAt: new Date().toISOString(),
     };
+  } finally {
+    await closeBrowserQuietly(browser);
+    browser = null;
   }
 }
 

@@ -8,6 +8,9 @@ import { RouteStarCustomer, CompanyMapping } from '../../models/customer/index.j
 import { MapDistanceRecord, MapDistanceSyncJob, FREQUENCY_MAP, FREQUENCY_REVERSE_MAP, DAY_OF_WEEK_MAP, DAY_OF_WEEK_REVERSE_MAP } from '../../models/sync/index.js';
 import { getDrivingTime, buildAddressString } from '../../services/mapboxService.js';
 import logger from "../../utils/logger.js";
+import { acquireBrowserGate } from "../../utils/browserGate.js";
+
+const AUTOMATION_LABEL = "Map-distance sync";
 
 // Account type detection constants
 const ACCOUNT_TYPE_THRESHOLDS = {
@@ -322,6 +325,15 @@ export const fetchMapDistance = async (req, res) => {
 async function runSingleFetchJob(jobId, customerName, customerId) {
   logger.debug(`[MapDistance] Running single fetch for: ${customerName}`);
 
+  const releaseGate = await acquireBrowserGate(AUTOMATION_LABEL, {
+    onQueued: (activeLabel) => {
+      MapDistanceSyncJob.findByIdAndUpdate(jobId, {
+        currentCustomerName: `Waiting for "${activeLabel}" to finish...`,
+        lastActivityAt: new Date(),
+      }).catch(() => {});
+    },
+  });
+
   try {
     const result = await getMapDistance(customerName, (progress, message) => {
       logger.debug(`[MapDistance] ${progress}% - ${message}`);
@@ -389,9 +401,10 @@ async function runSingleFetchJob(jobId, customerName, customerId) {
         }
       }
     });
+  } finally {
+    activeSyncJobId = null;
+    releaseGate();
   }
-
-  activeSyncJobId = null;
 }
 
 /**
@@ -461,6 +474,15 @@ async function runSyncJob(jobId, customers, isResume = false) {
 
   const syncJob = await MapDistanceSyncJob.findById(jobId);
   if (!syncJob) return;
+
+  const releaseGate = await acquireBrowserGate(AUTOMATION_LABEL, {
+    onQueued: (activeLabel) => {
+      MapDistanceSyncJob.findByIdAndUpdate(jobId, {
+        currentCustomerName: `Waiting for "${activeLabel}" to finish...`,
+        lastActivityAt: new Date(),
+      }).catch(() => {});
+    },
+  });
 
   const session = new MapDistanceSession();
   activeSyncSession = session;
@@ -583,6 +605,7 @@ async function runSyncJob(jobId, customers, isResume = false) {
       activeSyncSession = null;
     }
     activeSyncJobId = null;
+    releaseGate();
   }
 }
 

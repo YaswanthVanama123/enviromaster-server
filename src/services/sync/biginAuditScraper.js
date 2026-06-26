@@ -4,11 +4,11 @@
  * Stops when it reaches logs already in our database
  */
 
-import { chromium } from 'playwright-core';
 import path from 'path';
 import fs from 'fs';
 import { BiginAuditLog } from "#models/logging/index.js";
 import logger from "../../utils/logger.js";
+import { launchHardenedBrowser, closeBrowserQuietly } from "../../utils/playwrightBrowser.js";
 
 const BIGIN_AUDIT_URL = 'https://bigin.zoho.com/bigin/Home#/settings/data-administration/audit-log';
 const BIGIN_SIGNIN_URL = 'https://accounts.zoho.in/signin?servicename=ZohoBigin&signupurl=https://www.bigin.com/signup.html';
@@ -65,30 +65,6 @@ async function getLatestStoredLogTimestamp() {
   }
 
   return latestLog;
-}
-
-/**
- * Check if a log entry already exists in our database
- * Uses time range to handle slight timestamp differences
- */
-async function logExistsInDatabase(timestamp, user, action, recordName) {
-  // Look for logs within 1 minute of this timestamp with same user/action
-  const timeStart = new Date(timestamp.getTime() - 60000); // 1 minute before
-  const timeEnd = new Date(timestamp.getTime() + 60000); // 1 minute after
-
-  const filter = {
-    timestamp: { $gte: timeStart, $lte: timeEnd },
-    user: user.trim(),
-    action: action.trim(),
-  };
-
-  // Add recordName to filter if it exists
-  if (recordName) {
-    filter.recordName = recordName.trim();
-  }
-
-  const exists = await BiginAuditLog.findOne(filter).lean();
-  return !!exists;
 }
 
 /**
@@ -624,10 +600,10 @@ async function navigateToAuditLogs(page) {
 /**
  * Scrape visible audit logs from the timeline
  */
-async function scrapeVisibleLogs(page) {
-  return await page.evaluate(() => {
+async function scrapeVisibleLogs(page, initialDateHeader = '') {
+  return await page.evaluate((seedHeader) => {
     const logs = [];
-    let currentDateHeader = '';
+    let currentDateHeader = seedHeader || '';
 
     const timelineBoxes = document.querySelectorAll('.detail-timeline-box');
 
@@ -709,7 +685,7 @@ async function scrapeVisibleLogs(page) {
     });
 
     return logs;
-  });
+  }, initialDateHeader);
 }
 
 /**
@@ -734,6 +710,23 @@ async function clickViewMore(page) {
   return clicked;
 }
 
+async function pruneTimelineDom(page) {
+  try {
+    return await page.evaluate(() => {
+      const boxes = document.querySelectorAll('.detail-timeline-box');
+      let removed = 0;
+      boxes.forEach((box) => {
+        box.remove();
+        removed++;
+      });
+      return removed;
+    });
+  } catch (err) {
+    logger.debug(`   ⚠️ DOM prune skipped: ${err?.message || err}`);
+    return 0;
+  }
+}
+
 /**
  * Main function to scrape Bigin audit logs
  * Stops when it reaches logs that already exist in our database
@@ -747,6 +740,8 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
   let totalSaved = 0;
   let viewMoreClicks = 0;
   const MAX_VIEW_MORE_CLICKS = 50; // Safety limit
+  const STOP_OVERLAP_MS = 2 * 60 * 1000;
+  const RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 
   try {
     logger.debug('🚀 Starting Zoho Bigin audit log scrape...');
@@ -755,18 +750,17 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
 
     // Get latest stored log to know when to stop
     const latestStored = await getLatestStoredLogTimestamp();
+    const latestStoredMs =
+      latestStored?.timestamp && !isNaN(new Date(latestStored.timestamp).getTime())
+        ? new Date(latestStored.timestamp).getTime()
+        : null;
+    const oneYearAgoMs = Date.now() - RETENTION_MS;
+    const stopBoundaryMs =
+      latestStoredMs !== null
+        ? Math.max(oneYearAgoMs, latestStoredMs - STOP_OVERLAP_MS)
+        : oneYearAgoMs;
 
-    browser = await chromium.launch({
-      headless: true,
-      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=1920,1080'
-      ],
-    });
+    browser = await launchHardenedBrowser(['--window-size=1920,1080']);
 
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
@@ -790,14 +784,17 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
     onProgress?.(40, 'Scraping audit logs...');
 
     const seenLogs = new Set(); // Track seen logs to avoid duplicates
+    let carryDateHeader = '';
 
     while (!reachedExisting && viewMoreClicks < MAX_VIEW_MORE_CLICKS) {
-      const visibleLogs = await scrapeVisibleLogs(page);
+      const visibleLogs = await scrapeVisibleLogs(page, carryDateHeader);
       logger.debug(`   Found ${visibleLogs.length} visible logs`);
 
       for (const log of visibleLogs) {
         // Create unique key for this log
         const logKey = `${log.dateHeader}|${log.time}|${log.user}|${log.action}|${log.recordName}`;
+
+        if (log.dateHeader) carryDateHeader = log.dateHeader;
 
         if (seenLogs.has(logKey)) continue;
         seenLogs.add(logKey);
@@ -805,21 +802,13 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
         // Parse the timestamp
         const timestamp = parseTimelineDate(log.dateHeader, log.time);
 
-        // Check if this log exists in our database
-        if (latestStored) {
-          const existsInDb = await logExistsInDatabase(
-            timestamp,
-            log.user,
-            log.action,
-            log.recordName || null
-          );
-
-          if (existsInDb) {
-            logger.debug(`   ✅ Found existing log - stopping scrape`);
-            logger.debug(`      Log: ${log.user} - ${log.action} - ${log.recordName}`);
-            reachedExisting = true;
-            break;
-          }
+        if (
+          !isNaN(timestamp.getTime()) &&
+          timestamp.getTime() <= stopBoundaryMs
+        ) {
+          logger.debug(`   ⛳ Reached scrape boundary (already-stored or 1-year limit) - stopping scrape`);
+          reachedExisting = true;
+          break;
         }
 
         // Add to new logs
@@ -847,6 +836,11 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
       if (reachedExisting) break;
 
       // Click "View More" to load more logs
+      const prunedCount = await pruneTimelineDom(page);
+      if (prunedCount > 0) {
+        logger.debug(`   🧹 Pruned ${prunedCount} processed rows from the DOM to free memory`);
+      }
+
       const moreAvailable = await clickViewMore(page);
       if (!moreAvailable) {
         logger.debug('   No more logs to load');
@@ -859,9 +853,6 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
 
       logger.debug(`   Clicked View More (${viewMoreClicks}), total new logs: ${totalScraped}`);
     }
-
-    await browser.close();
-    browser = null;
 
     logger.debug(`🎉 Scrape completed! Found ${totalScraped} new audit logs`);
 
@@ -886,10 +877,6 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
       }
     }
 
-    if (browser) {
-      await browser.close();
-    }
-
     return {
       success: false,
       auditLogs: [],
@@ -898,6 +885,9 @@ export async function scrapeBiginAuditLogs(onProgress, onBatch) {
       screenshotsDir: SCREENSHOTS_DIR,
       scrapedAt: new Date().toISOString(),
     };
+  } finally {
+    await closeBrowserQuietly(browser);
+    browser = null;
   }
 }
 

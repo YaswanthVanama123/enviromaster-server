@@ -6,6 +6,9 @@
 import { RouteStarCustomer } from "../../models/customer/index.js";
 import { scrapeRouteStarCustomers } from "../../services/routestarScraper.js";
 import logger from "../../utils/logger.js";
+import { acquireBrowserGate } from "../../utils/browserGate.js";
+
+const AUTOMATION_LABEL = "RouteStar customer sync";
 
 // Track sync status in memory
 let syncStatus = {
@@ -165,7 +168,14 @@ export const startSync = async (req, res) => {
  * Run the sync process in background
  */
 async function runSyncInBackground() {
+  let releaseGate;
   try {
+    releaseGate = await acquireBrowserGate(AUTOMATION_LABEL, {
+      onQueued: (activeLabel) => {
+        syncStatus.message = `Waiting for "${activeLabel}" to finish before starting...`;
+      },
+    });
+
     logger.debug("🚀 Starting RouteStar customer sync...");
 
     // Progress callback
@@ -202,6 +212,8 @@ async function runSyncInBackground() {
     syncStatus.lastSyncResult = "failed";
     syncStatus.progress = 0;
     syncStatus.message = error.message || "Sync failed";
+  } finally {
+    releaseGate?.();
   }
 }
 

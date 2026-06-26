@@ -3,8 +3,8 @@
  * Scrapes customers from RouteStar using Playwright with pagination support
  */
 
-import { chromium } from 'playwright-core';
 import logger from "../../utils/logger.js";
+import { launchHardenedBrowser, closeBrowserQuietly } from "../../utils/playwrightBrowser.js";
 
 const BASE_URL = process.env.ROUTESTAR_BASE_URL || 'https://emnrv.routestar.online';
 const USERNAME = process.env.ROUTESTAR_USERNAME || '';
@@ -432,17 +432,7 @@ export async function scrapeRouteStarCustomers(onProgress, onBatch) {
     logger.debug('🚀 Starting RouteSTAR customer scrape...');
     onProgress?.(5, 'Launching browser...');
 
-    browser = await chromium.launch({
-      headless: true,
-      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ],
-    });
+    browser = await launchHardenedBrowser();
 
     const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
     const page = await context.newPage();
@@ -461,8 +451,6 @@ export async function scrapeRouteStarCustomers(onProgress, onBatch) {
 
     // Scrape all customers with pagination (streams each page to onBatch)
     const scraped = await scrapeAllCustomers(page, onProgress, onBatch);
-
-    await browser.close();
 
     if (onBatch) {
       logger.debug('🎉 Scrape completed successfully!');
@@ -490,10 +478,6 @@ export async function scrapeRouteStarCustomers(onProgress, onBatch) {
   } catch (error) {
     logger.error('❌ Scrape failed:', error);
 
-    if (browser) {
-      await browser.close();
-    }
-
     return {
       success: false,
       customers: [],
@@ -501,6 +485,9 @@ export async function scrapeRouteStarCustomers(onProgress, onBatch) {
       error: error.message || 'Unknown error',
       scrapedAt: new Date().toISOString(),
     };
+  } finally {
+    await closeBrowserQuietly(browser);
+    browser = null;
   }
 }
 

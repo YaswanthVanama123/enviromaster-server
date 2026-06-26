@@ -4,11 +4,11 @@
  * Supports session reuse for batch operations (login once, fetch many)
  */
 
-import { chromium } from 'playwright-core';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import logger from "../../utils/logger.js";
+import { launchHardenedBrowser, closeBrowserQuietly } from "../../utils/playwrightBrowser.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,17 +72,7 @@ class MapDistanceSession {
     logger.debug('[Session] Initializing new session...');
     onProgress?.(5, 'Launching browser...');
 
-    this.browser = await chromium.launch({
-      headless: true,
-      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ],
-    });
+    this.browser = await launchHardenedBrowser();
 
     this.context = await this.browser.newContext({ viewport: { width: 1920, height: 1080 } });
     this.page = await this.context.newPage();
@@ -161,7 +151,7 @@ class MapDistanceSession {
   async close() {
     if (this.browser) {
       logger.debug('[Session] Closing browser session');
-      await this.browser.close();
+      await closeBrowserQuietly(this.browser);
       this.browser = null;
       this.context = null;
       this.page = null;
