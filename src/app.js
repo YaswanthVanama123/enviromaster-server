@@ -15,6 +15,7 @@ import manualUploadRoutes from './routes/agreement/manualUploadRoutes.js';
 import versionRoutes from './routes/agreement/versionRoutes.js';
 import emailRoutes from './routes/agreement/emailRoutes.js';
 import versionLogRoutes from './routes/agreement/versionLogs.js';
+import agreementActivityRoutes from './routes/agreement/agreementActivityRoutes.js';
 
 // Admin Domain Routes
 import adminAuthRoutes from "./routes/admin/adminAuthRoutes.js";
@@ -195,6 +196,7 @@ app.use("/api/bigin-companies", biginCompanyRoutes);
 app.use("/api/company-mappings", companyMappingRoutes);
 app.use("/api/map-distance", mapDistanceRoutes);
 app.use("/api/payroll", payrollRoutes);
+app.use("/api/agreement-activity", agreementActivityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: "Not found" });
