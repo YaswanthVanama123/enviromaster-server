@@ -53,6 +53,14 @@ const AdminSettingsSchema = new mongoose.Schema(
       // Day of week for weekly/biweekly cycles (0=Sunday, 1=Monday, etc.)
       cycleDayOfWeek: { type: Number, default: 1 }, // Monday
     },
+
+    // Weekly cutoff after which payroll completions roll into the next period.
+    approvalCutoff: {
+      enabled: { type: Boolean, default: true },
+      dayOfWeek: { type: Number, default: 0 }, // 0 = Sunday
+      hour: { type: Number, default: 0 },
+      minute: { type: Number, default: 0 },
+    },
   },
   { timestamps: true }
 );

@@ -11,8 +11,7 @@ import logger from "../../utils/logger.js";
 /**
  * Calculate the current and previous payroll periods based on settings
  */
-export function calculatePayrollPeriods(payrollSettings) {
-  const now = new Date();
+export function calculatePayrollPeriods(payrollSettings, now = new Date()) {
   const { startDate, cycleType, cycleDayOfWeek } = payrollSettings || {};
 
   // Default: if no start date, use beginning of current month
@@ -76,6 +75,45 @@ export function calculatePayrollPeriods(payrollSettings) {
     current: { start: currentPeriodStart, end: currentPeriodEnd },
     previous: { start: previousPeriodStart, end: previousPeriodEnd }
   };
+}
+
+/**
+ * The weekly cutoff instant for a given period — the latest occurrence of the
+ * configured day-of-week + time that falls on/within the period.
+ */
+export function approvalCutoffInstant(period, approvalCutoff) {
+  const day = approvalCutoff?.dayOfWeek ?? 0;
+  const hour = approvalCutoff?.hour ?? 0;
+  const minute = approvalCutoff?.minute ?? 0;
+
+  const d = new Date(period.end);
+  d.setHours(hour, minute, 0, 0);
+  const diff = (d.getDay() - day + 7) % 7;
+  d.setDate(d.getDate() - diff);
+  if (d > period.end) d.setDate(d.getDate() - 7);
+  if (d < period.start) return new Date(period.end);
+  return d;
+}
+
+/**
+ * Resolve which payroll period a completion should land in right now. Before the
+ * weekly cutoff it stays in the current period; after the cutoff it rolls to next.
+ */
+export function resolveCompletionPeriod(settings, now = new Date()) {
+  const periods = calculatePayrollPeriods(settings.payrollSettings, now);
+  const cutoff = settings.approvalCutoff || {};
+
+  if (cutoff.enabled === false) {
+    return { period: periods.current, rolledToNext: false, cutoffAt: null };
+  }
+
+  const cutoffAt = approvalCutoffInstant(periods.current, cutoff);
+  if (now > cutoffAt) {
+    const intoNext = new Date(periods.current.end.getTime() + 1000);
+    const nextPeriods = calculatePayrollPeriods(settings.payrollSettings, intoNext);
+    return { period: nextPeriods.current, rolledToNext: true, cutoffAt };
+  }
+  return { period: periods.current, rolledToNext: false, cutoffAt };
 }
 
 /**

@@ -11,8 +11,8 @@ import mongoose from "mongoose";
 import { AdminSettings, PayrollSnapshot } from "../../models/admin/index.js";
 import { CustomerHeaderDoc } from "../../models/agreement/index.js";
 import {
-  calculatePayrollPeriods,
   formatPeriodLabel,
+  resolveCompletionPeriod,
 } from "./payrollController.js";
 import logger from "../../utils/logger.js";
 
@@ -32,11 +32,13 @@ function eligibleFilter() {
 export async function getPayrollEligibleAgreements(req, res) {
   try {
     const settings = await AdminSettings.getSingleton();
-    const periods = calculatePayrollPeriods(settings.payrollSettings);
+    const completion = resolveCompletionPeriod(settings);
     const currentPeriod = {
-      start: periods.current.start.toISOString(),
-      end: periods.current.end.toISOString(),
-      label: formatPeriodLabel(periods.current.start, periods.current.end),
+      start: completion.period.start.toISOString(),
+      end: completion.period.end.toISOString(),
+      label: formatPeriodLabel(completion.period.start, completion.period.end),
+      rolledToNext: completion.rolledToNext,
+      cutoffAt: completion.cutoffAt ? completion.cutoffAt.toISOString() : null,
     };
 
     const docs = await CustomerHeaderDoc.find(eligibleFilter())
@@ -130,9 +132,9 @@ export async function markAgreementCompleted(req, res) {
     }
 
     const settings = await AdminSettings.getSingleton();
-    const periods = calculatePayrollPeriods(settings.payrollSettings);
-    const periodStart = periods.current.start;
-    const periodEnd = periods.current.end;
+    const completion = resolveCompletionPeriod(settings);
+    const periodStart = completion.period.start;
+    const periodEnd = completion.period.end;
     const periodLabel = formatPeriodLabel(periodStart, periodEnd);
 
     const payrollLock = {
