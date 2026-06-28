@@ -2,8 +2,11 @@ import express from "express";
 import * as productCatalogController from "../../controllers/product/productCatalogController.js";
 import * as productDescriptionController from "../../controllers/product/productDescriptionController.js";
 import PricingChangeDetector from "../../middleware/pricingChangeDetector.js";
+import { priceChangeWriteGuard } from "../../middleware/adminAuth.js";
 
 const router = express.Router();
+
+router.use(priceChangeWriteGuard);
 
 router.post(
   "/",

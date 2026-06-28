@@ -48,6 +48,8 @@ export async function adminLogin(req, res) {
         username: admin.username,
         canManageBackups:
           admin.username === "envimaster" || admin.permissions?.backupManagement === true,
+        canManagePriceChanges:
+          admin.username === "envimaster" || admin.permissions?.priceChanges === true,
       },
     });
   } catch (err) {
@@ -133,6 +135,7 @@ export async function getAdminProfile(req, res) {
       admin: {
         ...admin,
         canManageBackups: isSuperAdmin || admin.permissions?.backupManagement === true,
+        canManagePriceChanges: isSuperAdmin || admin.permissions?.priceChanges === true,
       },
     });
   } catch (err) {

@@ -4,8 +4,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import * as serviceConfigController from "../../controllers/service/serviceConfigController.js";
 import PricingChangeDetector from "../../middleware/pricingChangeDetector.js";
+import { priceChangeWriteGuard } from "../../middleware/adminAuth.js";
 
 const router = express.Router();
+
+router.use(priceChangeWriteGuard);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, "../../../../uploads/service-images");

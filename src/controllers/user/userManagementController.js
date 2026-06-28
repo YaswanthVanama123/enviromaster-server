@@ -26,7 +26,10 @@ export async function listUsers(req, res) {
         fullName: a.username, // Admins don't have fullName, use username
         email: null,
         isActive: a.isActive,
-        permissions: { backupManagement: a.permissions?.backupManagement === true },
+        permissions: {
+          backupManagement: a.permissions?.backupManagement === true,
+          priceChanges: a.permissions?.priceChanges === true,
+        },
         lastLoginAt: a.lastLoginAt,
         createdAt: a.createdAt,
         updatedAt: a.updatedAt,
@@ -247,6 +250,9 @@ export async function updateUser(req, res) {
       if (permissions && typeof permissions.backupManagement === 'boolean') {
         updateData['permissions.backupManagement'] = permissions.backupManagement;
       }
+      if (permissions && typeof permissions.priceChanges === 'boolean') {
+        updateData['permissions.priceChanges'] = permissions.priceChanges;
+      }
 
       const admin = await AdminUser.findByIdAndUpdate(
         id,
@@ -266,7 +272,10 @@ export async function updateUser(req, res) {
           fullName: admin.username,
           email: null,
           isActive: admin.isActive,
-          permissions: { backupManagement: admin.permissions?.backupManagement === true },
+          permissions: {
+            backupManagement: admin.permissions?.backupManagement === true,
+            priceChanges: admin.permissions?.priceChanges === true,
+          },
           role: 'admin',
           lastLoginAt: admin.lastLoginAt,
           createdAt: admin.createdAt,

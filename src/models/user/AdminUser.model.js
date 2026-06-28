@@ -25,6 +25,7 @@ const AdminUserSchema = new mongoose.Schema(
     },
     permissions: {
       backupManagement: { type: Boolean, default: false },
+      priceChanges: { type: Boolean, default: false },
     },
     lastLoginAt: {
       type: Date,
@@ -55,7 +56,7 @@ AdminUserSchema.statics.ensureDefaultAdmin = async function () {
     username: DEFAULT_USERNAME,
     passwordHash,
     isActive: true,
-    permissions: { backupManagement: true },
+    permissions: { backupManagement: true, priceChanges: true },
   });
 
   logger.debug(
