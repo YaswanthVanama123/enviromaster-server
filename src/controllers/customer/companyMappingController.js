@@ -715,3 +715,77 @@ export const syncMappings = async (req, res) => {
     });
   }
 };
+
+export async function runAutoMapByAccountNumber() {
+  const companies = await BiginCompany.find({
+    routeStarAccountNumber: { $nin: [null, ""] },
+  })
+    .select("_id biginId companyName biginPhone city state routeStarAccountNumber")
+    .lean();
+
+  const summary = {
+    totalWithAccount: companies.length,
+    mapped: 0,
+    created: 0,
+    skippedManual: 0,
+    alreadyMapped: 0,
+    noMatch: 0,
+  };
+
+  for (const company of companies) {
+    const account = (company.routeStarAccountNumber || "").trim();
+    if (!account) continue;
+
+    let mapping = await CompanyMapping.findOne({ biginId: String(company.biginId) });
+
+    if (mapping && mapping.mappingStatus === "mapped" && mapping.mappedBy !== "account-match") {
+      summary.skippedManual++;
+      continue;
+    }
+
+    const customer = await RouteStarCustomer.findOne({ accountNumber: account });
+    if (!customer) {
+      summary.noMatch++;
+      continue;
+    }
+
+    if (
+      mapping &&
+      mapping.mappingStatus === "mapped" &&
+      String(mapping.routeStarCustomerId) === String(customer._id)
+    ) {
+      summary.alreadyMapped++;
+      continue;
+    }
+
+    if (!mapping) {
+      mapping = new CompanyMapping({
+        biginCompanyId: company._id,
+        biginId: String(company.biginId),
+        biginCompanyName: company.companyName || "Unknown",
+        biginPhone: company.biginPhone || undefined,
+        biginCity: company.city || undefined,
+        biginState: company.state || undefined,
+      });
+      summary.created++;
+    }
+
+    await mapping.setMapping(customer, "account-match");
+    summary.mapped++;
+  }
+
+  logger.debug(
+    `[AUTO-MAP] account-number mapping: mapped=${summary.mapped} skippedManual=${summary.skippedManual} alreadyMapped=${summary.alreadyMapped} noMatch=${summary.noMatch}`,
+  );
+  return summary;
+}
+
+export const autoMapByAccountNumber = async (req, res) => {
+  try {
+    const summary = await runAutoMapByAccountNumber();
+    res.json({ success: true, data: summary });
+  } catch (error) {
+    logger.error("Error auto-mapping by account number:", error);
+    res.status(500).json({ success: false, error: "Failed to auto-map by account number" });
+  }
+};

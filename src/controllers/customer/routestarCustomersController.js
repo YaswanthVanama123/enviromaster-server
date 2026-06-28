@@ -4,11 +4,13 @@
  */
 
 import { RouteStarCustomer } from "../../models/customer/index.js";
-import { scrapeRouteStarCustomers } from "../../services/routestarScraper.js";
+import { scrapeRouteStarCustomers, scrapeAccountNumbers } from "../../services/routestarScraper.js";
 import logger from "../../utils/logger.js";
 import { acquireBrowserGate } from "../../utils/browserGate.js";
+import { runAutoMapByAccountNumber } from "./companyMappingController.js";
 
 const AUTOMATION_LABEL = "RouteStar customer sync";
+const ACCOUNT_AUTOMATION_LABEL = "RouteStar account number sync";
 
 // Track sync status in memory
 let syncStatus = {
@@ -17,6 +19,16 @@ let syncStatus = {
   lastSyncResult: null,
   progress: 0,
   message: "",
+};
+
+let accountSyncStatus = {
+  isRunning: false,
+  lastSyncAt: null,
+  lastSyncResult: null,
+  progress: 0,
+  message: "",
+  total: 0,
+  fetched: 0,
 };
 
 /**
@@ -290,6 +302,158 @@ async function saveCustomersToDatabase(customers) {
 
   return saved + updated;
 }
+
+const ACCOUNT_MISSING_FILTER = {
+  isActive: true,
+  $or: [{ accountNumber: { $in: [null, ""] } }, { accountNumber: { $exists: false } }],
+};
+
+export const getAccountNumberSyncStatus = async (req, res) => {
+  try {
+    const remaining = await RouteStarCustomer.countDocuments(ACCOUNT_MISSING_FILTER);
+    res.json({ success: true, data: { ...accountSyncStatus, remaining } });
+  } catch (error) {
+    logger.error("Error getting account number sync status:", error);
+    res.status(500).json({ success: false, error: "Failed to get account number sync status" });
+  }
+};
+
+export const startAccountNumberSync = async (req, res) => {
+  try {
+    if (accountSyncStatus.isRunning) {
+      return res.status(400).json({ success: false, error: "Account number sync already in progress" });
+    }
+
+    const customers = await RouteStarCustomer.find(ACCOUNT_MISSING_FILTER)
+      .select("routeStarId name")
+      .lean();
+
+    if (customers.length === 0) {
+      return res.json({
+        success: true,
+        message: "All active customers already have account numbers",
+        remaining: 0,
+      });
+    }
+
+    accountSyncStatus = {
+      isRunning: true,
+      lastSyncAt: accountSyncStatus.lastSyncAt,
+      lastSyncResult: null,
+      progress: 0,
+      message: "Starting account number sync...",
+      total: customers.length,
+      fetched: 0,
+    };
+
+    res.json({ success: true, message: "Account number sync started", total: customers.length });
+
+    runAccountNumberSyncInBackground(customers).catch((bgErr) => {
+      logger.error("Background account number sync crashed:", bgErr);
+      accountSyncStatus.isRunning = false;
+      accountSyncStatus.lastSyncResult = "failed";
+      accountSyncStatus.message = bgErr?.message || "Account number sync failed";
+    });
+  } catch (error) {
+    logger.error("Error starting account number sync:", error);
+    accountSyncStatus.isRunning = false;
+    res.status(500).json({ success: false, error: "Failed to start account number sync" });
+  }
+};
+
+async function runAccountNumberSyncInBackground(customers) {
+  let releaseGate;
+  try {
+    releaseGate = await acquireBrowserGate(ACCOUNT_AUTOMATION_LABEL, {
+      onQueued: (activeLabel) => {
+        accountSyncStatus.message = `Waiting for "${activeLabel}" to finish before starting...`;
+      },
+    });
+
+    const onProgress = (progress, message) => {
+      accountSyncStatus.progress = progress;
+      accountSyncStatus.message = message;
+    };
+
+    const onBatch = async (batch) => {
+      let saved = 0;
+      for (const row of batch) {
+        const update = { accountNumberFetchedAt: new Date() };
+        if (row.accountNumber) {
+          update.accountNumber = row.accountNumber;
+          saved++;
+        }
+        await RouteStarCustomer.updateOne({ routeStarId: row.routeStarId }, { $set: update });
+      }
+      accountSyncStatus.fetched += saved;
+      return saved;
+    };
+
+    const result = await scrapeAccountNumbers(customers, onProgress, onBatch);
+    if (!result.success) {
+      throw new Error(result.error || "Account number sync failed");
+    }
+
+    let mappedCount = 0;
+    try {
+      const mapSummary = await runAutoMapByAccountNumber();
+      mappedCount = mapSummary.mapped;
+    } catch (mapErr) {
+      logger.error("Auto-map by account number failed:", mapErr?.message || mapErr);
+    }
+
+    accountSyncStatus.isRunning = false;
+    accountSyncStatus.lastSyncAt = new Date();
+    accountSyncStatus.lastSyncResult = "success";
+    accountSyncStatus.progress = 100;
+    accountSyncStatus.message = `Fetched ${accountSyncStatus.fetched}/${result.total} account numbers · auto-mapped ${mappedCount}`;
+  } catch (error) {
+    logger.error("❌ Account number sync failed:", error);
+    accountSyncStatus.isRunning = false;
+    accountSyncStatus.lastSyncAt = new Date();
+    accountSyncStatus.lastSyncResult = "failed";
+    accountSyncStatus.message = error.message || "Account number sync failed";
+  } finally {
+    releaseGate?.();
+  }
+}
+
+export const fetchCustomerAccountNumber = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let customer = await RouteStarCustomer.findOne({ routeStarId: id });
+    if (!customer) customer = await RouteStarCustomer.findById(id).catch(() => null);
+
+    if (!customer) {
+      return res.status(404).json({ success: false, error: "Customer not found" });
+    }
+
+    let releaseGate;
+    try {
+      releaseGate = await acquireBrowserGate(ACCOUNT_AUTOMATION_LABEL);
+      const result = await scrapeAccountNumbers([{ routeStarId: customer.routeStarId }]);
+      const row = (result.results && result.results[0]) || {};
+
+      customer.accountNumberFetchedAt = new Date();
+      if (row.accountNumber) customer.accountNumber = row.accountNumber;
+      await customer.save();
+
+      return res.json({
+        success: true,
+        data: {
+          _id: customer._id,
+          routeStarId: customer.routeStarId,
+          accountNumber: customer.accountNumber || null,
+        },
+      });
+    } finally {
+      releaseGate?.();
+    }
+  } catch (error) {
+    logger.error("Error fetching customer account number:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch account number" });
+  }
+};
 
 /**
  * Get customer statistics

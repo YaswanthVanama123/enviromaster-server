@@ -10,6 +10,9 @@ import {
   getSyncStatus,
   startSync,
   getCustomerStats,
+  getAccountNumberSyncStatus,
+  startAccountNumberSync,
+  fetchCustomerAccountNumber,
 } from "../../controllers/customer/routestarCustomersController.js";
 
 const router = express.Router();
@@ -25,6 +28,13 @@ router.get("/sync/status", getSyncStatus);
 
 // Start sync from RouteStar
 router.post("/sync/start", startSync);
+
+// Account number backfill (only customers missing an account number)
+router.get("/sync/account-numbers/status", getAccountNumberSyncStatus);
+router.post("/sync/account-numbers/start", startAccountNumberSync);
+
+// Fetch + store the account number for a single customer (by clicking a row)
+router.post("/:id/account-number", fetchCustomerAccountNumber);
 
 // Get customer by ID
 router.get("/:id", getCustomerById);

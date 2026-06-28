@@ -457,6 +457,9 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
           anchorPerVisit: round2(anchorOfThis / visitsF),
           commissionablePerVisit: cpv
         };
+        if (g.accountType === "Pit" && perFarGroupPrior > rules.anchorPerVisitThreshold) {
+          g.accountType = "Anchor";
+        }
         break;
       }
       case "Bread5": {
@@ -544,7 +547,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
       const rowOriginal = row.annualOriginal;
       services.push({
         serviceName: row.serviceName,
-        accountType: row.accountType,
+        accountType: g.accountType,
         confidence: row.cacheEntry?.confidence || null,
         reason: row.cacheEntry?.reason || null,
         perVisitRevenue: row.annualCurrent,
@@ -611,6 +614,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     totalFarAnnualRedline,
     totalFarAnnualGreenline,
     agreementMultiplier,
+    agreementTerm,
     effectiveCommissionRate,
     priorQuotaCredit,
     quotaTarget: rules.quotaTarget,

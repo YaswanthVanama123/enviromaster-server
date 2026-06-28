@@ -173,7 +173,8 @@ async function computeEmployeesForPeriod(periodStart, periodEnd) {
     isDeleted: { $ne: true },
     createdBy: { $nin: [null, ""], $exists: true },
     "payrollLock.addedToPayroll": true,
-    "payrollLock.periodStart": { $gte: periodStart, $lte: periodEnd }
+    "payrollLock.periodStart": { $lte: periodEnd },
+    "payrollLock.periodEnd": { $gte: periodStart }
   })
     .select({
       _id: 1,

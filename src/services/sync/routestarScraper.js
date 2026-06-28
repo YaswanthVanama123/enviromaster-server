@@ -491,4 +491,83 @@ export async function scrapeRouteStarCustomers(onProgress, onBatch) {
   }
 }
 
-export default { scrapeRouteStarCustomers };
+export async function scrapeAccountNumbers(customers, onProgress, onBatch) {
+  let browser = null;
+  const results = [];
+
+  if (!Array.isArray(customers) || customers.length === 0) {
+    return { success: true, total: 0, fetched: 0, results: [] };
+  }
+
+  try {
+    logger.debug(`🚀 Fetching account numbers for ${customers.length} customers...`);
+    onProgress?.(5, 'Launching browser...');
+
+    browser = await launchHardenedBrowser();
+    const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+    const page = await context.newPage();
+    page.setDefaultTimeout(30000);
+    page.setDefaultNavigationTimeout(30000);
+
+    onProgress?.(10, 'Logging into RouteStar...');
+    await login(page);
+
+    await context.route('**/*', (route) => {
+      const type = route.request().resourceType();
+      if (type === 'image' || type === 'media' || type === 'font' || type === 'stylesheet') {
+        return route.abort();
+      }
+      return route.continue();
+    });
+
+    let index = 0;
+    for (const customer of customers) {
+      index++;
+      const routeStarId = customer.routeStarId;
+      if (!routeStarId) continue;
+
+      try {
+        await page.goto(`${BASE_URL}/web/customerdetail/${routeStarId}`, {
+          waitUntil: 'domcontentloaded',
+          timeout: 30000,
+        });
+        await page.waitForSelector('#ctxt_accountnum', { timeout: 15000 });
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const accountNumber = await page.evaluate(() => {
+          const el = document.querySelector('#ctxt_accountnum');
+          return el ? (el.value || '').trim() : '';
+        });
+
+        const row = { routeStarId, accountNumber };
+        results.push(row);
+        if (onBatch) await onBatch([row]);
+      } catch (err) {
+        logger.error(`   ⚠️ Account # fetch failed for ${routeStarId}: ${err.message}`);
+        results.push({ routeStarId, accountNumber: null, error: err.message });
+      }
+
+      await page.goto('about:blank').catch(() => {});
+
+      const progress = Math.min(10 + Math.round((index / customers.length) * 85), 95);
+      onProgress?.(progress, `Fetched ${index}/${customers.length}`);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    logger.debug(`🎉 Account number fetch completed for ${results.length} customers`);
+    return {
+      success: true,
+      total: customers.length,
+      fetched: results.filter((r) => r.accountNumber).length,
+      results,
+    };
+  } catch (error) {
+    logger.error('❌ Account number fetch failed:', error);
+    return { success: false, total: customers.length, fetched: 0, results, error: error.message };
+  } finally {
+    await closeBrowserQuietly(browser);
+    browser = null;
+  }
+}
+
+export default { scrapeRouteStarCustomers, scrapeAccountNumbers };

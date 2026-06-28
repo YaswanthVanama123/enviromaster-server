@@ -3067,14 +3067,14 @@ function _buildPricingCatalogLatex({ exportDate, services, catalog, currency }) 
 \\usepackage{longtable}
 \\usepackage{colortbl}
 \\usepackage{ragged2e}
-\\definecolor{emink}{HTML}{1E1B4B}
-\\definecolor{emhdr}{HTML}{3730A3}
-\\definecolor{emaccent}{HTML}{4F46E5}
-\\definecolor{emhdracc}{HTML}{A5B4FC}
+\\definecolor{emink}{HTML}{1F2937}
+\\definecolor{emhdr}{HTML}{A00000}
+\\definecolor{emaccent}{HTML}{C00000}
+\\definecolor{emhdracc}{HTML}{F4C9C9}
 \\definecolor{emmuted}{HTML}{6B7280}
 \\definecolor{emborder}{HTML}{E5E7EB}
-\\definecolor{emrowalt}{HTML}{FAFAFA}
-\\definecolor{emtitlebg}{HTML}{EEF2FF}
+\\definecolor{emrowalt}{HTML}{FBF7F7}
+\\definecolor{emtitlebg}{HTML}{FBEAEA}
 \\setlength{\\parindent}{0pt}
 \\renewcommand{\\arraystretch}{1.5}
 \\setlength{\\tabcolsep}{8pt}
@@ -3083,8 +3083,9 @@ function _buildPricingCatalogLatex({ exportDate, services, catalog, currency }) 
 
 \\noindent\\colorbox{emhdr}{\\parbox[c]{\\dimexpr\\textwidth-2\\fboxsep\\relax}{\\vspace{14pt}
 \\begin{minipage}[c]{0.60\\linewidth}
-{\\fontsize{30}{32}\\selectfont\\bfseries\\color{white}Enviro-Master}\\\\[5pt]
-{\\color{emhdracc}\\large Service Pricing Report}
+{\\fontsize{30}{32}\\selectfont\\bfseries\\color{white}Enviro-Master NVA}\\\\[5pt]
+{\\color{emhdracc}\\large Service Pricing Report}\\\\[3pt]
+{\\color{emhdracc}\\small Serving Northern Virginia}
 \\end{minipage}\\hfill
 \\begin{minipage}[c]{0.38\\linewidth}\\RaggedLeft
 {\\scriptsize\\color{emhdracc}Generated on}\\\\{\\small\\color{white}${esc(exportDate)}}\\\\[6pt]
@@ -3094,9 +3095,9 @@ function _buildPricingCatalogLatex({ exportDate, services, catalog, currency }) 
 
 \\vspace{18pt}
 \\noindent{\\setlength{\\fboxsep}{14pt}%
-\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Service Categories}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emink}${categoryCount}}}}\\hfill
-\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Pricing Items}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emink}${totalPricingItems}}}}\\hfill
-\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Currency}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emink}${esc(currency)}}}}}
+\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Service Categories}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emaccent}${categoryCount}}}}\\hfill
+\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Pricing Items}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emaccent}${totalPricingItems}}}}\\hfill
+\\fcolorbox{emborder}{white}{\\parbox[c][1.5cm][c]{\\dimexpr0.32\\textwidth-2\\fboxsep-2\\fboxrule\\relax}{{\\scriptsize\\color{emmuted}Currency}\\\\[4pt]{\\fontsize{22}{24}\\selectfont\\bfseries\\color{emaccent}${esc(currency)}}}}}
 
 \\vspace{26pt}
 

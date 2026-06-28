@@ -46,6 +46,8 @@ export async function adminLogin(req, res) {
       admin: {
         id: admin._id,
         username: admin.username,
+        canManageBackups:
+          admin.username === "envimaster" || admin.permissions?.backupManagement === true,
       },
     });
   } catch (err) {
@@ -117,7 +119,7 @@ export async function getAdminProfile(req, res) {
     }
 
     const admin = await AdminUser.findById(adminId)
-      .select("_id username isActive lastLoginAt createdAt updatedAt")
+      .select("_id username isActive permissions lastLoginAt createdAt updatedAt")
       .lean();
 
     if (!admin) {
@@ -126,7 +128,13 @@ export async function getAdminProfile(req, res) {
         .json({ error: "Not found", detail: "Admin user not found" });
     }
 
-    res.json({ admin });
+    const isSuperAdmin = admin.username === "envimaster";
+    res.json({
+      admin: {
+        ...admin,
+        canManageBackups: isSuperAdmin || admin.permissions?.backupManagement === true,
+      },
+    });
   } catch (err) {
     logger.error("getAdminProfile error:", err);
     res

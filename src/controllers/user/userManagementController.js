@@ -17,7 +17,7 @@ export async function listUsers(req, res) {
         adminQuery.username = { $regex: search, $options: 'i' };
       }
       admins = await AdminUser.find(adminQuery)
-        .select('_id username isActive lastLoginAt createdAt updatedAt')
+        .select('_id username isActive permissions lastLoginAt createdAt updatedAt')
         .lean();
 
       admins = admins.map(a => ({
@@ -26,6 +26,7 @@ export async function listUsers(req, res) {
         fullName: a.username, // Admins don't have fullName, use username
         email: null,
         isActive: a.isActive,
+        permissions: { backupManagement: a.permissions?.backupManagement === true },
         lastLoginAt: a.lastLoginAt,
         createdAt: a.createdAt,
         updatedAt: a.updatedAt,
@@ -211,7 +212,7 @@ export async function createEmployee(req, res) {
 export async function updateUser(req, res) {
   try {
     const { type, id } = req.params;
-    const { username, fullName, email, isActive } = req.body || {};
+    const { username, fullName, email, isActive, permissions } = req.body || {};
 
     if (type !== 'admin' && type !== 'employee') {
       return res.status(400).json({
@@ -243,12 +244,15 @@ export async function updateUser(req, res) {
       const updateData = {};
       if (username) updateData.username = username;
       if (typeof isActive === 'boolean') updateData.isActive = isActive;
+      if (permissions && typeof permissions.backupManagement === 'boolean') {
+        updateData['permissions.backupManagement'] = permissions.backupManagement;
+      }
 
       const admin = await AdminUser.findByIdAndUpdate(
         id,
         updateData,
         { new: true }
-      ).select('_id username isActive lastLoginAt createdAt updatedAt');
+      ).select('_id username isActive permissions lastLoginAt createdAt updatedAt');
 
       if (!admin) {
         return res.status(404).json({ error: "Not found", detail: "Admin not found" });
@@ -262,6 +266,7 @@ export async function updateUser(req, res) {
           fullName: admin.username,
           email: null,
           isActive: admin.isActive,
+          permissions: { backupManagement: admin.permissions?.backupManagement === true },
           role: 'admin',
           lastLoginAt: admin.lastLoginAt,
           createdAt: admin.createdAt,

@@ -20,6 +20,7 @@ import {
   initializeMappings,
   getAvailableRouteStarCustomers,
   syncMappings,
+  autoMapByAccountNumber,
 } from "../../controllers/customer/companyMappingController.js";
 
 const router = express.Router();
@@ -53,6 +54,10 @@ router.post("/initialize", initializeMappings);
 
 // Sync mapping info from Bigin companies
 router.post("/sync", syncMappings);
+
+// Auto-map Bigin companies to RouteStar customers by account number
+// (only where no manual mapping exists)
+router.post("/auto-map-by-account", autoMapByAccountNumber);
 
 // Bulk save mappings
 router.post("/bulk", bulkSaveMapping);

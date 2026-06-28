@@ -57,6 +57,15 @@ const RouteStarCustomerSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    accountNumber: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    accountNumberFetchedAt: {
+      type: Date,
+      default: null,
+    },
     // Status
     isActive: {
       type: Boolean,
