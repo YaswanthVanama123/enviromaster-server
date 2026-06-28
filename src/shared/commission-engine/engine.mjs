@@ -491,12 +491,30 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
   const tierAggBase = { below: 0, above: 0, double: 0 };
   const tierAggCommission = { below: 0, above: 0, double: 0 };
   const quotaAggCredit = { below: 0, above: 0, double: 0 };
+  let cumQuotaCredit = priorQuotaCredit;
   groups.forEach((g) => {
-    const groupCommissionTiers = rules.quotaTarget > 0 && g.commissionableAnnual > 0 ? computeCommissionTiers(priorQuotaCredit, g.commissionableAnnual, rules.quotaTarget, rules.quotaRates, agreementMultiplier) : [];
-    g.commissionTiers = groupCommissionTiers;
-    g.annualCommission = groupCommissionTiers.length ? groupCommissionTiers.reduce((sum, t) => sum + t.commission, 0) : g.commissionableAnnual * (commissionRate * mult / 100);
     const groupQuotaCredit = g.annualCurrent * g.pricingMultiplier;
-    const groupQuotaPortions = rules.quotaTarget > 0 && groupQuotaCredit > 0 ? computeQuotaTierPortions(priorQuotaCredit, groupQuotaCredit, rules.quotaTarget, rules.quotaRates) : [];
+    const groupBaseRate = progressiveQuotaCommissionRate(
+      cumQuotaCredit,
+      groupQuotaCredit,
+      rules.quotaTarget,
+      rules.quotaRates,
+      commissionRate
+    );
+    g.annualCommission = g.commissionableAnnual * (groupBaseRate * mult / 100);
+    const groupQuotaPortions = rules.quotaTarget > 0 && groupQuotaCredit > 0 ? computeQuotaTierPortions(cumQuotaCredit, groupQuotaCredit, rules.quotaTarget, rules.quotaRates) : [];
+    const groupCommissionTiers = groupQuotaPortions.filter((p) => p.quotaCredit > 0).map((p) => {
+      const share = groupQuotaCredit > 0 ? p.quotaCredit / groupQuotaCredit : 0;
+      return {
+        level: p.level,
+        label: p.label,
+        rate: p.rate,
+        effectiveRate: p.rate * mult,
+        base: g.commissionableAnnual * share,
+        commission: g.annualCommission * share
+      };
+    });
+    g.commissionTiers = groupCommissionTiers;
     groupCommissionTiers.forEach((t) => {
       tierAggBase[t.level] += t.base;
       tierAggCommission[t.level] += t.commission;
@@ -504,6 +522,7 @@ function computeGlobalCommission(servicesState, accountTypeCache, globalContract
     groupQuotaPortions.forEach((t) => {
       quotaAggCredit[t.level] += t.quotaCredit;
     });
+    cumQuotaCredit += groupQuotaCredit;
     const groupVisits = visitsPerYearOf(g.freqStr);
     groupsList.push({
       groupKey: `${g.accountType || "none"}|${g.freqStr}`,
