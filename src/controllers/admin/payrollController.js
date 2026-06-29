@@ -132,6 +132,12 @@ export async function getPayrollPeriods(req, res) {
         cycleType: 'biweekly',
         cycleDayOfWeek: 1
       },
+      approvalCutoff: settings.approvalCutoff || {
+        enabled: true,
+        dayOfWeek: 0,
+        hour: 0,
+        minute: 0,
+      },
       periods: {
         current: {
           start: periods.current.start.toISOString(),
