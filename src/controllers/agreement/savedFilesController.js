@@ -202,6 +202,9 @@ export async function getSavedFilesGrouped(req, res) {
                 crmDealId: '$zoho.crm.dealId',
                 addedToPayroll: '$payrollLock.addedToPayroll',
                 payrollPeriodLabel: '$payrollLock.periodLabel',
+                lockedAnnualCommission: '$payrollLock.lockedAnnualCommission',
+                lockedWeeklyCommission: '$payrollLock.lockedWeeklyCommission',
+                lockedMonthlyValue: '$payrollLock.lockedMonthlyValue',
                 annualCommission: '$payload.commission.annualCommission',
                 weeklyCommission: '$payload.commission.weeklyCommission',
                 monthlyValue: '$payload.summary.serviceAgreementTotal',
@@ -361,6 +364,17 @@ export async function getSavedFilesGrouped(req, res) {
 
       const allFiles = [...attachedFiles, ...versionFiles, ...logFiles];
 
+      const isLockedToPayroll = !!agreement.addedToPayroll;
+      const displayAnnualCommission = isLockedToPayroll && agreement.lockedAnnualCommission != null
+        ? agreement.lockedAnnualCommission
+        : (agreement.annualCommission || 0);
+      const displayWeeklyCommission = isLockedToPayroll && agreement.lockedWeeklyCommission != null
+        ? agreement.lockedWeeklyCommission
+        : (agreement.weeklyCommission || 0);
+      const displayMonthlyValue = isLockedToPayroll && agreement.lockedMonthlyValue != null
+        ? agreement.lockedMonthlyValue
+        : (agreement.monthlyValue || 0);
+
       return {
         id: agreement._id, agreementTitle: agreement.title || 'Untitled Agreement',
         fileCount: allFiles.length, latestUpdate: agreement.updatedAt,
@@ -368,11 +382,12 @@ export async function getSavedFilesGrouped(req, res) {
         deletedAt: agreement.deletedAt, deletedBy: agreement.deletedBy,
         createdBy: agreement.createdBy || null, updatedBy: agreement.updatedBy || null,
         agreementStatus: agreement.status || 'draft',
-        addedToPayroll: !!agreement.addedToPayroll,
+        addedToPayroll: isLockedToPayroll,
         payrollPeriodLabel: agreement.payrollPeriodLabel || null,
-        annualCommission: agreement.annualCommission || 0,
-        weeklyCommission: agreement.weeklyCommission || 0,
-        monthlyValue: agreement.monthlyValue || 0,
+        payrollFrozen: isLockedToPayroll && agreement.lockedAnnualCommission != null,
+        annualCommission: displayAnnualCommission,
+        weeklyCommission: displayWeeklyCommission,
+        monthlyValue: displayMonthlyValue,
         hasUploads: allFiles.some(f => f.zohoInfo.biginDealId || f.zohoInfo.crmDealId) ||
                     !!(agreement.biginDealId || agreement.crmDealId),
         startDate: agreement.startDate || null, contractMonths: agreement.contractMonths || null,

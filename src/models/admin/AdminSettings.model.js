@@ -49,9 +49,10 @@ const AdminSettingsSchema = new mongoose.Schema(
       // The start date for payroll calculations (commissions tracked from this date)
       startDate: { type: Date, default: null },
       // Optional: payroll cycle type (weekly, biweekly, monthly)
-      cycleType: { type: String, enum: ['weekly', 'biweekly', 'monthly'], default: 'biweekly' },
-      // Day of week for weekly/biweekly cycles (0=Sunday, 1=Monday, etc.)
-      cycleDayOfWeek: { type: Number, default: 1 }, // Monday
+      cycleType: { type: String, enum: ['weekly', 'biweekly', 'monthly'], default: 'weekly' },
+      // Day of week the cycle STARTS on (0=Sunday, 1=Monday, ...). Monday start =>
+      // the weekly period ends Sunday 23:59:59.999 (Sunday midnight).
+      cycleDayOfWeek: { type: Number, default: 1 }, // Monday start -> Sunday end
     },
 
     // Weekly cutoff after which payroll completions roll into the next period.

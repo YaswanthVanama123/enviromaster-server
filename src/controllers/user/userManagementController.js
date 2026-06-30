@@ -17,14 +17,14 @@ export async function listUsers(req, res) {
         adminQuery.username = { $regex: search, $options: 'i' };
       }
       admins = await AdminUser.find(adminQuery)
-        .select('_id username isActive permissions lastLoginAt createdAt updatedAt')
+        .select('_id username email isActive permissions lastLoginAt createdAt updatedAt')
         .lean();
 
       admins = admins.map(a => ({
         id: a._id,
         username: a.username,
         fullName: a.username, // Admins don't have fullName, use username
-        email: null,
+        email: a.email || null,
         isActive: a.isActive,
         permissions: {
           backupManagement: a.permissions?.backupManagement === true,
@@ -96,7 +96,7 @@ export async function listUsers(req, res) {
  */
 export async function createAdmin(req, res) {
   try {
-    const { username, password, isActive = true } = req.body || {};
+    const { username, password, email, permissions, isActive = true } = req.body || {};
 
     if (!username || !password) {
       return res.status(400).json({
@@ -128,7 +128,12 @@ export async function createAdmin(req, res) {
     const admin = await AdminUser.create({
       username,
       passwordHash,
+      email: email || undefined,
       isActive,
+      permissions: {
+        backupManagement: permissions?.backupManagement === true,
+        priceChanges: permissions?.priceChanges === true,
+      },
     });
 
     res.status(201).json({
@@ -137,8 +142,12 @@ export async function createAdmin(req, res) {
         id: admin._id,
         username: admin.username,
         fullName: admin.username,
-        email: null,
+        email: admin.email || null,
         isActive: admin.isActive,
+        permissions: {
+          backupManagement: admin.permissions?.backupManagement === true,
+          priceChanges: admin.permissions?.priceChanges === true,
+        },
         role: 'admin',
         createdAt: admin.createdAt,
       },
@@ -246,6 +255,7 @@ export async function updateUser(req, res) {
     if (type === 'admin') {
       const updateData = {};
       if (username) updateData.username = username;
+      if (email !== undefined) updateData.email = email;
       if (typeof isActive === 'boolean') updateData.isActive = isActive;
       if (permissions && typeof permissions.backupManagement === 'boolean') {
         updateData['permissions.backupManagement'] = permissions.backupManagement;
@@ -258,7 +268,7 @@ export async function updateUser(req, res) {
         id,
         updateData,
         { new: true }
-      ).select('_id username isActive permissions lastLoginAt createdAt updatedAt');
+      ).select('_id username email isActive permissions lastLoginAt createdAt updatedAt');
 
       if (!admin) {
         return res.status(404).json({ error: "Not found", detail: "Admin not found" });
@@ -270,7 +280,7 @@ export async function updateUser(req, res) {
           id: admin._id,
           username: admin.username,
           fullName: admin.username,
-          email: null,
+          email: admin.email || null,
           isActive: admin.isActive,
           permissions: {
             backupManagement: admin.permissions?.backupManagement === true,
