@@ -21,8 +21,8 @@ export function calculatePayrollPeriods(payrollSettings, now = new Date()) {
 
   switch (cycleType) {
     case 'weekly': {
-      // Find the most recent cycle day
-      const daysSinceCycleDay = (now.getDay() - (cycleDayOfWeek || 1) + 7) % 7;
+      // Business rule: the week ALWAYS runs Monday 00:00 → Sunday 23:59:59.999.
+      const daysSinceCycleDay = (now.getDay() - 1 + 7) % 7;
       currentPeriodStart = new Date(now);
       currentPeriodStart.setDate(now.getDate() - daysSinceCycleDay);
       currentPeriodStart.setHours(0, 0, 0, 0);
@@ -40,13 +40,24 @@ export function calculatePayrollPeriods(payrollSettings, now = new Date()) {
       break;
     }
     case 'biweekly': {
-      // Calculate weeks since base date
-      const weeksSinceBase = Math.floor((now - baseDate) / (7 * 24 * 60 * 60 * 1000));
-      const biweeklyPeriods = Math.floor(weeksSinceBase / 2);
+      // Biweekly runs Monday morning → the 2nd Sunday night (14 days), always
+      // anchored to Monday. Parity is anchored to the payroll start date's week.
+      const day = 1;
+      const mondayThisWeek = new Date(now);
+      mondayThisWeek.setDate(now.getDate() - ((now.getDay() - day + 7) % 7));
+      mondayThisWeek.setHours(0, 0, 0, 0);
 
-      currentPeriodStart = new Date(baseDate);
-      currentPeriodStart.setDate(baseDate.getDate() + (biweeklyPeriods * 14));
-      currentPeriodStart.setHours(0, 0, 0, 0);
+      const anchor = new Date(baseDate);
+      anchor.setDate(anchor.getDate() - ((anchor.getDay() - day + 7) % 7));
+      anchor.setHours(0, 0, 0, 0);
+
+      const weeksBetween = Math.round((mondayThisWeek - anchor) / (7 * 24 * 60 * 60 * 1000));
+      const inSecondWeek = (((weeksBetween % 2) + 2) % 2) === 1;
+
+      currentPeriodStart = new Date(mondayThisWeek);
+      if (inSecondWeek) {
+        currentPeriodStart.setDate(currentPeriodStart.getDate() - 7);
+      }
 
       currentPeriodEnd = new Date(currentPeriodStart);
       currentPeriodEnd.setDate(currentPeriodStart.getDate() + 13);

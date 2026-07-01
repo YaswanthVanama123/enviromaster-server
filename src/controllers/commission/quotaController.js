@@ -99,7 +99,7 @@ async function getPayrollPeriodBoundaries(targetDate = new Date()) {
 
   switch (cycleType) {
     case 'weekly': {
-      const daysSinceCycleDay = (now.getDay() - (cycleDayOfWeek || 1) + 7) % 7;
+      const daysSinceCycleDay = (now.getDay() - 1 + 7) % 7;
       start = new Date(now);
       start.setDate(now.getDate() - daysSinceCycleDay);
       start.setHours(0, 0, 0, 0);
@@ -114,12 +114,24 @@ async function getPayrollPeriodBoundaries(targetDate = new Date()) {
       break;
     }
     case 'biweekly': {
-      const weeksSinceBase = Math.floor((now - baseDate) / (7 * 24 * 60 * 60 * 1000));
-      const biweeklyPeriods = Math.floor(weeksSinceBase / 2);
+      // Biweekly runs Monday morning → the 2nd Sunday night (14 days), always
+      // anchored to Monday. Parity is anchored to the payroll start date's week.
+      const day = 1;
+      const mondayThisWeek = new Date(now);
+      mondayThisWeek.setDate(now.getDate() - ((now.getDay() - day + 7) % 7));
+      mondayThisWeek.setHours(0, 0, 0, 0);
 
-      start = new Date(baseDate);
-      start.setDate(baseDate.getDate() + (biweeklyPeriods * 14));
-      start.setHours(0, 0, 0, 0);
+      const anchor = new Date(baseDate);
+      anchor.setDate(anchor.getDate() - ((anchor.getDay() - day + 7) % 7));
+      anchor.setHours(0, 0, 0, 0);
+
+      const weeksBetween = Math.round((mondayThisWeek - anchor) / (7 * 24 * 60 * 60 * 1000));
+      const inSecondWeek = (((weeksBetween % 2) + 2) % 2) === 1;
+
+      start = new Date(mondayThisWeek);
+      if (inSecondWeek) {
+        start.setDate(start.getDate() - 7);
+      }
 
       end = new Date(start);
       end.setDate(start.getDate() + 13);
@@ -145,10 +157,11 @@ async function getPayrollPeriodBoundaries(targetDate = new Date()) {
 // Quota is WEEKLY and resets every week (2 weekly quota periods per biweekly
 // payroll). The week is anchored to the payroll cycle day-of-week.
 export async function getWeeklyQuotaBoundaries(targetDate = new Date()) {
-  const settings = await AdminSettings.getSingleton();
-  const { cycleDayOfWeek } = settings.payrollSettings || {};
   const now = new Date(targetDate);
-  const daysSinceCycleDay = (now.getDay() - (cycleDayOfWeek ?? 1) + 7) % 7;
+  // Business rule: the quota week ALWAYS runs Monday 00:00 → Sunday 23:59:59.999,
+  // regardless of the configured payroll cycle day.
+  const MONDAY = 1;
+  const daysSinceCycleDay = (now.getDay() - MONDAY + 7) % 7;
 
   const start = new Date(now);
   start.setDate(now.getDate() - daysSinceCycleDay);
