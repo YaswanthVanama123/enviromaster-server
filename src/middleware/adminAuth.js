@@ -17,7 +17,12 @@ export function signAdminToken(admin) {
 
 export function requireAdminAuth(req, res, next) {
   const auth = req.headers.authorization || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  // Accept the token from the Authorization header OR a `?token=` query param.
+  // Browser navigation / RN Linking (e.g. PDF export downloads opened by URL)
+  // cannot set request headers, so they pass the JWT as a query parameter.
+  const token = auth.startsWith("Bearer ")
+    ? auth.slice(7)
+    : (typeof req.query?.token === "string" && req.query.token) || null;
 
   if (!token) {
     return res
