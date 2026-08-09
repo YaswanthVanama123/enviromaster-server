@@ -954,10 +954,11 @@ export const getCustomersWithData = async (req, res) => {
  */
 export const getStats = async (req, res) => {
   try {
-    const [totalRecords, customersWithData, lastSync] = await Promise.all([
+    const [totalRecords, customersWithData, lastSync, activeCustomers] = await Promise.all([
       MapDistanceRecord.countDocuments(),
       MapDistanceRecord.distinct('customerId').then(ids => ids.length),
-      MapDistanceSyncJob.findOne({ status: 'completed' }).sort({ completedAt: -1 }).lean()
+      MapDistanceSyncJob.findOne({ status: 'completed' }).sort({ completedAt: -1 }).lean(),
+      RouteStarCustomer.countDocuments({ isActive: true })
     ]);
 
     let storageSizeBytes = 0;
@@ -997,6 +998,8 @@ export const getStats = async (req, res) => {
       stats: {
         totalRecords,
         customersWithData,
+        activeCustomers,
+        customersMissingData: Math.max(0, activeCustomers - customersWithData),
         lastSyncAt: lastSync?.completedAt || null,
         lastSyncRecords: lastSync?.recordsCreated || 0,
         storageSizeBytes,
@@ -1015,7 +1018,10 @@ export const getStats = async (req, res) => {
 
 /**
  * POST /api/map-distance/sync/update
- * Update/refresh data for customers that already have records
+ * Refresh every active customer's records. Customers that already have data get
+ * their records replaced; customers that have never been fetched (e.g. added to
+ * RouteStar after the last sync) get picked up here too, so the stored data stays
+ * in step with the customer list instead of drifting behind it.
  */
 export const startUpdateSync = async (req, res) => {
   try {
@@ -1029,18 +1035,9 @@ export const startUpdateSync = async (req, res) => {
     }
 
     const customerIdsWithData = await MapDistanceRecord.distinct('customerId');
+    const idsWithData = new Set(customerIdsWithData.map(id => String(id)));
 
-    if (customerIdsWithData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'No customers with existing data to update. Run a full sync first.'
-      });
-    }
-
-    const customers = await RouteStarCustomer.find({
-      _id: { $in: customerIdsWithData },
-      isActive: true
-    })
+    const customers = await RouteStarCustomer.find({ isActive: true })
       .select('_id name')
       .lean();
 
@@ -1051,11 +1048,22 @@ export const startUpdateSync = async (req, res) => {
       });
     }
 
+    // Refresh the ones that already have records first, then backfill the rest,
+    // so an interrupted run still leaves existing data up to date.
+    const existing = customers.filter(c => idsWithData.has(String(c._id)));
+    const missing = customers.filter(c => !idsWithData.has(String(c._id)));
+    const orderedCustomers = [...existing, ...missing];
+
+    logger.debug(
+      `[MapDistance Update Sync] ${orderedCustomers.length} active customers ` +
+      `(${existing.length} refresh, ${missing.length} backfill)`
+    );
+
     const syncJob = new MapDistanceSyncJob({
       status: 'running',
       jobType: 'update_sync',
-      totalCustomers: customers.length,
-      customerIds: customers.map(c => c._id),
+      totalCustomers: orderedCustomers.length,
+      customerIds: orderedCustomers.map(c => c._id),
       processedCustomerIds: [],
       startedAt: new Date(),
       lastActivityAt: new Date(),
@@ -1065,7 +1073,7 @@ export const startUpdateSync = async (req, res) => {
 
     activeSyncJobId = syncJob._id;
 
-    runSyncJob(syncJob._id, customers, false).catch(err => {
+    runSyncJob(syncJob._id, orderedCustomers, false).catch(err => {
       logger.error('[MapDistance Update Sync] Background job error:', err);
     });
 
@@ -1073,7 +1081,9 @@ export const startUpdateSync = async (req, res) => {
       success: true,
       message: 'Update sync started',
       jobId: syncJob._id,
-      totalCustomers: customers.length
+      totalCustomers: orderedCustomers.length,
+      refreshedCustomers: existing.length,
+      backfilledCustomers: missing.length
     });
   } catch (error) {
     logger.error('Error starting update sync:', error);
