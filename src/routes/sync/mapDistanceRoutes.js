@@ -38,7 +38,7 @@ router.post('/fetch', fetchMapDistance);
 // POST /api/map-distance/sync/start - Start syncing all customers
 router.post('/sync/start', startSync);
 
-// POST /api/map-distance/sync/update - Update existing customer data only
+// POST /api/map-distance/sync/update - Refresh all active customers (backfills never-synced)
 router.post('/sync/update', startUpdateSync);
 
 // GET /api/map-distance/sync/status - Get current sync status
