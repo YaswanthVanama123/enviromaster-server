@@ -1095,6 +1095,85 @@ export const startUpdateSync = async (req, res) => {
 };
 
 /**
+ * Launch a sync covering only active customers that have no stored records yet.
+ * Shared by the HTTP endpoint and the daily scheduler so both behave identically.
+ * Returns a plain result object rather than touching `res`.
+ */
+export async function launchMissingSync({ startedBy = 'admin' } = {}) {
+  const runningJob = await MapDistanceSyncJob.findOne({ status: 'running' }).lean();
+  if (runningJob) {
+    return { ok: false, code: 'job_running', error: 'A sync job is already running', jobId: runningJob._id };
+  }
+
+  const customerIdsWithData = await MapDistanceRecord.distinct('customerId');
+  const idsWithData = new Set(customerIdsWithData.map(id => String(id)));
+
+  const activeCustomers = await RouteStarCustomer.find({ isActive: true })
+    .select('_id name')
+    .lean();
+
+  const missing = activeCustomers.filter(c => !idsWithData.has(String(c._id)));
+
+  if (missing.length === 0) {
+    return { ok: false, code: 'nothing_missing', error: 'All active customers already have distance data', totalCustomers: 0 };
+  }
+
+  logger.debug(`[MapDistance New-Customer Sync] ${missing.length} customer(s) without data`);
+
+  const syncJob = new MapDistanceSyncJob({
+    status: 'running',
+    jobType: 'update_sync',
+    totalCustomers: missing.length,
+    customerIds: missing.map(c => c._id),
+    processedCustomerIds: [],
+    startedAt: new Date(),
+    lastActivityAt: new Date(),
+    startedBy
+  });
+  await syncJob.save();
+
+  activeSyncJobId = syncJob._id;
+
+  runSyncJob(syncJob._id, missing, false).catch(err => {
+    logger.error('[MapDistance New-Customer Sync] Background job error:', err);
+  });
+
+  return { ok: true, jobId: syncJob._id, totalCustomers: missing.length };
+}
+
+/**
+ * POST /api/map-distance/sync/missing
+ * Fetch distances only for customers that have never been stored.
+ */
+export const startMissingSync = async (req, res) => {
+  try {
+    const result = await launchMissingSync({ startedBy: req.body?.startedBy || 'admin' });
+
+    if (!result.ok) {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        code: result.code,
+        jobId: result.jobId
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `New-customer sync started for ${result.totalCustomers} customer(s)`,
+      jobId: result.jobId,
+      totalCustomers: result.totalCustomers
+    });
+  } catch (error) {
+    logger.error('Error starting new-customer sync:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to start new-customer sync'
+    });
+  }
+};
+
+/**
  * POST /api/map-distance/sync/resume
  * Manually resume a paused or interrupted job
  */
@@ -1753,6 +1832,8 @@ export default {
   fetchMapDistance,
   startSync,
   startUpdateSync,
+  startMissingSync,
+  launchMissingSync,
   resumeSync,
   pauseSync,
   getSyncStatus,

@@ -9,6 +9,7 @@ import {
   fetchMapDistance,
   startSync,
   startUpdateSync,
+  startMissingSync,
   resumeSync,
   pauseSync,
   getSyncStatus,
@@ -40,6 +41,9 @@ router.post('/sync/start', startSync);
 
 // POST /api/map-distance/sync/update - Refresh all active customers (backfills never-synced)
 router.post('/sync/update', startUpdateSync);
+
+// POST /api/map-distance/sync/missing - Fetch only customers that have no stored data
+router.post('/sync/missing', startMissingSync);
 
 // GET /api/map-distance/sync/status - Get current sync status
 router.get('/sync/status', getSyncStatus);

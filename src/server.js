@@ -24,10 +24,16 @@ process.on('uncaughtException', (err) => {
     if (dbConnected) {
       logger.info('Database connection successful');
       try {
-        const { initializeJobStatus } = await import('./controllers/mapDistanceController.js');
+        const { initializeJobStatus } = await import('./controllers/sync/mapDistanceController.js');
         await initializeJobStatus();
       } catch (initErr) {
         logger.warn('Could not initialize map distance job status:', initErr.message);
+      }
+      try {
+        const { startDailyMissingSyncScheduler } = await import('./utils/mapDistanceScheduler.js');
+        startDailyMissingSyncScheduler();
+      } catch (schedErr) {
+        logger.warn('Could not start map distance scheduler:', schedErr.message);
       }
     } else {
       logger.warn('Running without database - some features may not work');
