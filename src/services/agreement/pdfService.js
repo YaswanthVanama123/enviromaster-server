@@ -633,6 +633,23 @@ function fmtNum(value) {
   return num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
+// A line item is printable as soon as a quantity was entered, even when the price
+// is $0 — reps comp items for existing customers and those still have to appear on
+// the agreement. The total is only a fallback so flat charges that carry no
+// quantity keep printing. Values arrive both as numbers and as already-formatted
+// strings ("$1,234.56"), so strip currency decoration before comparing.
+function toPrintableNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (value === null || value === undefined) return 0;
+  const cleaned = String(value).replace(/[^0-9.\-]/g, "");
+  const num = parseFloat(cleaned);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function hasPrintableLineItem(qty, total) {
+  return toPrintableNumber(qty) > 0 || toPrintableNumber(total) > 0;
+}
+
 function getFrequencyLabel(freq) {
   const normalized = Number(freq);
   const labels = {
@@ -2036,8 +2053,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
 
         if (field.type === 'calc') {
           if (field.calcValues) {
-            const total = parseFloat(field.calcValues.right) || 0;
-            if (total > 0) {
+            if (hasPrintableLineItem(field.calcValues.left, field.calcValues.right)) {
               pushRow({ orderNo: topOrderNo }, {
                 type: 'atCharge',
                 label: fieldLabel,
@@ -2049,8 +2065,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
             }
           } else if (field.value && typeof field.value === 'object') {
             const calcValue = field.value;
-            const total = typeof calcValue.total === 'number' ? calcValue.total : parseFloat(calcValue.total) || 0;
-            if (calcValue.qty != null && calcValue.rate != null && total > 0) {
+            if (calcValue.qty != null && calcValue.rate != null && hasPrintableLineItem(calcValue.qty, calcValue.total)) {
               pushRow({ orderNo: topOrderNo }, {
                 type: 'atCharge',
                 label: fieldLabel,
@@ -2146,8 +2161,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
       const topOrderNo = -1000 + customIdx;
       if (field.type === 'calc') {
         if (field.calcValues) {
-          const total = parseFloat(field.calcValues.right) || 0;
-          if (total > 0) {
+          if (hasPrintableLineItem(field.calcValues.left, field.calcValues.right)) {
             rows.push({
               orderNo: topOrderNo,
               type: 'atCharge',
@@ -2160,8 +2174,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
           }
         } else if (field.value !== undefined && field.value !== null && typeof field.value === 'object') {
           const calcValue = field.value;
-          const total = typeof calcValue.total === 'number' ? calcValue.total : parseFloat(calcValue.total) || 0;
-          if (total > 0) {
+          if (hasPrintableLineItem(calcValue.qty ?? calcValue.left, calcValue.total)) {
             rows.push({
               orderNo: topOrderNo,
               type: 'atCharge',
