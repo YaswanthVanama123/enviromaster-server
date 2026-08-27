@@ -319,6 +319,9 @@ const PayloadSchema = new mongoose.Schema(
   {
     headerTitle: { type: String, default: "" },
     headerRows: [HeaderRowSchema],
+    // Extensions (renewals of an existing agreement) print the legacy
+    // "CUSTOMER UPDATE ADDENDUM" heading instead of "CUSTOMER SERVICE AGREEMENT".
+    isExtension: { type: Boolean, default: false },
     products: {
       type: ProductsSchema,
       default: () => ({ smallProducts: [], dispensers: [], bigProducts: [] }),

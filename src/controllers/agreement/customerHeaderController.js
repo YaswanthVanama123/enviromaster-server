@@ -19,6 +19,7 @@ export async function compileAndStoreCustomerHeader(req, res) {
     const payload = {
       headerTitle: body.headerTitle || "",
       headerRows: body.headerRows || [],
+      isExtension: body.isExtension === true,
       products: body.products || {},
       services: body.services || {},
       agreement: body.agreement || {},
@@ -237,6 +238,7 @@ export async function getCustomerHeaderForEdit(req, res) {
       // Spread payload fields for direct access in editor
       headerTitle: doc.payload?.headerTitle || "",
       headerRows: doc.payload?.headerRows || [],
+      isExtension: doc.payload?.isExtension === true,
       products: doc.payload?.products || { products: [], dispensers: [] },
       services: doc.payload?.services || {},
       agreement: doc.payload?.agreement || {},
@@ -348,6 +350,7 @@ export async function updateCustomerHeader(req, res) {
     doc.payload ||= {};
     if (body.headerTitle !== undefined) doc.payload.headerTitle = body.headerTitle;
     if (body.headerRows !== undefined) doc.payload.headerRows = body.headerRows;
+    if (body.isExtension !== undefined) doc.payload.isExtension = body.isExtension === true;
     if (body.products !== undefined) doc.payload.products = body.products;
     if (body.services !== undefined) doc.payload.services = body.services;
     if (body.agreement !== undefined) doc.payload.agreement = body.agreement;
@@ -396,6 +399,7 @@ export async function updateCustomerHeader(req, res) {
       const pdfResult = await compileCustomerHeader({
         headerTitle: doc.payload.headerTitle,
         headerRows: doc.payload.headerRows,
+        isExtension: doc.payload.isExtension === true,
         products: productsData,
         services: body.services || doc.payload.services,
         agreement: doc.payload.agreement,

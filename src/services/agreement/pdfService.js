@@ -3279,6 +3279,11 @@ export async function compileCustomerHeader(body = {}, options = {}) {
 
   const view = {
     headerTitle: latexEscape(body.headerTitle || ""),
+    // Extensions keep the legacy addendum heading; new agreements use the
+    // service-agreement wording.
+    documentHeading: body.isExtension === true
+      ? "CUSTOMER UPDATE ADDENDUM"
+      : "CUSTOMER SERVICE AGREEMENT",
     headerRows: (body.headerRows || []).map((r) => ({
       labelLeft: latexEscape(r.labelLeft || ""),
       valueLeft: latexEscape(r.valueLeft || ""),
