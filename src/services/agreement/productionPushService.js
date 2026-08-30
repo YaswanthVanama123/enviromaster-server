@@ -39,10 +39,13 @@ export function isProductionPushConfigured() {
   return Boolean(process.env.PRODUCTION_PUSH_TOKEN);
 }
 
-export function assertNotSelfTarget() {
-  const target = getProductionApiUrl().toLowerCase();
+export function isSelfTarget() {
   const self = (process.env.SELF_API_URL || "").replace(/\/+$/, "").toLowerCase();
-  if (self && target === self) {
+  return Boolean(self) && self === getProductionApiUrl().toLowerCase();
+}
+
+export function assertNotSelfTarget() {
+  if (isSelfTarget()) {
     throw new Error(
       "PRODUCTION_API_URL points at this same deployment — refusing to push production onto itself."
     );
@@ -282,5 +285,6 @@ export default {
   pushAgreementToProduction,
   ingestAgreementFolder,
   isProductionPushConfigured,
+  isSelfTarget,
   getProductionApiUrl,
 };

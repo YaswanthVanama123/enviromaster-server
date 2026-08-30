@@ -13,6 +13,7 @@ import {
   pushAgreementToProduction,
   ingestAgreementFolder,
   isProductionPushConfigured,
+  isSelfTarget,
   getProductionApiUrl,
 } from "../../services/agreement/productionPushService.js";
 import logger from "../../utils/logger.js";
@@ -24,7 +25,7 @@ function actorOf(req) {
 export async function getProductionPushStatus(req, res) {
   res.json({
     success: true,
-    configured: isProductionPushConfigured(),
+    configured: isProductionPushConfigured() && !isSelfTarget(),
     targetApiUrl: getProductionApiUrl(),
   });
 }
