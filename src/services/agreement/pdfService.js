@@ -1202,7 +1202,7 @@ function determineFrequencyGroup(key) {
   return undefined;
 }
 
-function transformServicesToPdfFormat(usedServices) {
+function transformServicesToPdfFormat(usedServices, { includeContractTotals = true } = {}) {
   const topRow = [];
   const bottomRow = [];
 
@@ -1228,7 +1228,7 @@ function transformServicesToPdfFormat(usedServices) {
     if (serviceKey === 'customServices') continue;
     if (serviceKey === 'refreshPowerScrub') continue;
 
-    const column = transformServiceToColumn(serviceKey, serviceData, serviceLabels[serviceKey]);
+    const column = transformServiceToColumn(serviceKey, serviceData, serviceLabels[serviceKey], { includeContractTotals });
     if (column && column.rows && column.rows.length > 0) {
       allServices.push(column);
     }
@@ -1254,7 +1254,7 @@ function transformServicesToPdfFormat(usedServices) {
   return { topRow, bottomRow };
 }
 
-function transformServiceToColumn(serviceKey, serviceData, label) {
+function transformServiceToColumn(serviceKey, serviceData, label, { includeContractTotals = true } = {}) {
   const rows = [];
   const pushRow = (field, row) => rows.push(attachOrderNo(field, row));
 
@@ -1366,7 +1366,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
       }
 
       // Add contract total (bold)
-      if (data.totals.contract && shouldDisplayField(data.totals.contract) && data.totals.contract.amount != null) {
+      if (includeContractTotals && data.totals.contract && shouldDisplayField(data.totals.contract) && data.totals.contract.amount != null) {
         const numAmount = Number(data.totals.contract.amount);
         if (!isNaN(numAmount) && numAmount !== 0) {
           const contractLabel = data.totals.contract.label || 'Contract Total';
@@ -1992,7 +1992,7 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
         addBoldTotal(data.totals.weekly);
       }
 
-      if (!isOneTime && data.totals.contract && shouldDisplayField(data.totals.contract) && data.totals.contract.amount != null) {
+      if (includeContractTotals && !isOneTime && data.totals.contract && shouldDisplayField(data.totals.contract) && data.totals.contract.amount != null) {
         const formattedContract = formatMoneyValue(data.totals.contract.amount);
         const contractValue =
           typeof data.totals.contract.amount === "number"
@@ -2146,7 +2146,10 @@ function transformServiceToColumn(serviceKey, serviceData, label) {
     rows.push({ type: 'bold', label: 'Monthly Total', value });
   }
 
-  if (data.contractTotal !== undefined && data.contractTotal !== null && data.contractTotal !== 0) {
+  if (
+    data.contractTotal !== undefined && data.contractTotal !== null && data.contractTotal !== 0 &&
+    (includeContractTotals || data.frequency === 'oneTime')
+  ) {
     const value = typeof data.contractTotal === 'number' ? `${formatCurrency(data.contractTotal)}` : String(data.contractTotal);
     const contractTotalLabel = data.frequency === 'oneTime' ? 'Total Price' : 'Contract Total';
     rows.push({ type: 'bold', label: contractTotalLabel, value });
@@ -2408,7 +2411,7 @@ function buildPerServiceNotesLatex(services = {}) {
   return latex;
 }
 
-function buildServicesLatex(services = {}) {
+function buildServicesLatex(services = {}, { includeContractTotals = true } = {}) {
   const filterServiceColumns = (cols) => {
     if (!cols || !Array.isArray(cols)) return [];
     return cols.filter((col) => {
@@ -2567,7 +2570,7 @@ function buildServicesLatex(services = {}) {
     };
   }
 
-  const transformedServices = transformServicesToPdfFormat(usedServices);
+  const transformedServices = transformServicesToPdfFormat(usedServices, { includeContractTotals });
   const topRowCols = transformedServices.topRow || [];
   const bottomRowCols = transformedServices.bottomRow || [];
 
@@ -2813,7 +2816,7 @@ function buildServicesLatex(services = {}) {
         };
 
         const areasToDisplay = enabledAreas.slice(0, maxAreas);
-        const shouldDisplayContractRow = areasToDisplay.some(
+        const shouldDisplayContractRow = includeContractTotals && areasToDisplay.some(
           area => !isOneTimeFrequency(getAreaFrequencyLabel(area))
         );
 
@@ -3265,6 +3268,7 @@ export async function compileCustomerHeader(body = {}, options = {}) {
 
   const hasSummaryData = summaryData && Object.keys(summaryData).length > 0;
   const summaryExists = Boolean(hasSummaryData) && body.includeContractSummary !== false;
+  const includeContractTotals = body.includeContractSummary !== false;
 
   const activeServiceEntries = Object.values(body.services || {}).filter(sd => isServiceUsed(sd));
   const allServicesOneTime =
@@ -3307,7 +3311,7 @@ export async function compileCustomerHeader(body = {}, options = {}) {
         includeProductsTable: productsData.hasProducts && body.includeProductsTable !== false,
       };
     })(),
-    ...buildServicesLatex(body.services || {}),
+    ...buildServicesLatex(body.services || {}, { includeContractTotals }),
     includeWatermark: watermark,
     summaryContractMonthsDisplay,
     summaryTripChargeLabel,
