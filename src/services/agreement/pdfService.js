@@ -3264,7 +3264,7 @@ export async function compileCustomerHeader(body = {}, options = {}) {
   const summaryProductTotalsLabel = latexEscape(combinedProductTotals || SUMMARY_PLACEHOLDER);
 
   const hasSummaryData = summaryData && Object.keys(summaryData).length > 0;
-  const summaryExists = Boolean(hasSummaryData);
+  const summaryExists = Boolean(hasSummaryData) && body.includeContractSummary !== false;
 
   const activeServiceEntries = Object.values(body.services || {}).filter(sd => isServiceUsed(sd));
   const allServicesOneTime =

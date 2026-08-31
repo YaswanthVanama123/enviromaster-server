@@ -327,6 +327,7 @@ const PayloadSchema = new mongoose.Schema(
       default: () => ({ smallProducts: [], dispensers: [], bigProducts: [] }),
     },
     includeProductsTable: { type: Boolean, default: true },
+    includeContractSummary: { type: Boolean, default: true },
     services: { type: ServicesSchema, default: () => ({}) },
     agreement: { type: AgreementInfoSchema, default: () => ({}) },
     serviceAgreement: { type: ServiceAgreementSchema, default: null },

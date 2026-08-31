@@ -26,6 +26,7 @@ export async function compileAndStoreCustomerHeader(req, res) {
       serviceAgreement: body.serviceAgreement || null,
       summary: body.summary || null,
       includeProductsTable: body.includeProductsTable !== false,
+      includeContractSummary: body.includeContractSummary !== false,
       commission: body.commission || null,
     };
 
@@ -245,6 +246,7 @@ export async function getCustomerHeaderForEdit(req, res) {
       serviceAgreement: doc.payload?.serviceAgreement || null,
       summary: doc.payload?.summary || null,
       includeProductsTable: doc.payload?.includeProductsTable !== false,
+      includeContractSummary: doc.payload?.includeContractSummary !== false,
       commission: doc.payload?.commission || null,
       // Include saved account type cache for commission calculations
       accountTypeCache: doc.payload?.accountTypeCache || null,
@@ -358,6 +360,7 @@ export async function updateCustomerHeader(req, res) {
     if (body.serviceAgreement !== undefined) doc.payload.serviceAgreement = body.serviceAgreement;
     if (body.summary !== undefined) doc.payload.summary = body.summary;
     if (body.includeProductsTable !== undefined) doc.payload.includeProductsTable = body.includeProductsTable;
+    if (body.includeContractSummary !== undefined) doc.payload.includeContractSummary = body.includeContractSummary;
     if (body.commission !== undefined) {
       doc.payload.commission = body.commission;
       doc.markModified('payload.commission');
@@ -407,6 +410,7 @@ export async function updateCustomerHeader(req, res) {
         serviceAgreement: body.serviceAgreement || doc.payload.serviceAgreement,
         summary: body.summary || doc.payload.summary,
         includeProductsTable: doc.payload.includeProductsTable !== false,
+        includeContractSummary: doc.payload.includeContractSummary !== false,
       });
 
       buffer = pdfResult.buffer;
