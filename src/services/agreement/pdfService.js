@@ -1346,7 +1346,7 @@ function transformServiceToColumn(serviceKey, serviceData, label, { includeContr
         'annualSupplies',
         'totalAnnualCost',
         'grossProfit',
-        'annualContractValue',
+        ...(includeContractTotals ? ['annualContractValue'] : []),
         'monthlyRecurring',
         'recurringVisitTotal'
       ];
@@ -2005,7 +2005,7 @@ function transformServiceToColumn(serviceKey, serviceData, label, { includeContr
         });
       }
 
-      if (!isOneTime && data.totals.annual && shouldDisplayField(data.totals.annual) && data.totals.annual.amount != null) {
+      if (includeContractTotals && !isOneTime && data.totals.annual && shouldDisplayField(data.totals.annual) && data.totals.annual.amount != null) {
         const formattedAnnual = formatMoneyValue(data.totals.annual.amount);
         const annualValue =
           typeof data.totals.annual.amount === "number"
