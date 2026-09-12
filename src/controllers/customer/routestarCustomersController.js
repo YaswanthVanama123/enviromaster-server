@@ -4,12 +4,15 @@
  */
 
 import { RouteStarCustomer } from "../../models/customer/index.js";
-import { scrapeRouteStarCustomers, scrapeAccountNumbers } from "../../services/routestarScraper.js";
+import { scrapeAccountNumbers } from "../../services/routestarScraper.js";
+import {
+  streamInventoryCustomers,
+  isInventoryDbConfigured,
+} from "../../services/sync/inventoryCustomersService.js";
 import logger from "../../utils/logger.js";
 import { acquireBrowserGate } from "../../utils/browserGate.js";
 import { runAutoMapByAccountNumber } from "./companyMappingController.js";
 
-const AUTOMATION_LABEL = "RouteStar customer sync";
 const ACCOUNT_AUTOMATION_LABEL = "RouteStar account number sync";
 
 // Track sync status in memory
@@ -143,6 +146,14 @@ export const startSync = async (req, res) => {
       });
     }
 
+    if (!isInventoryDbConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error:
+          "INVENTORY_MONGO_URI is not configured. Customers are imported from the inventory database.",
+      });
+    }
+
     // Set sync status to running
     syncStatus = {
       isRunning: true,
@@ -180,52 +191,48 @@ export const startSync = async (req, res) => {
  * Run the sync process in background
  */
 async function runSyncInBackground() {
-  let releaseGate;
   try {
-    releaseGate = await acquireBrowserGate(AUTOMATION_LABEL, {
-      onQueued: (activeLabel) => {
-        syncStatus.message = `Waiting for "${activeLabel}" to finish before starting...`;
-      },
+    logger.debug("🚀 Starting RouteStar customer import from the inventory database...");
+
+    syncStatus.progress = 5;
+    syncStatus.message = "Reading customers from the inventory database...";
+
+    let savedCount = 0;
+
+    const stats = await streamInventoryCustomers(async (batch, { read, total }) => {
+      savedCount += await saveCustomersToDatabase(batch);
+      const pct = total > 0 ? Math.min(95, 5 + Math.floor((read / total) * 90)) : 50;
+      syncStatus.progress = pct;
+      syncStatus.message = `Imported ${read}/${total} customers from inventory...`;
     });
 
-    logger.debug("🚀 Starting RouteStar customer sync...");
-
-    // Progress callback
-    const onProgress = (progress, message) => {
-      syncStatus.progress = progress;
-      syncStatus.message = message;
-    };
-
-    // Stream each scraped page straight to MongoDB so RAM stays ~constant.
-    const onBatch = (batch) => saveCustomersToDatabase(batch);
-
-    // Run the scraper
-    const result = await scrapeRouteStarCustomers(onProgress, onBatch);
-
-    if (!result.success) {
-      throw new Error(result.error || "Scrape failed");
+    let mappedCount = 0;
+    try {
+      const mapSummary = await runAutoMapByAccountNumber();
+      mappedCount = mapSummary.mapped;
+    } catch (mapErr) {
+      logger.error("Auto-map by account number failed:", mapErr?.message || mapErr);
     }
 
-    const totalScraped = result.totalCount || 0;
-    const savedCount = result.savedCount ?? 0;
-
-    // Update final status
     syncStatus.isRunning = false;
     syncStatus.lastSyncAt = new Date();
     syncStatus.lastSyncResult = syncStatus.lastSyncResult === "partial" ? "partial" : "success";
     syncStatus.progress = 100;
-    syncStatus.message = `Synced ${totalScraped} customers, saved/updated ${savedCount}`;
+    syncStatus.message =
+      `Imported ${stats.mapped} customers from inventory, saved/updated ${savedCount}` +
+      (stats.skipped ? ` (${stats.skipped} skipped)` : "") +
+      ` · auto-mapped ${mappedCount}`;
 
-    logger.debug(`✅ Sync completed: ${totalScraped} customers, saved ${savedCount}`);
+    logger.debug(
+      `✅ Inventory customer import completed: read ${stats.read}, mapped ${stats.mapped}, saved ${savedCount}`
+    );
   } catch (error) {
-    logger.error("❌ Sync failed:", error);
+    logger.error("❌ Inventory customer import failed:", error);
     syncStatus.isRunning = false;
     syncStatus.lastSyncAt = new Date();
     syncStatus.lastSyncResult = "failed";
     syncStatus.progress = 0;
-    syncStatus.message = error.message || "Sync failed";
-  } finally {
-    releaseGate?.();
+    syncStatus.message = error.message || "Import failed";
   }
 }
 
@@ -233,74 +240,32 @@ async function runSyncInBackground() {
  * Save scraped customers to database
  */
 async function saveCustomersToDatabase(customers) {
+  if (!customers.length) return 0;
+
   logger.debug(`💾 Saving ${customers.length} customers to database...`);
 
-  let saved = 0;
-  let updated = 0;
-  let errors = 0;
+  const operations = customers.map((customer) => ({
+    updateOne: {
+      filter: { routeStarId: customer.routeStarId },
+      update: { $set: customer },
+      upsert: true,
+    },
+  }));
 
-  for (let i = 0; i < customers.length; i++) {
-    const customer = customers[i];
-    try {
-      // Parse date
-      let createdDate = null;
-      if (customer.createdInRouteStar) {
-        const parsed = new Date(customer.createdInRouteStar);
-        if (!isNaN(parsed.getTime())) {
-          createdDate = parsed;
-        }
-      }
-
-      const customerData = {
-        routeStarId: customer.routeStarId,
-        name: customer.name,
-        address: customer.address,
-        city: customer.city,
-        state: customer.state,
-        zipCode: customer.zipCode,
-        phone: customer.phone,
-        email: customer.email,
-        company: customer.company,
-        isActive: customer.isActive,
-        isPaperless: customer.isPaperless,
-        grouping: customer.grouping,
-        onRoute: customer.onRoute,
-        createdInRouteStar: createdDate,
-        account: customer.account,
-        salesRep: customer.salesRep,
-        customerType: customer.customerType,
-        balance: customer.balance || 0,
-        detailUrl: customer.detailUrl,
-        lastSyncedAt: new Date(),
-      };
-
-      const existing = await RouteStarCustomer.findOne({ routeStarId: customer.routeStarId });
-
-      if (existing) {
-        await RouteStarCustomer.updateOne({ routeStarId: customer.routeStarId }, customerData);
-        updated++;
-      } else {
-        await RouteStarCustomer.create(customerData);
-        saved++;
-      }
-    } catch (err) {
-      logger.error(`Error saving customer ${customer.name}:`, err.message);
-      errors++;
-    }
-
-    // Update progress (50-100%)
-    const progress = 50 + Math.floor(((i + 1) / customers.length) * 50);
-    syncStatus.progress = progress;
-    syncStatus.message = `Saving customers... ${i + 1}/${customers.length}`;
-  }
-
-  logger.debug(`✅ Save complete: ${saved} new, ${updated} updated, ${errors} errors`);
-
-  if (errors > 0) {
+  try {
+    const result = await RouteStarCustomer.bulkWrite(operations, { ordered: false });
+    const inserted = result.upsertedCount ?? 0;
+    const updated = result.modifiedCount ?? 0;
+    logger.debug(`✅ Save complete: ${inserted} new, ${updated} updated`);
+    return inserted + updated;
+  } catch (err) {
+    const writeErrors = err?.writeErrors?.length ?? 0;
+    const partial = err?.result?.nUpserted ?? 0;
+    const partialModified = err?.result?.nModified ?? 0;
+    logger.error(`Error saving customer batch (${writeErrors} write errors):`, err.message);
     syncStatus.lastSyncResult = "partial";
+    return partial + partialModified;
   }
-
-  return saved + updated;
 }
 
 const ACCOUNT_MISSING_FILTER = {
