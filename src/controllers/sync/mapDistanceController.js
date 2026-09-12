@@ -11,6 +11,7 @@ import logger from "../../utils/logger.js";
 import { acquireBrowserGate } from "../../utils/browserGate.js";
 
 const AUTOMATION_LABEL = "Map-distance sync";
+const SYNC_STALE_MS = Number(process.env.MAP_DISTANCE_STALE_MS) || 120000;
 
 // Account type detection constants
 const ACCOUNT_TYPE_THRESHOLDS = {
@@ -491,6 +492,10 @@ async function runSyncJob(jobId, customers, isResume = false) {
     logger.debug('[MapDistance Sync] Initializing browser session...');
     await session.initialize((progress, message) => {
       logger.debug(`[MapDistance Sync] Init: ${progress}% - ${message}`);
+      MapDistanceSyncJob.findByIdAndUpdate(jobId, {
+        currentCustomerName: `Connecting to RouteStar — ${message} (${progress}%)`,
+        lastActivityAt: new Date()
+      }).catch(() => {});
     });
     logger.debug('[MapDistance Sync] Browser session ready - starting customer processing');
 
@@ -585,20 +590,36 @@ async function runSyncJob(jobId, customers, isResume = false) {
 
     logger.debug('[MapDistance Sync] Sync completed');
   } catch (error) {
-    logger.error('[MapDistance Sync] Session error:', error.message);
+    // A pause/cancel closes the browser out from under us, so the resulting
+    // "browser has been closed" throw is expected — it must not overwrite the
+    // deliberate paused/cancelled status, or the job can never be resumed.
+    const current = await MapDistanceSyncJob.findById(jobId).select('status').lean();
+    const stoppedByUser = current?.status === 'paused' || current?.status === 'cancelled';
 
-    await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
-      status: 'failed',
-      completedAt: new Date(),
-      currentCustomerName: null,
-      $push: {
-        errors: {
-          customerName: 'System',
-          error: `Session error: ${error.message}`,
-          timestamp: new Date()
+    if (stoppedByUser) {
+      logger.debug(
+        `[MapDistance Sync] Session closed by ${current.status} request: ${error.message}`
+      );
+      await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
+        currentCustomerName: null,
+        lastActivityAt: new Date()
+      });
+    } else {
+      logger.error('[MapDistance Sync] Session error:', error.message);
+
+      await MapDistanceSyncJob.findByIdAndUpdate(jobId, {
+        status: 'failed',
+        completedAt: new Date(),
+        currentCustomerName: null,
+        $push: {
+          errors: {
+            customerName: 'System',
+            error: `Session error: ${error.message}`,
+            timestamp: new Date()
+          }
         }
-      }
-    });
+      });
+    }
   } finally {
     if (session) {
       await session.close();
@@ -643,18 +664,42 @@ export const getSyncStatus = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const isActuallyRunning = runningJob !== null &&
+    const ownedHere =
+      runningJob !== null &&
       activeSyncJobId !== null &&
       runningJob._id.toString() === activeSyncJobId.toString();
 
-    const isInterrupted = (runningJob !== null && !isActuallyRunning);
+    const heartbeatAge = runningJob?.lastActivityAt
+      ? Date.now() - new Date(runningJob.lastActivityAt).getTime()
+      : null;
+    const heartbeatFresh = heartbeatAge !== null && heartbeatAge < SYNC_STALE_MS;
+
+    const isActuallyRunning = runningJob !== null && (ownedHere || heartbeatFresh);
+    const isInterrupted = runningJob !== null && !isActuallyRunning;
     const isPaused = pausedJob !== null;
+
+    const failedJob =
+      !runningJob && !pausedJob && latestJob?.status === 'failed' ? latestJob : null;
+    const lastFailure = failedJob
+      ? {
+          jobId: String(failedJob._id),
+          jobType: failedJob.jobType,
+          at: failedJob.completedAt || failedJob.updatedAt,
+          error:
+            failedJob.errors?.[failedJob.errors.length - 1]?.error ||
+            'Sync failed without a recorded reason',
+          processedCustomers: failedJob.processedCustomers || 0,
+          totalCustomers: failedJob.totalCustomers || 0
+        }
+      : null;
 
     res.json({
       success: true,
       isRunning: isActuallyRunning,
       isInterrupted: isInterrupted,
       isPaused: isPaused,
+      heartbeatAgeMs: heartbeatAge,
+      lastFailure,
       job: runningJob || pausedJob || latestJob
     });
   } catch (error) {
