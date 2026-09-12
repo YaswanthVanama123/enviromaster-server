@@ -6,9 +6,9 @@
 import { RouteStarCustomer } from "../../models/customer/index.js";
 import { scrapeAccountNumbers } from "../../services/routestarScraper.js";
 import {
-  streamInventoryCustomers,
-  isInventoryDbConfigured,
-} from "../../services/sync/inventoryCustomersService.js";
+  streamBiCustomers,
+  isBiDbConfigured,
+} from "../../services/sync/biCustomersService.js";
 import logger from "../../utils/logger.js";
 import { acquireBrowserGate } from "../../utils/browserGate.js";
 import { runAutoMapByAccountNumber } from "./companyMappingController.js";
@@ -146,11 +146,10 @@ export const startSync = async (req, res) => {
       });
     }
 
-    if (!isInventoryDbConfigured()) {
+    if (!isBiDbConfigured()) {
       return res.status(503).json({
         success: false,
-        error:
-          "INVENTORY_MONGO_URI is not configured. Customers are imported from the inventory database.",
+        error: "BI_MONGO_URI is not configured. Customers are imported from the BI database.",
       });
     }
 
@@ -192,18 +191,18 @@ export const startSync = async (req, res) => {
  */
 async function runSyncInBackground() {
   try {
-    logger.debug("🚀 Starting RouteStar customer import from the inventory database...");
+    logger.debug("🚀 Starting RouteStar customer import from the BI database...");
 
     syncStatus.progress = 5;
-    syncStatus.message = "Reading customers from the inventory database...";
+    syncStatus.message = "Reading customers from the BI database...";
 
     let savedCount = 0;
 
-    const stats = await streamInventoryCustomers(async (batch, { read, total }) => {
+    const stats = await streamBiCustomers(async (batch, { read, total }) => {
       savedCount += await saveCustomersToDatabase(batch);
       const pct = total > 0 ? Math.min(95, 5 + Math.floor((read / total) * 90)) : 50;
       syncStatus.progress = pct;
-      syncStatus.message = `Imported ${read}/${total} customers from inventory...`;
+      syncStatus.message = `Imported ${read}/${total} customers from BI...`;
     });
 
     let mappedCount = 0;
@@ -219,15 +218,15 @@ async function runSyncInBackground() {
     syncStatus.lastSyncResult = syncStatus.lastSyncResult === "partial" ? "partial" : "success";
     syncStatus.progress = 100;
     syncStatus.message =
-      `Imported ${stats.mapped} customers from inventory, saved/updated ${savedCount}` +
+      `Imported ${stats.mapped} customers from BI, saved/updated ${savedCount}` +
       (stats.skipped ? ` (${stats.skipped} skipped)` : "") +
       ` · auto-mapped ${mappedCount}`;
 
     logger.debug(
-      `✅ Inventory customer import completed: read ${stats.read}, mapped ${stats.mapped}, saved ${savedCount}`
+      `✅ BI customer import completed: read ${stats.read}, mapped ${stats.mapped}, saved ${savedCount}`
     );
   } catch (error) {
-    logger.error("❌ Inventory customer import failed:", error);
+    logger.error("❌ BI customer import failed:", error);
     syncStatus.isRunning = false;
     syncStatus.lastSyncAt = new Date();
     syncStatus.lastSyncResult = "failed";
