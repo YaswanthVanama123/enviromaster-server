@@ -3,11 +3,12 @@ import {
   getBiConnection,
   isBiDbConfigured,
   getBiCollectionPrefix,
-  getBiTenantCode,
 } from "../../config/biDb.js";
 import logger from "../../utils/logger.js";
 
-const collectionFor = (name) => `${getBiCollectionPrefix()}${name}`;
+const SOURCE_CUSTOMERS = "routestarcustomers";
+const SOURCE_ROUTES = "routestarcustomerroutes";
+const biCollection = (name) => `${getBiCollectionPrefix()}${name}`;
 
 let models = null;
 
@@ -19,83 +20,11 @@ function getBiModels() {
     new mongoose.Schema({}, { strict: false, collection, versionKey: false });
 
   models = {
-    Tenant: conn.model("BiTenant", loose(collectionFor("tenants"))),
-    Customer: conn.model("BiCustomer", loose(collectionFor("customers"))),
+    SourceCustomer: conn.model("BiSourceCustomer", loose(SOURCE_CUSTOMERS)),
+    CustomerAccount: conn.model("BiCustomerAccount", loose(biCollection("customeraccounts"))),
   };
   return models;
 }
-
-async function resolveTenantId() {
-  const { Tenant } = getBiModels();
-  const tenantCode = getBiTenantCode();
-  const tenant = await Tenant.findOne({ tenantCode }).select("_id tenantCode").lean();
-
-  if (!tenant) {
-    const err = new Error(
-      `BI tenant "${tenantCode}" was not found in ${collectionFor("tenants")}. Set BI_TENANT_CODE.`
-    );
-    err.code = "bi_tenant_not_found";
-    throw err;
-  }
-  return tenant._id;
-}
-
-function buildPipeline(tenantId) {
-  return [
-    { $match: { tenantId } },
-    { $sort: { _id: 1 } },
-    {
-      $lookup: {
-        from: collectionFor("customerlocations"),
-        let: { cid: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$customerId", "$$cid"] },
-              $or: [{ effectiveEnd: null }, { effectiveEnd: { $exists: false } }],
-            },
-          },
-          {
-            $addFields: {
-              typeRank: {
-                $switch: {
-                  branches: [
-                    { case: { $eq: ["$locationType", "service"] }, then: 0 },
-                    { case: { $eq: ["$locationType", "both"] }, then: 1 },
-                  ],
-                  default: 2,
-                },
-              },
-            },
-          },
-          { $sort: { isActive: -1, typeRank: 1, updatedAt: -1 } },
-          { $limit: 1 },
-        ],
-        as: "location",
-      },
-    },
-    {
-      $lookup: {
-        from: collectionFor("customercontacts"),
-        let: { cid: "$_id" },
-        pipeline: [
-          { $match: { $expr: { $eq: ["$customerId", "$$cid"] } } },
-          { $sort: { isPrimary: -1, updatedAt: -1 } },
-          { $limit: 1 },
-        ],
-        as: "contact",
-      },
-    },
-    {
-      $addFields: {
-        location: { $arrayElemAt: ["$location", 0] },
-        contact: { $arrayElemAt: ["$contact", 0] },
-      },
-    },
-  ];
-}
-
-const INACTIVE_STATUSES = new Set(["suspended", "stopped", "cancelled", "churned", "inactive"]);
 
 const firstNonEmpty = (...values) => {
   for (const value of values) {
@@ -104,6 +33,14 @@ const firstNonEmpty = (...values) => {
     if (text) return text;
   }
   return undefined;
+};
+
+const joinParts = (...parts) => {
+  const joined = parts
+    .map((p) => (p === undefined || p === null ? "" : String(p).trim()))
+    .filter(Boolean)
+    .join(", ");
+  return joined || undefined;
 };
 
 const toNumber = (value) => {
@@ -118,55 +55,85 @@ const toDate = (value) => {
   return isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
+const toFlagLabel = (value) => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value).trim() || undefined;
+};
+
+export function isChurnedName(name) {
+  return /^zzz/i.test(String(name || "").trim());
+}
+
 export function mapBiCustomer(doc) {
-  const routeStarId = firstNonEmpty(doc.routeStarCustomerId);
+  const account = Array.isArray(doc.account) ? doc.account[0] || {} : doc.account || {};
+  const routes = Array.isArray(doc.routes) ? doc.routes : [];
+
+  const routeStarId = firstNonEmpty(doc.customerId, account.customerId);
   if (!routeStarId) return null;
 
-  const name = firstNonEmpty(doc.customerName, doc.companyName);
+  const name = firstNonEmpty(
+    doc.customerName,
+    doc.company,
+    doc.contact,
+    account.customerName,
+    account.company
+  );
   if (!name) return null;
 
-  const location = doc.location || {};
-  const contact = doc.contact || {};
-  const status = String(doc.customerStatus || "").toLowerCase();
-  const addressLines = Array.isArray(location.addressLines) ? location.addressLines : [];
-  const address = addressLines
-    .map((line) => (line === undefined || line === null ? "" : String(line).trim()))
-    .filter((line) => line && line !== "(no address)")
-    .join(", ");
+  const statusText = String(doc.status || "").toLowerCase();
+  const isInactive =
+    doc.active === false ||
+    isChurnedName(name) ||
+    ["cancel", "suspend", "stop", "churn", "inactiv"].some((token) => statusText.includes(token));
 
-  const city = firstNonEmpty(location.city);
-  const postalCode = firstNonEmpty(location.postalCode);
+  const routeName = firstNonEmpty(
+    ...routes.map((r) => r?.routeName),
+    ...(Array.isArray(account.routes) ? account.routes.map((r) => r?.Route ?? r?.route) : []),
+    doc.onRoute
+  );
 
   const mapped = {
     routeStarId,
     name,
-    address: address || undefined,
-    city: city === "UNKNOWN" ? undefined : city,
-    state: firstNonEmpty(location.state),
-    zipCode: postalCode === "00000" ? undefined : postalCode,
-    phone: firstNonEmpty(contact.phone),
-    email: firstNonEmpty(contact.email),
-    company: firstNonEmpty(doc.companyName),
-    isActive: !INACTIVE_STATUSES.has(status),
-    status: firstNonEmpty(doc.sourceStatusText, doc.customerStatus),
-    grouping: firstNonEmpty(doc.customerGrouping),
-    zone: firstNonEmpty(location.zone),
-    salesRep: firstNonEmpty(doc.salesRepresentative),
-    customerType: firstNonEmpty(doc.customerCategory),
-    terms: firstNonEmpty(doc.paymentTerms),
+    address:
+      joinParts(doc.serviceAddress1, doc.serviceAddress2, doc.serviceAddress3) ??
+      joinParts(account.serviceAddress1, account.serviceAddress2, account.serviceAddress3) ??
+      joinParts(doc.billingAddress1, doc.billingAddress2, doc.billingAddress3),
+    city: firstNonEmpty(doc.serviceCity, account.serviceCity, doc.billingCity),
+    state: firstNonEmpty(doc.serviceState, account.serviceState, doc.billingState),
+    zipCode: firstNonEmpty(doc.serviceZip, account.serviceZip, doc.billingZip),
+    phone: firstNonEmpty(doc.phone, doc.altPhone, doc.mobilePhone),
+    email: firstNonEmpty(doc.email, doc.ccEmail),
+    company: firstNonEmpty(doc.company, account.company),
+    isActive: !isInactive,
+    status: firstNonEmpty(doc.status),
+    isPaperless: doc.paperless === true,
+    notifyBy: firstNonEmpty(doc.notificationMethod),
+    proofOfService: toFlagLabel(doc.proofOfService),
+    preferredPaymentMethod: firstNonEmpty(doc.preferredPaymentMethod),
+    grouping: firstNonEmpty(doc.grouping),
+    onRoute: routeName,
+    zone: firstNonEmpty(doc.zone, account.zone),
+    salesRep: firstNonEmpty(doc.salesRep),
+    customerType: firstNonEmpty(doc.customerType),
+    terms: firstNonEmpty(doc.terms),
     taxCode: firstNonEmpty(doc.taxCode),
     taxRate: toNumber(doc.taxRate) ?? 0,
     balance: toNumber(doc.balance) ?? 0,
-    detailUrl: firstNonEmpty(doc.source?.sourceUrl),
-    createdInRouteStar: toDate(doc.source?.sourceCreatedAt),
+    priceLevel: firstNonEmpty(doc.priceLevel),
+    priceGrouping: firstNonEmpty(doc.priceGrouping),
+    creditLimit: toNumber(doc.creditLimit) ?? 0,
+    detailUrl: firstNonEmpty(account.detailUrl, doc.detailUrl),
+    createdInRouteStar: toDate(doc.createdDate ?? account.createdDate),
     lastSyncedAt: new Date(),
   };
 
-  const accountNumber = firstNonEmpty(doc.routeStarAccountNumber);
+  const accountNumber = firstNonEmpty(doc.accountNumber, account.accountNumber);
   if (accountNumber) {
     mapped.accountNumber = accountNumber;
     mapped.account = accountNumber;
-    mapped.accountNumberFetchedAt = toDate(doc.source?.lastSyncedAt) ?? new Date();
+    mapped.accountNumberFetchedAt = toDate(account.updatedAt ?? doc.lastSyncDate) ?? new Date();
   }
 
   for (const key of Object.keys(mapped)) {
@@ -177,16 +144,20 @@ export function mapBiCustomer(doc) {
 }
 
 export async function countBiCustomers() {
-  const { Customer } = getBiModels();
-  const tenantId = await resolveTenantId();
-  return Customer.countDocuments({ tenantId });
+  const { SourceCustomer } = getBiModels();
+  return SourceCustomer.countDocuments({});
 }
 
 export async function streamBiCustomers(onBatch, { batchSize = 500 } = {}) {
-  const { Customer } = getBiModels();
-  const tenantId = await resolveTenantId();
-  const total = await Customer.countDocuments({ tenantId });
+  const { SourceCustomer, CustomerAccount } = getBiModels();
 
+  const [sourceTotal, accountTotal] = await Promise.all([
+    SourceCustomer.countDocuments({}),
+    CustomerAccount.countDocuments({}),
+  ]);
+  const total = Math.max(sourceTotal, accountTotal);
+
+  const seen = new Set();
   let read = 0;
   let mapped = 0;
   let skipped = 0;
@@ -198,29 +169,65 @@ export async function streamBiCustomers(onBatch, { batchSize = 500 } = {}) {
     batch = [];
   };
 
-  const cursor = Customer.aggregate(buildPipeline(tenantId))
-    .allowDiskUse(true)
-    .cursor({ batchSize });
-
-  for await (const doc of cursor) {
+  const consume = async (doc) => {
     read++;
     const row = mapBiCustomer(doc);
     if (!row) {
       skipped++;
-      continue;
+      return;
     }
+    seen.add(row.routeStarId);
     mapped++;
     batch.push(row);
     if (batch.length >= batchSize) await flush();
-  }
+  };
 
+  const sourceCursor = SourceCustomer.aggregate([
+    { $sort: { _id: 1 } },
+    {
+      $lookup: {
+        from: biCollection("customeraccounts"),
+        localField: "customerId",
+        foreignField: "customerId",
+        as: "account",
+      },
+    },
+    {
+      $lookup: {
+        from: SOURCE_ROUTES,
+        localField: "customerId",
+        foreignField: "customerId",
+        as: "routes",
+      },
+    },
+  ])
+    .allowDiskUse(true)
+    .cursor({ batchSize });
+
+  for await (const doc of sourceCursor) await consume(doc);
+  await flush();
+
+  let accountOnly = 0;
+  const accountCursor = CustomerAccount.find({}).sort({ _id: 1 }).lean().cursor({ batchSize });
+
+  for await (const acct of accountCursor) {
+    const id = firstNonEmpty(acct.customerId);
+    if (!id || seen.has(id)) continue;
+    accountOnly++;
+    await consume({ ...acct, account: [acct], routes: [] });
+  }
   await flush();
 
   if (skipped > 0) {
-    logger.warn(`[BiCustomers] Skipped ${skipped} BI customer(s) with no RouteStar id or name`);
+    logger.warn(`[BiCustomers] Skipped ${skipped} customer(s) with no id or name`);
+  }
+  if (accountOnly > 0) {
+    logger.info(
+      `[BiCustomers] Included ${accountOnly} customer(s) present only in ${biCollection("customeraccounts")}`
+    );
   }
 
-  return { total, read, mapped, skipped };
+  return { total, read, mapped, skipped, accountOnly, sourceTotal, accountTotal };
 }
 
 export { isBiDbConfigured };

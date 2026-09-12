@@ -12,6 +12,7 @@ import logger from "./utils/logger.js";
 // Agreement Domain Routes
 import pdfRoutes from "./routes/agreement/pdfRoutes.js";
 import productionPushRoutes from "./routes/agreement/productionPushRoutes.js";
+import diagnosticsRoutes from "./routes/admin/diagnosticsRoutes.js";
 import manualUploadRoutes from './routes/agreement/manualUploadRoutes.js';
 import versionRoutes from './routes/agreement/versionRoutes.js';
 import emailRoutes from './routes/agreement/emailRoutes.js';
@@ -182,6 +183,7 @@ app.use((req, _res, next) => {
 app.use('/api/proposals', proposalRoutes);
 app.use("/api/pdf",       pdfRoutes);
 app.use("/api/production-push", productionPushRoutes);
+app.use("/api/diagnostics", diagnosticsRoutes);
 app.use("/api/admin", adminAuthRoutes);
 app.use("/api/employee", employeeAuthRoutes);
 app.use("/api/users", userManagementRoutes);
