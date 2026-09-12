@@ -57,7 +57,7 @@ export function requireAdmin(req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.role !== 'admin') {
-      return res.status(403).json({ error: 'Forbidden', detail: 'Admin access required' });
+      return res.status(403).json({ error: 'Forbidden', code: 'role_mismatch', detail: 'Admin access required' });
     }
     req.user = {
       id: payload.id,
@@ -89,7 +89,7 @@ export function requireEmployee(req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.role !== 'employee') {
-      return res.status(403).json({ error: 'Forbidden', detail: 'Employee access required' });
+      return res.status(403).json({ error: 'Forbidden', code: 'role_mismatch', detail: 'Employee access required' });
     }
     req.user = {
       id: payload.id,

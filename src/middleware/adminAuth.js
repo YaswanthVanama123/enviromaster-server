@@ -72,6 +72,7 @@ function permissionGuard(permKey, label) {
       if (!allowed) {
         return res.status(403).json({
           error: "Forbidden",
+          code: "permission_denied",
           detail: `You do not have permission to ${label}`,
         });
       }
