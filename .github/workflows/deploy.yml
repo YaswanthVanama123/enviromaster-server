@@ -47,6 +47,27 @@ jobs:
 
       - name: Health check
         run: |
-          echo "Waiting for backend to stabilize..."
-          sleep 15
-          curl -f https://backend.clicksolver.com/health || exit 1
+          echo "Checking backend health..."
+
+          for i in {1..12}; do
+            echo "Attempt $i of 12..."
+
+            if curl \
+              --fail \
+              --silent \
+              --show-error \
+              --connect-timeout 10 \
+              --max-time 15 \
+              https://pdfform.enviromasternva.com/health; then
+
+              echo ""
+              echo "Backend is healthy."
+              exit 0
+            fi
+
+            echo "Backend is not ready yet. Retrying in 10 seconds..."
+            sleep 10
+          done
+
+          echo "Backend health check failed."
+          exit 1
