@@ -399,6 +399,9 @@ const CustomerHeaderDocSchema = new mongoose.Schema(
     isNewLocation: { type: Boolean, default: null },
     locationTypeCheckedAt: { type: Date, default: null },
 
+    pushedToProductionAt: { type: Date, default: null },
+    pushedToProductionBy: { type: String, default: null, trim: true },
+    pushedFromEnv: { type: String, default: null, trim: true },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
     deletedBy: { type: String, default: null },
@@ -412,6 +415,7 @@ const CustomerHeaderDocSchema = new mongoose.Schema(
 // Indexes
 CustomerHeaderDocSchema.index({ createdAt: -1 });
 CustomerHeaderDocSchema.index({ isDeleted: 1, createdAt: -1 });
+CustomerHeaderDocSchema.index({ pushedToProductionAt: -1 });
 CustomerHeaderDocSchema.index({ "payload.headerTitle": "text" });
 CustomerHeaderDocSchema.index({ status: 1, createdAt: -1 });
 CustomerHeaderDocSchema.index({ createdBy: 1, isDeleted: 1, createdAt: -1 });

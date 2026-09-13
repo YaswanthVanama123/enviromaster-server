@@ -167,6 +167,18 @@ export async function getSavedFilesGrouped(req, res) {
       matchFilter['payload.commission.annualCommission'] = { $gt: 0 };
     }
 
+    // Documents that arrived here via a Push to Production carry a
+    // pushedToProductionAt stamp. `source=migrated` narrows to just those;
+    // omitting it leaves them mixed in with everything else.
+    if (req.query.source === 'migrated') {
+      matchFilter.pushedToProductionAt = { $ne: null, $exists: true };
+    } else if (req.query.source === 'local') {
+      matchFilter.$or = [
+        { pushedToProductionAt: null },
+        { pushedToProductionAt: { $exists: false } }
+      ];
+    }
+
     const isTrashMode = req.query.isDeleted === 'true';
     const includeDrafts = req.query.includeDrafts === 'true';
     const includeLogs = req.query.includeLogs === 'true' || isTrashMode;
@@ -208,6 +220,9 @@ export async function getSavedFilesGrouped(req, res) {
                 annualCommission: '$payload.commission.annualCommission',
                 weeklyCommission: '$payload.commission.weeklyCommission',
                 monthlyValue: '$payload.summary.serviceAgreementTotal',
+                pushedToProductionAt: 1,
+                pushedToProductionBy: 1,
+                pushedFromEnv: 1,
                 attachedFiles: 1
               }
             },
@@ -391,6 +406,10 @@ export async function getSavedFilesGrouped(req, res) {
         hasUploads: allFiles.some(f => f.zohoInfo.biginDealId || f.zohoInfo.crmDealId) ||
                     !!(agreement.biginDealId || agreement.crmDealId),
         startDate: agreement.startDate || null, contractMonths: agreement.contractMonths || null,
+        isMigrated: !!agreement.pushedToProductionAt,
+        migratedAt: agreement.pushedToProductionAt || null,
+        migratedBy: agreement.pushedToProductionBy || null,
+        migratedFromEnv: agreement.pushedFromEnv || null,
         files: allFiles
       };
     });
