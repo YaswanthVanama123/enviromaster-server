@@ -7,6 +7,13 @@ import CustomerHeaderDoc, { DOCUMENT_STATUS } from "./CustomerHeaderDoc.model.js
 import VersionPdf, { VERSION_STATUS, CREATION_REASON } from "./VersionPdf.model.js";
 import ManualUploadDocument, { UPLOAD_STATUS } from "./ManualUploadDocument.model.js";
 import AdminHeaderDoc from "./AdminHeaderDoc.model.js";
+import SignatureRequest, {
+  SIGNATURE_REQUEST_STATUS,
+  SIGNER_STATUS,
+  SIGNATURE_METHOD,
+  SIGNED_VIA,
+  SIGNER_ROLE,
+} from "./SignatureRequest.model.js";
 
 export {
   // Models
@@ -14,12 +21,18 @@ export {
   VersionPdf,
   ManualUploadDocument,
   AdminHeaderDoc,
+  SignatureRequest,
 
   // Constants
   DOCUMENT_STATUS,
   VERSION_STATUS,
   CREATION_REASON,
   UPLOAD_STATUS,
+  SIGNATURE_REQUEST_STATUS,
+  SIGNER_STATUS,
+  SIGNATURE_METHOD,
+  SIGNED_VIA,
+  SIGNER_ROLE,
 };
 
 export default {
@@ -27,4 +40,5 @@ export default {
   VersionPdf,
   ManualUploadDocument,
   AdminHeaderDoc,
+  SignatureRequest,
 };

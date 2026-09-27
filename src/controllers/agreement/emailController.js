@@ -2,6 +2,7 @@ import { sendEmail as sendEmailService, verifyEmailConfig } from '../../services
 import { CustomerHeaderDoc, VersionPdf, ManualUploadDocument } from "../../models/agreement/index.js";
 import { Log } from "../../models/logging/index.js";
 import { compileCustomerHeader } from '../../services/pdfService.js';
+import { resolveSignedCopy } from "../../services/agreement/signedCopyService.js";
 import logger from "../../utils/logger.js";
 
 export async function sendEmailWithPdf(req, res) {
@@ -58,7 +59,7 @@ export async function sendEmailWithPdf(req, res) {
 
       if (requestedCategory === 'version') {
         const version = await VersionPdf.findById(documentId)
-          .select('_id versionNumber versionLabel fileName payloadSnapshot')
+          .select('_id agreementId versionNumber versionLabel fileName payloadSnapshot')
           .lean();
 
         let skipVersionCompile = false;
@@ -95,15 +96,28 @@ export async function sendEmailWithPdf(req, res) {
         }
 
         if (!skipVersionCompile) {
-          logger.debug(`📄 [EMAIL-CONTROLLER] Compiling version PDF: ${version.versionLabel}`);
-          const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, { watermark });
-          if (!compiledPdf?.buffer) {
-            throw new Error('Failed to compile version PDF');
+          const signed = watermark
+            ? null
+            : await resolveSignedCopy({
+                agreementId: version.agreementId,
+                versionId: version._id,
+              });
+
+          if (signed) {
+            logger.debug(`📄 [EMAIL-CONTROLLER] Attaching signed copy: ${version.versionLabel}`);
+            pdfBuffer = signed.buffer;
+            fileName = version.fileName;
+          } else {
+            logger.debug(`📄 [EMAIL-CONTROLLER] Compiling version PDF: ${version.versionLabel}`);
+            const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, { watermark });
+            if (!compiledPdf?.buffer) {
+              throw new Error('Failed to compile version PDF');
+            }
+            pdfBuffer = compiledPdf.buffer;
+            fileName = watermark
+              ? version.fileName.replace('.pdf', '_DRAFT.pdf')
+              : version.fileName;
           }
-          pdfBuffer = compiledPdf.buffer;
-          fileName = watermark
-            ? version.fileName.replace('.pdf', '_DRAFT.pdf')
-            : version.fileName;
         }
 
       } else if (requestedCategory === 'manual') {
@@ -148,19 +162,31 @@ export async function sendEmailWithPdf(req, res) {
         if (!agreement) {
           if (!documentType) {
             const version = await VersionPdf.findById(documentId)
-              .select('_id versionNumber versionLabel fileName payloadSnapshot')
+              .select('_id agreementId versionNumber versionLabel fileName payloadSnapshot')
               .lean();
 
             if (version) {
               logger.debug(`📄 [EMAIL-CONTROLLER] Auto-detected as version PDF`);
-              const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, { watermark });
-              if (!compiledPdf?.buffer) {
-                throw new Error('Failed to compile version PDF');
+              const signedVersion = watermark
+                ? null
+                : await resolveSignedCopy({
+                    agreementId: version.agreementId,
+                    versionId: version._id,
+                  });
+
+              if (signedVersion) {
+                pdfBuffer = signedVersion.buffer;
+                fileName = version.fileName;
+              } else {
+                const compiledPdf = await compileCustomerHeader(version.payloadSnapshot, { watermark });
+                if (!compiledPdf?.buffer) {
+                  throw new Error('Failed to compile version PDF');
+                }
+                pdfBuffer = compiledPdf.buffer;
+                fileName = watermark
+                  ? version.fileName.replace('.pdf', '_DRAFT.pdf')
+                  : version.fileName;
               }
-              pdfBuffer = compiledPdf.buffer;
-              fileName = watermark
-                ? version.fileName.replace('.pdf', '_DRAFT.pdf')
-                : version.fileName;
             } else {
               throw new Error(`Document not found with ID: ${documentId}`);
             }
@@ -172,11 +198,20 @@ export async function sendEmailWithPdf(req, res) {
             throw new Error('PDF not available. Please generate it first.');
           }
 
-          const rawBuffer = agreement.pdf_meta.pdfBuffer;
-          const hasBufferProperty = rawBuffer.buffer;
-          const isBufferInstance = Buffer.isBuffer(rawBuffer);
-          const bufferChoice = hasBufferProperty ? Buffer.from(rawBuffer.buffer) : rawBuffer;
-          pdfBuffer = isBufferInstance ? bufferChoice : Buffer.from(rawBuffer);
+          const signed = await resolveSignedCopy({
+            agreementId: agreement._id,
+            versionId: null,
+          });
+
+          if (signed) {
+            pdfBuffer = signed.buffer;
+          } else {
+            const rawBuffer = agreement.pdf_meta.pdfBuffer;
+            const hasBufferProperty = rawBuffer.buffer;
+            const isBufferInstance = Buffer.isBuffer(rawBuffer);
+            const bufferChoice = hasBufferProperty ? Buffer.from(rawBuffer.buffer) : rawBuffer;
+            pdfBuffer = isBufferInstance ? bufferChoice : Buffer.from(rawBuffer);
+          }
 
           fileName = `${agreement.payload?.headerTitle || 'Agreement'}.pdf`;
           logger.debug(`📄 [EMAIL-CONTROLLER] Loaded agreement PDF: ${fileName} (${pdfBuffer.length} bytes)`);

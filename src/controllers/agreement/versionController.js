@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 import { VersionPdf, CustomerHeaderDoc } from "../../models/agreement/index.js";
 import { compileCustomerHeader } from "../../services/pdfService.js";
+import {
+  resolveSignedCopy,
+  sendSignedCopy,
+} from "../../services/agreement/signedCopyService.js";
 import logger from "../../utils/logger.js";
 
 export async function getAllVersionPdfs(req, res) {
@@ -258,6 +262,19 @@ export async function downloadVersionPdf(req, res) {
         success: false,
         error: "Version not found"
       });
+    }
+
+    if (!applyWatermark) {
+      const signed = await resolveSignedCopy({
+        agreementId: version.agreementId?._id || version.agreementId,
+        versionId: version._id,
+      });
+      if (signed) {
+        logger.debug(
+          `📥 [VERSION-DOWNLOAD] Serving signed copy for version ${version.versionNumber}`
+        );
+        return sendSignedCopy(res, signed, version.fileName || 'agreement.pdf');
+      }
     }
 
     logger.debug(`📥 [VERSION-DOWNLOAD] Downloading version ${version.versionNumber}:`, {
@@ -812,6 +829,19 @@ export async function viewVersionPdf(req, res) {
         success: false,
         error: "Version not found"
       });
+    }
+
+    if (!applyWatermark) {
+      const signed = await resolveSignedCopy({
+        agreementId: version.agreementId,
+        versionId: version._id,
+      });
+      if (signed) {
+        logger.debug(
+          `👁️ [VERSION-VIEW] Serving signed copy for version ${version.versionNumber}`
+        );
+        return sendSignedCopy(res, signed, version.fileName || 'agreement.pdf');
+      }
     }
 
     logger.debug(`👁️ [VERSION-VIEW] Viewing version ${version.versionNumber}:`, {

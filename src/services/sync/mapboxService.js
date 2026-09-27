@@ -43,6 +43,60 @@ export async function geocodeAddress(address) {
   return { lng, lat, formattedAddress: response.data.features[0].place_name };
 }
 
+const MAPBOX_CONTEXT_FIELDS = {
+  place: 'city',
+  locality: 'city',
+  region: 'region',
+  postcode: 'postalCode',
+  country: 'country',
+};
+
+export async function reverseGeocode(longitude, latitude) {
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    throw new Error('Valid longitude and latitude are required for reverse geocoding');
+  }
+
+  const accessToken = process.env.MAPBOX_ACCESS_TOKEN;
+  if (!accessToken) {
+    throw new Error('MAPBOX_ACCESS_TOKEN environment variable is not set');
+  }
+
+  const response = await axios.get(
+    `${MAPBOX_GEOCODING_URL}/${longitude},${latitude}.json`,
+    {
+      params: {
+        access_token: accessToken,
+        limit: 1,
+        types: 'address,place,locality,postcode,region,country',
+      },
+      timeout: 8000,
+    }
+  );
+
+  const feature = response.data?.features?.[0];
+  if (!feature) {
+    throw new Error(`Unable to reverse geocode coordinates: ${latitude}, ${longitude}`);
+  }
+
+  const parts = { address: feature.place_name || '', city: '', region: '', postalCode: '', country: '' };
+
+  for (const entry of feature.context || []) {
+    const kind = String(entry.id || '').split('.')[0];
+    const field = MAPBOX_CONTEXT_FIELDS[kind];
+    if (field && !parts[field]) {
+      parts[field] = entry.text || '';
+    }
+  }
+
+  const ownKind = String(feature.id || '').split('.')[0];
+  const ownField = MAPBOX_CONTEXT_FIELDS[ownKind];
+  if (ownField && !parts[ownField]) {
+    parts[ownField] = feature.text || '';
+  }
+
+  return parts;
+}
+
 /**
  * Get driving time between two addresses
  * @param {string} fromAddress - Origin address
@@ -140,6 +194,7 @@ export function buildAddressString(customer) {
 
 export default {
   geocodeAddress,
+  reverseGeocode,
   getDrivingTime,
   getDrivingTimesToMultiple,
   buildAddressString

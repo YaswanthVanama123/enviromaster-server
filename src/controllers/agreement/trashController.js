@@ -4,7 +4,7 @@
  */
 
 import mongoose from "mongoose";
-import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf } from "../../models/agreement/index.js";
+import { CustomerHeaderDoc, ManualUploadDocument, VersionPdf, SignatureRequest } from "../../models/agreement/index.js";
 import { Log } from "../../models/logging/index.js";
 import logger from "../../utils/logger.js";
 
@@ -209,17 +209,18 @@ export async function permanentlyDeleteAgreement(req, res) {
 
     const attachedFileIds = (agreement.attachedFiles || []).filter(a => a.manualDocumentId).map(a => a.manualDocumentId);
 
-    const [manualResult, versionResult, logResult] = await Promise.all([
+    const [manualResult, versionResult, logResult, signatureResult] = await Promise.all([
       attachedFileIds.length > 0 ? ManualUploadDocument.deleteMany({ _id: { $in: attachedFileIds } }) : Promise.resolve({ deletedCount: 0 }),
       VersionPdf.deleteMany({ agreementId }),
-      Log.deleteMany({ agreementId })
+      Log.deleteMany({ agreementId }),
+      SignatureRequest.deleteMany({ agreementId })
     ]);
 
     await CustomerHeaderDoc.findByIdAndDelete(agreementId);
 
     res.json({
       success: true, message: "Agreement permanently deleted",
-      deletedData: { agreementId, deletedAttachedFiles: manualResult.deletedCount, deletedVersions: versionResult.deletedCount, deletedLogs: logResult.deletedCount }
+      deletedData: { agreementId, deletedAttachedFiles: manualResult.deletedCount, deletedVersions: versionResult.deletedCount, deletedLogs: logResult.deletedCount, deletedSignatureRequests: signatureResult.deletedCount }
     });
   } catch (err) {
     logger.error("permanentlyDeleteAgreement error:", err);

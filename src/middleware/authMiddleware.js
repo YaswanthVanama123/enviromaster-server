@@ -44,6 +44,35 @@ export function requireAuth(req, res, next) {
 }
 
 /**
+ * Middleware for GET download endpoints that native clients open directly
+ * (Image sources, WebViews, Linking) and therefore cannot attach an
+ * Authorization header to. Accepts ?token=<jwt> and falls back to the header.
+ * Only mount this on read-only endpoints.
+ */
+export function requireAuthAllowQueryToken(req, res, next) {
+  const hdr = req.headers.authorization || '';
+  const headerToken = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
+  const queryToken = typeof req.query?.token === 'string' ? req.query.token : null;
+  const token = headerToken || queryToken;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized', detail: 'Missing Authorization token' });
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = {
+      id: payload.id,
+      username: payload.username,
+      role: payload.role,
+    };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Unauthorized', detail: 'Invalid or expired token' });
+  }
+}
+
+/**
  * Middleware to require admin role only
  */
 export function requireAdmin(req, res, next) {

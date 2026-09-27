@@ -5,6 +5,10 @@
 
 import mongoose from "mongoose";
 import { CustomerHeaderDoc, ManualUploadDocument } from "../../models/agreement/index.js";
+import {
+  resolveSignedCopy,
+  sendSignedCopy,
+} from "../../services/agreement/signedCopyService.js";
 import logger from "../../utils/logger.js";
 
 export async function getSavedFilesList(req, res) {
@@ -313,6 +317,39 @@ export async function getSavedFilesGrouped(req, res) {
                 ],
                 as: 'manualUploads'
               }
+            },
+            {
+              $lookup: {
+                from: 'signaturerequests',
+                let: { agreementId: '$_id' },
+                pipeline: [
+                  { $match: { $expr: { $eq: ['$agreementId', '$$agreementId'] } } },
+                  {
+                    $project: {
+                      _id: 1,
+                      status: 1,
+                      envelopeId: 1,
+                      updatedAt: 1,
+                      completedAt: 1,
+                      totalSigners: { $size: { $ifNull: ['$signers', []] } },
+                      signedCount: {
+                        $size: {
+                          $filter: {
+                            input: { $ifNull: ['$signers', []] },
+                            as: 'signer',
+                            cond: { $eq: ['$$signer.status', 'signed'] }
+                          }
+                        }
+                      },
+                      signedPdfAvailable: {
+                        $gt: [{ $ifNull: ['$signedPdf.sizeBytes', 0] }, 0]
+                      }
+                    }
+                  },
+                  { $limit: 1 }
+                ],
+                as: 'signatureRequests'
+              }
             }
           ]
         }
@@ -390,8 +427,22 @@ export async function getSavedFilesGrouped(req, res) {
         ? agreement.lockedMonthlyValue
         : (agreement.monthlyValue || 0);
 
+      const signatureRequest = (agreement.signatureRequests || [])[0] || null;
+      const signature = signatureRequest
+        ? {
+            status: signatureRequest.status,
+            envelopeId: signatureRequest.envelopeId || null,
+            totalSigners: signatureRequest.totalSigners || 0,
+            signedCount: signatureRequest.signedCount || 0,
+            signedPdfAvailable: !!signatureRequest.signedPdfAvailable,
+            updatedAt: signatureRequest.updatedAt || null,
+            completedAt: signatureRequest.completedAt || null,
+          }
+        : null;
+
       return {
         id: agreement._id, agreementTitle: agreement.title || 'Untitled Agreement',
+        signature,
         fileCount: allFiles.length, latestUpdate: agreement.updatedAt,
         statuses: [agreement.status], isDeleted: agreement.isDeleted || false,
         deletedAt: agreement.deletedAt, deletedBy: agreement.deletedBy,
@@ -663,6 +714,13 @@ export async function downloadCustomerHeaderPdf(req, res) {
     }
 
     const filename = `${doc.payload?.headerTitle || 'document'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const signed = await resolveSignedCopy({ agreementId: doc._id, versionId: null });
+    if (signed) {
+      logger.debug(`Serving signed copy for agreement ${doc._id}`);
+      return sendSignedCopy(res, signed, filename);
+    }
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,

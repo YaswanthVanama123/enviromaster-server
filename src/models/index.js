@@ -84,10 +84,16 @@ export {
   VersionPdf,
   ManualUploadDocument,
   AdminHeaderDoc,
+  SignatureRequest,
   DOCUMENT_STATUS,
   VERSION_STATUS,
   CREATION_REASON,
   UPLOAD_STATUS,
+  SIGNATURE_REQUEST_STATUS,
+  SIGNER_STATUS,
+  SIGNATURE_METHOD,
+  SIGNED_VIA,
+  SIGNER_ROLE,
 } from "./agreement/index.js";
 
 // ============================================================
@@ -207,6 +213,7 @@ export default {
   VersionPdf: AgreementModels.VersionPdf,
   ManualUploadDocument: AgreementModels.ManualUploadDocument,
   AdminHeaderDoc: AgreementModels.AdminHeaderDoc,
+  SignatureRequest: AgreementModels.SignatureRequest,
 
   // Admin
   AdminSettings: AdminModels.AdminSettings,

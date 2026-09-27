@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import { CustomerHeaderDoc, VersionPdf } from "#models/agreement/index.js";
+import { resolveSignedCopy } from "../agreement/signedCopyService.js";
 import logger from "../../utils/logger.js";
 
 /**
@@ -115,7 +116,14 @@ export async function getPdfForAgreement(agreementId, options = {}) {
         (await CustomerHeaderDoc.findById(agreementId).select("pdf_meta fileName currentVersionNumber"));
 
       if (customerDoc?.pdf_meta?.pdfBuffer) {
-        const fallbackBuffer = Buffer.isBuffer(customerDoc.pdf_meta.pdfBuffer)
+        const signedAgreementCopy = await resolveSignedCopy({
+          agreementId,
+          versionId: null,
+        });
+
+        const fallbackBuffer = signedAgreementCopy
+          ? signedAgreementCopy.buffer
+          : Buffer.isBuffer(customerDoc.pdf_meta.pdfBuffer)
           ? customerDoc.pdf_meta.pdfBuffer
           : Buffer.from(customerDoc.pdf_meta.pdfBuffer);
         const resolvedFileName = customerDoc.fileName || customerDoc.pdf_meta.fileName || `agreement_${customerDoc.currentVersionNumber || 1}.pdf`;
@@ -154,6 +162,28 @@ export async function getPdfForAgreement(agreementId, options = {}) {
     }
 
     logger.debug(`📎 [PDF-LOOKUP] Found VersionPdf v${versionDoc.versionNumber} (ID: ${versionDoc._id})`);
+  }
+
+  const signedCopy = await resolveSignedCopy({
+    agreementId,
+    versionId: versionDoc._id,
+  });
+
+  if (signedCopy) {
+    logger.debug(
+      `📎 [PDF-LOOKUP] Using signed copy for VersionPdf v${versionDoc.versionNumber} (${signedCopy.buffer.length} bytes)`
+    );
+    return {
+      pdfBuffer: signedCopy.buffer,
+      source: "SignatureRequest",
+      version: versionDoc.versionNumber,
+      versionId: versionDoc._id,
+      fileName: versionDoc.fileName || `agreement_v${versionDoc.versionNumber}.pdf`,
+      requestedVersionId,
+      sizeBytes: signedCopy.buffer.length,
+      bufferSize: signedCopy.buffer.length,
+      signed: true,
+    };
   }
 
   if (!versionDoc.pdf_meta?.pdfBuffer) {
