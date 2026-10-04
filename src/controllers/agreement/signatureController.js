@@ -454,6 +454,103 @@ export async function downloadPublicSignedPdf(req, res) {
   }
 }
 
+function findSignerByReceipt(request, receipt) {
+  return (request.signers || []).find((entry) => entry.receiptToken === receipt);
+}
+
+function receiptExpired(signer) {
+  return (
+    !signer.receiptExpiresAt ||
+    new Date(signer.receiptExpiresAt).getTime() < Date.now()
+  );
+}
+
+async function loadReceipt(res, receipt) {
+  if (!receipt || typeof receipt !== "string" || receipt.length < 32) {
+    notFound(res, "This download link is no longer valid");
+    return null;
+  }
+
+  const request = await SignatureRequest.findByReceiptToken(receipt);
+  const signer = request ? findSignerByReceipt(request, receipt) : null;
+  if (!request || !signer) {
+    notFound(res, "This download link is no longer valid");
+    return null;
+  }
+
+  if (receiptExpired(signer)) {
+    res.status(410).json({
+      success: false,
+      error: "receipt_expired",
+      detail: "This download link has expired.",
+    });
+    return null;
+  }
+
+  return { request, signer };
+}
+
+export async function getReceiptContext(req, res) {
+  try {
+    const loaded = await loadReceipt(res, req.params.receipt);
+    if (!loaded) return;
+
+    const { request, signer } = loaded;
+    const signedCount = request.signers.filter(
+      (entry) => entry.status === SIGNER_STATUS.SIGNED
+    ).length;
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      success: true,
+      agreementTitle: request.agreementTitle,
+      documentLabel: request.versionLabel || "Agreement PDF",
+      requestStatus: request.status,
+      envelopeId: request.envelopeId || "",
+      totalSigners: request.signers.length,
+      signedCount,
+      signedPdfAvailable: !!request.signedPdf?.buffer,
+      receiptExpiresAt: signer.receiptExpiresAt,
+      signer: {
+        name: signer.name,
+        role: signer.role,
+        placement: signer.placement || "",
+        signedAt: signer.signedAt || null,
+        signatureId: signer.signatureId || null,
+      },
+    });
+  } catch (error) {
+    serverError(res, error, "getReceiptContext failed");
+  }
+}
+
+export async function downloadReceiptSignedPdf(req, res) {
+  try {
+    const loaded = await loadReceipt(res, req.params.receipt);
+    if (!loaded) return;
+
+    const { request } = loaded;
+    if (!request.signedPdf?.buffer) {
+      return notFound(res, "The signed copy is not ready yet");
+    }
+
+    const safeTitle = (request.agreementTitle || "agreement")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .slice(0, 80);
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${safeTitle}_signed.pdf"`,
+      "Content-Length": request.signedPdf.buffer.length.toString(),
+      "Cache-Control": "no-store",
+      "X-Envelope-Id": request.envelopeId || "",
+    });
+    res.send(request.signedPdf.buffer);
+  } catch (error) {
+    serverError(res, error, "downloadReceiptSignedPdf failed");
+  }
+}
+
 export async function getSignatureRequest(req, res) {
   try {
     const portalOrigin = resolvePortalOrigin(req);
@@ -524,6 +621,8 @@ export async function syncToLatestVersion(req, res) {
       signer.declineReason = "";
       signer.token = null;
       signer.tokenExpiresAt = null;
+      signer.receiptToken = null;
+      signer.receiptExpiresAt = null;
     }
 
     request.completedAt = null;
@@ -955,6 +1054,8 @@ async function applySignature(request, signer, payload, req, signedVia, signedBy
   signer.userAgent = String(req.headers["user-agent"] || "").slice(0, 400);
   signer.token = null;
   signer.tokenExpiresAt = null;
+  signer.receiptToken = SignatureRequest.generateToken();
+  signer.receiptExpiresAt = SignatureRequest.receiptExpiry();
   signer.signatureId = signer.signatureId || SignatureRequest.generateSignatureId();
 
   const previousStatus = request.status;
@@ -1259,6 +1360,11 @@ export async function signWithToken(req, res) {
       signedAt: signer.signedAt,
       requestStatus: request.status,
       location: serializeSigner(signer).location,
+      receiptToken: signer.receiptToken,
+      receiptExpiresAt: signer.receiptExpiresAt,
+      signedPdfAvailable: !!request.signedPdf?.buffer,
+      signatureId: signer.signatureId,
+      envelopeId: request.envelopeId || "",
     });
   } catch (error) {
     if (error.statusCode === 400) return badRequest(res, error.message);
@@ -1341,6 +1447,8 @@ export async function resetSigner(req, res) {
     signer.viewedAt = null;
     signer.token = null;
     signer.tokenExpiresAt = null;
+    signer.receiptToken = null;
+    signer.receiptExpiresAt = null;
 
     request.updatedBy = actor;
     request.recordEvent(SIGNATURE_EVENT.SIGNER_UPDATED, {

@@ -38,6 +38,10 @@ export const SIGNATURE_TOKEN_TTL_DAYS = Number(
   process.env.SIGNATURE_TOKEN_TTL_DAYS || 30
 );
 
+export const SIGNATURE_RECEIPT_TTL_MINUTES = Number(
+  process.env.SIGNATURE_RECEIPT_TTL_MINUTES || 60
+);
+
 export const SIGNATURE_EVENT = {
   CREATED: "created",
   SIGNER_ADDED: "signer_added",
@@ -115,6 +119,8 @@ const SignerSchema = new mongoose.Schema(
 
     token: { type: String, default: null },
     tokenExpiresAt: { type: Date, default: null },
+    receiptToken: { type: String, default: null },
+    receiptExpiresAt: { type: Date, default: null },
     invitedAt: { type: Date, default: null },
     invitedBy: { type: String, default: null },
     inviteCount: { type: Number, default: 0 },
@@ -211,6 +217,7 @@ const SignatureRequestSchema = new mongoose.Schema(
 );
 
 SignatureRequestSchema.index({ "signers.token": 1 });
+SignatureRequestSchema.index({ "signers.receiptToken": 1 });
 SignatureRequestSchema.index({ status: 1, updatedAt: -1 });
 
 SignatureRequestSchema.statics.generateToken = function () {
@@ -240,6 +247,15 @@ SignatureRequestSchema.statics.tokenExpiry = function () {
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + SIGNATURE_TOKEN_TTL_DAYS);
   return expiry;
+};
+
+SignatureRequestSchema.statics.receiptExpiry = function () {
+  return new Date(Date.now() + SIGNATURE_RECEIPT_TTL_MINUTES * 60000);
+};
+
+SignatureRequestSchema.statics.findByReceiptToken = async function (token) {
+  if (!token) return null;
+  return await this.findOne({ "signers.receiptToken": token });
 };
 
 SignatureRequestSchema.statics.findByToken = async function (token) {

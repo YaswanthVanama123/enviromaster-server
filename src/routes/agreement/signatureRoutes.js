@@ -19,6 +19,8 @@ import {
   downloadSignedPdf,
   regenerateSignedPdf,
   downloadPublicSignedPdf,
+  downloadReceiptSignedPdf,
+  getReceiptContext,
   getPublicSigningContext,
   downloadPublicPdf,
   signWithToken,
@@ -26,6 +28,9 @@ import {
 } from "../../controllers/agreement/signatureController.js";
 
 const router = Router();
+
+router.get("/public/receipt/:receipt", getReceiptContext);
+router.get("/public/receipt/:receipt/signed-pdf", downloadReceiptSignedPdf);
 
 router.get("/public/:token", getPublicSigningContext);
 router.get("/public/:token/pdf", downloadPublicPdf);
